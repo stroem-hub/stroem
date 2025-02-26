@@ -1,0 +1,10 @@
+[package]
+name = "workflow-engine"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+members = ["server"] #, "worker", "executor"]
+
+[dependencies]
+workflow-server = { path = "./server" }

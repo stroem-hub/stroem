@@ -1,0 +1,96 @@
+actions:
+  allunite.test:
+    type: cmd
+    path: run/last.sh
+    args: "--var ${inputs.varname}"
+
+    input:
+      varname:
+        type: "string"
+        default: ""
+        required: true
+        order: 0
+
+      varname2:
+        type: "int"
+        default: 0
+
+    output:
+      properties:
+        id:
+          type: int
+        valid:
+          type: boolean
+
+  allunite.two:
+    type: cmd
+    content: |
+      #!/bin/sh
+      
+      echo '{"test": "ggg"}'
+
+    input:
+      vvv:
+        type: string
+
+    output:
+      properties:
+        test:
+          type: string
+
+  core.mail:
+    type: cmd
+    content: |
+      #!/bin/sh
+      
+      echo '{"test": "ggg"}'
+
+    input:
+      vvv:
+        type: string
+
+    output:
+      properties:
+        test:
+          type: string
+
+
+tasks:
+  task1:
+    input:
+      field1:
+        type: string
+        default: 111
+
+    flow:
+      step1:
+        action: allunite.test
+        input:
+          varname: "test"
+        on_success: step2
+
+      step2:
+        action: allunite.two
+        input:
+          vvv: "${step1.output.id}"
+        on_fail: _exit
+        on_success: step3
+
+      step3:
+        action: core.mail
+        input:
+          value: "${step2.output.test}"
+
+triggers:
+  trigger01:
+    type: "cron"
+    cron: "10 5 * * *"
+    task: task1
+    input:
+      field1: "123"
+
+globals:
+  error_handler:
+    path: global/error_handler.sh
+    # input: path, job_id, error
+

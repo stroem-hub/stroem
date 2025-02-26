@@ -1,0 +1,7 @@
+triggers:
+  trigger02:
+    type: "cron"
+    cron: "10 15 * * *"
+    task: task1
+    input:
+      field1: "123"
