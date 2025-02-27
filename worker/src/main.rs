@@ -5,6 +5,8 @@ use tracing_subscriber;
 use tokio::time::{self, Duration};
 use reqwest::Client;
 use common::Job;
+use std::path::PathBuf;
+use std::env;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -35,11 +37,11 @@ async fn main() {
             }
             Ok(None) => {
                 debug!("No jobs available, waiting...");
-                time::sleep(Duration::from_millis(100)).await;
+                time::sleep(Duration::from_secs(2)).await;
             }
             Err(e) => {
                 error!("Error polling job: {}", e);
-                time::sleep(Duration::from_secs(1)).await;
+                time::sleep(Duration::from_secs(5)).await;
             }
         }
     }
@@ -66,10 +68,19 @@ async fn execute_job(job: &Job, server: &str) -> Result<(), String> {
     let uuid = job.uuid.as_ref().ok_or("Job missing UUID")?;
     info!("Executing job with UUID: {}", uuid);
 
-    let runner_path = "workflow-runner";
-    let mut cmd = tokio::process::Command::new(runner_path);
+    // Get the directory of the current executable (worker binary)
+    let worker_path = env::current_exe()
+        .map_err(|e| format!("Failed to get current executable path: {}", e))?;
+    let runner_path = worker_path.parent()
+        .unwrap_or_else(|| {
+            error!("Failed to get parent directory of worker binary");
+            std::process::exit(1);
+        })
+        .join("workflow-runner");
+
+    let mut cmd = tokio::process::Command::new(&runner_path);
     cmd.arg("--server").arg(server)
-        .arg("--job_id").arg(uuid);
+        .arg("--job-id").arg(uuid);
 
     if let Some(task) = &job.task {
         cmd.arg("--task").arg(task);
@@ -87,7 +98,7 @@ async fn execute_job(job: &Job, server: &str) -> Result<(), String> {
 
     let output = cmd.output()
         .await
-        .map_err(|e| format!("Failed to spawn runner: {}", e))?;
+        .map_err(|e| format!("Failed to spawn runner at {:?}: {}", runner_path, e))?;
 
     if output.status.success() {
         info!("Runner output: {}", String::from_utf8_lossy(&output.stdout));
