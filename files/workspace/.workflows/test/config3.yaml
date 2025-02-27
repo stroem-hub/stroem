@@ -1,7 +1,7 @@
 triggers:
   trigger03:
     type: "cron"
-    cron: "15 15 * * *"
+    cron: "*/5 * * * * *"
     task: task1
     input:
       field1: "123"
