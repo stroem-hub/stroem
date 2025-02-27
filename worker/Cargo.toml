@@ -1,10 +1,10 @@
-# common/Cargo.toml
 [package]
-name = "common"
+name = "workflow-worker"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+common = { path = "../common" }
 axum = { version = "0.8.1", features = ["macros"] }
 tokio = { version = "1.43", features = ["full"] }
 serde = { version = "1.0.218", features = ["derive"] }
@@ -21,3 +21,4 @@ anyhow = "1.0.96"
 tera = "1.20.0"
 cron = "0.15.0"
 chrono = "0.4.40"
+reqwest = { version = "0.12.12", features = ["json", "rustls-tls"] }

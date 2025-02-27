@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [workspace]
-members = ["common", "server"] #, "worker", "executor"]
+members = ["common", "server", "worker", "runner"]
 
 [dependencies]
 workflow-server = { path = "./server" }
