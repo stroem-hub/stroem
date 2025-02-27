@@ -1,5 +1,5 @@
-// server/src/queue.rs
-use crate::Job;
+// workflow-server/src/queue.rs
+use common::Job;
 use tokio::sync::mpsc::{self, Sender, Receiver};
 use std::sync::{Arc, Mutex};
 use tracing::{info, error, debug};
@@ -44,9 +44,5 @@ impl Queue {
                 Err("Queue sender disconnected".to_string())
             }
         }
-    }
-
-    pub fn sender(&self) -> Sender<Job> {
-        self.tx.clone()
     }
 }

@@ -1,6 +1,8 @@
-// server/src/scheduler.rs
-use crate::{Job, Queue};
-use crate::workspace::WorkspaceConfiguration;
+// workflow-server/src/scheduler.rs
+use crate::Queue;
+use common::Job;
+use common::workspace::{WorkspaceConfiguration, WorkspaceConfigurationTrait};
+use tokio::sync::mpsc::Sender;
 use tokio::sync::watch;
 use tracing::{info, error, debug};
 use cron::Schedule;
@@ -11,7 +13,7 @@ use chrono::{Utc, DateTime};
 
 pub struct Scheduler {
     schedules: Vec<(Schedule, Job, String, Option<DateTime<Utc>>, Option<DateTime<Utc>>)>,
-    queue: Queue, // Changed from tx: Sender<Job>
+    queue: Queue,
     task: Option<tokio::task::JoinHandle<()>>,
     cancel_tx: watch::Sender<bool>,
 }
@@ -38,7 +40,7 @@ impl Scheduler {
                                             }
                                             serde_json::Value::Object(map)
                                         }),
-                                    uuid: None, // UUID will be assigned by Queue::enqueue
+                                    uuid: None,
                                 };
                                 info!("Added trigger '{}' to scheduler: {}", trigger_name, cron_expr);
                                 schedules.push((schedule, job, trigger_name.clone(), None, None));
@@ -94,7 +96,7 @@ impl Scheduler {
                                 task: job.task.clone(),
                                 action: None,
                                 input: job.input.clone(),
-                                uuid: None, // UUID assigned by Queue::enqueue
+                                uuid: None,
                             };
                             if let Err(e) = queue.enqueue(job).await {
                                 error!("Failed to enqueue job for trigger '{}': {}", trigger_name, e);

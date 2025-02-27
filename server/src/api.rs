@@ -1,10 +1,10 @@
-// server/src/api.rs
+// workflow-server/src/api.rs
 use axum::{routing::{post, get}, Router, Json, response::IntoResponse, http::StatusCode, extract::State};
 use std::path::PathBuf;
 use tokio::net::TcpListener;
 use tracing::{info, error};
-use std::sync::Arc;
-use crate::{Job, Queue};
+use crate::Queue;
+use common::Job;
 use tar::Builder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
@@ -43,7 +43,7 @@ async fn enqueue_job(
     State(api): State<Api>,
     Json(job): Json<Job>,
 ) -> Result<String, String> {
-    api.queue.enqueue(job).await // Returns UUID
+    api.queue.enqueue(job).await
 }
 
 #[axum::debug_handler]

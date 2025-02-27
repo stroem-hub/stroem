@@ -1,11 +1,13 @@
-// server/src/workspace.rs
+// common/src/workspace.rs
 use std::path::PathBuf;
-use config::{Config, ConfigError, Value};
+use config::{Config, File, FileFormat};
 use globwalker::GlobWalkerBuilder;
 use serde::{Deserialize, Serialize};
+use serde_json::{Value, Map};
 use std::collections::HashMap;
 use anyhow::Error;
 use tracing::debug;
+use tera::Tera;
 
 pub trait WorkspaceConfigurationTrait {
     fn reread(&mut self) -> Result<(), Error>;
@@ -28,8 +30,8 @@ pub struct Action {
     pub description: Option<String>,
     #[serde(rename = "type")]
     pub action_type: String,
-    pub path: Option<String>,          // Made optional
-    pub content: Option<String>,       // Added to support inline scripts
+    pub path: Option<String>,
+    pub content: Option<String>,
     pub args: Option<String>,
     pub input: Option<HashMap<String, InputField>>,
     pub output: Option<OutputSpec>,
@@ -42,7 +44,7 @@ pub struct InputField {
     pub required: Option<bool>,
     pub default: Option<Value>,
     pub description: Option<String>,
-    pub order: Option<i32>,           // Added to support 'order' field
+    pub order: Option<i32>,
 }
 
 #[derive(Debug, Deserialize)]

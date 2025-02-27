@@ -1,27 +1,18 @@
-// server/src/main.rs
+// workflow-server/src/main.rs
 use clap::Parser;
 use tracing::{info, error, Level};
 use tracing_subscriber;
 use tokio::signal;
 use std::path::PathBuf;
 
-mod workspace;
 mod scheduler;
 mod queue;
 mod api;
 
-use workspace::WorkspaceConfigurationTrait;
+use common::Job;
+use common::workspace::{WorkspaceConfiguration, WorkspaceConfigurationTrait};
 use scheduler::Scheduler;
 use queue::Queue;
-use serde::{Serialize, Deserialize};
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Job {
-    task: Option<String>,
-    action: Option<String>,
-    input: Option<serde_json::Value>,
-    uuid: Option<String>,
-}
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -49,7 +40,7 @@ async fn main() {
     std::fs::create_dir_all(workspace.join("logs")).unwrap();
 
     let workflows_path = workspace.join(".workflows");
-    let mut workspace_config = workspace::WorkspaceConfiguration::new(
+    let mut workspace_config = WorkspaceConfiguration::new(
         workflows_path.to_str().unwrap()
     );
     if let Err(e) = workspace_config.reread() {
@@ -62,7 +53,7 @@ async fn main() {
     let queue = Queue::new(100);
 
     // Create Scheduler
-    let mut scheduler = Scheduler::new(queue.clone(), &workspace_config); // Pass Queue instead of Sender
+    let mut scheduler = Scheduler::new(queue.clone(), &workspace_config);
     scheduler.run().await;
 
     // Create Api
