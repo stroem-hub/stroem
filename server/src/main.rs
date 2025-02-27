@@ -4,7 +4,6 @@ use tracing::{info, error, Level};
 use tracing_subscriber;
 use tokio::signal;
 use std::path::PathBuf;
-use serde::{Serialize, Deserialize};
 
 mod workspace;
 mod scheduler;
@@ -14,12 +13,14 @@ mod api;
 use workspace::WorkspaceConfigurationTrait;
 use scheduler::Scheduler;
 use queue::Queue;
-use api::Api;
+use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Job {
-    task: String,
-    input: serde_json::Value,
+    task: Option<String>,
+    action: Option<String>,
+    input: Option<serde_json::Value>,
+    uuid: Option<String>,
 }
 
 #[derive(Parser, Debug)]
@@ -61,17 +62,18 @@ async fn main() {
     let queue = Queue::new(100);
 
     // Create Scheduler
-    let mut scheduler = Scheduler::new(&queue.sender(), &workspace_config);
-    scheduler.run().await; // Call run directly, no extra spawn
+    let mut scheduler = Scheduler::new(queue.clone(), &workspace_config); // Pass Queue instead of Sender
+    scheduler.run().await;
 
     // Create Api
-    let api_obj = api::Api::new(queue.clone(), workspace.clone());
+    let server = api::Api::new(queue.clone(), workspace.clone());
     tokio::spawn(async move {
-        api::run(api_obj, "0.0.0.0:8080").await;
+        api::run(server, "0.0.0.0:8080").await;
     });
+
     // Empty loop with graceful shutdown
     info!("Server running, waiting for shutdown signal...");
     signal::ctrl_c().await.expect("Failed to listen for shutdown signal");
     info!("Received shutdown signal, shutting down gracefully...");
-    scheduler.stop().await; // Ensure scheduler stops on shutdown
+    scheduler.stop().await;
 }

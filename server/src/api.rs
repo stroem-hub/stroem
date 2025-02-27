@@ -43,8 +43,7 @@ async fn enqueue_job(
     State(api): State<Api>,
     Json(job): Json<Job>,
 ) -> Result<String, String> {
-    api.queue.enqueue(job).await?;
-    Ok("Job enqueued".to_string())
+    api.queue.enqueue(job).await // Returns UUID
 }
 
 #[axum::debug_handler]
