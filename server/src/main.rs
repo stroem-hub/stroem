@@ -17,8 +17,9 @@ use globwalker::GlobWalkerBuilder;
 
 mod workspace;
 mod scheduler;
+
+use scheduler::Scheduler;
 use workspace::WorkspaceConfigurationTrait;
-use scheduler::scheduler;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct Job {
@@ -64,11 +65,9 @@ async fn main() {
     let addr = "0.0.0.0:8080";
     let (tx, rx) = mpsc::channel::<Job>(100);
     let rx = Arc::new(Mutex::new(rx));
-    let tx_for_scheduler = tx.clone();
 
-    tokio::spawn(async move {
-        scheduler(tx_for_scheduler, workspace_config).await;
-    });
+    let mut scheduler = Scheduler::new(&tx, &workspace_config);
+    scheduler.run().await;
 
     let app = Router::new()
         .route("/jobs", post(enqueue_job))
