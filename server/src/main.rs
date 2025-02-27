@@ -65,9 +65,9 @@ async fn main() {
     scheduler.run().await; // Call run directly, no extra spawn
 
     // Create Api
-    let api = Api::new(queue.clone(), workspace.clone());
+    let api_obj = api::Api::new(queue.clone(), workspace.clone());
     tokio::spawn(async move {
-        api::run(api, "0.0.0.0:8080").await;
+        api::run(api_obj, "0.0.0.0:8080").await;
     });
     // Empty loop with graceful shutdown
     info!("Server running, waiting for shutdown signal...");
