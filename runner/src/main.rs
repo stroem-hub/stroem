@@ -27,6 +27,8 @@ struct Args {
     action: Option<String>,  // Action name (optional, mutually exclusive with task)
     #[arg(long)]
     input: Option<String>,   // JSON input string (optional)
+    #[arg(long, required = true)]
+    worker_id: String,       // Worker ID passed from worker
 }
 
 #[tokio::main]
@@ -37,7 +39,7 @@ async fn main() {
         .with_max_level(log_level)
         .init();
 
-    info!("Runner started for job_id: {}", args.job_id);
+    info!("Runner started for job_id: {}, worker_id: {}", args.job_id, args.worker_id);
 
     // Parse input if provided
     let input: Option<Value> = args.input.as_ref()
@@ -69,10 +71,9 @@ async fn main() {
     // Execute the job
     match (args.task, args.action) {
         (Some(task), None) => {
-            info!("Running task: {} with job_id: {}", task, args.job_id);
+            info!("Running task: {} with job_id: {}, worker_id: {}", task, args.job_id, args.worker_id);
             if let Some(tasks) = &workspace_config.workflow_data.tasks {
                 if let Some(task_def) = tasks.get(&task) {
-                    // Placeholder: Log task execution (expand later with flow steps)
                     info!("Task definition: {:?}", task_def);
                     println!("Task {} executed successfully with input: {:?}", task, input);
                 } else {
@@ -85,7 +86,7 @@ async fn main() {
             }
         }
         (None, Some(action)) => {
-            info!("Running action: {} with job_id: {}", action, args.job_id);
+            info!("Running action: {} with job_id: {}, worker_id: {}", action, args.job_id, args.worker_id);
             if let Some(actions) = &workspace_config.workflow_data.actions {
                 if let Some(action_def) = actions.get(&action) {
                     let input_str = input.as_ref().map_or(String::new(), |v| v.to_string());

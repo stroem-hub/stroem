@@ -11,11 +11,31 @@ use flate2::Compression;
 use globwalker::GlobWalkerBuilder;
 use std::fs::File;
 use std::io::{Write, Cursor};
+use serde::{Deserialize, Serialize};
+use chrono::{DateTime, Utc};
 
 #[derive(Clone)]
 pub struct Api {
     pub queue: Queue,
     pub workspace: PathBuf,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct JobResult {
+    worker_id: String,
+    job_id: String,
+    exit_status: i32,
+    logs: String,
+    start_datetime: DateTime<Utc>,
+    end_datetime: DateTime<Utc>,
+    #[serde(default)]
+    task: Option<String>,      // Optional for case 3
+    #[serde(default)]
+    action: Option<String>,    // Optional for case 3
+    #[serde(default)]
+    input: Option<serde_json::Value>,  // Optional for case 3
+    #[serde(default)]
+    output: Option<serde_json::Value>, // Optional for case 3
 }
 
 impl Api {
@@ -28,6 +48,7 @@ pub async fn run(api: Api, addr: &str) {
     let app = Router::new()
         .route("/jobs", post(enqueue_job))
         .route("/jobs/next", get(get_next_job))
+        .route("/jobs/results", post(post_job_result))  // Updated endpoint
         .route("/files/workflows.tar.gz", get(serve_workspace_tarball))
         .with_state(api);
 
@@ -54,6 +75,32 @@ async fn get_next_job(
         Ok(job) => Ok(Json(job)),
         Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, e)),
     }
+}
+
+#[axum::debug_handler]
+async fn post_job_result(
+    State(_api): State<Api>,
+    Json(result): Json<JobResult>,
+) -> Result<(), (StatusCode, String)> {
+    info!(
+        "Received job result: worker_id={}, job_id={}, status={}, logs={}, start={}, end={}{}",
+        result.worker_id,
+        result.job_id,
+        if result.exit_status == 0 { "success" } else { "failed" },
+        result.logs,
+        result.start_datetime,
+        result.end_datetime,
+        if result.task.is_some() || result.action.is_some() {
+            format!(
+                ", task={:?}, action={:?}, input={:?}, output={:?}",
+                result.task, result.action, result.input, result.output
+            )
+        } else {
+            String::new()
+        }
+    );
+    // TODO: Store result (e.g., file, database)
+    Ok(())
 }
 
 #[axum::debug_handler]
