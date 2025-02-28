@@ -3,6 +3,13 @@ pub mod workspace;
 // common/src/lib.rs
 use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
+use tokio::io::{AsyncWriteExt, BufReader};
+use tokio::io::AsyncBufReadExt;
+use tokio::process::{Command};
+use std::process::{ExitStatus, Stdio};
+use anyhow::Error;
+use tokio::select;
+use tracing::{error, info};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Job {
@@ -36,4 +43,63 @@ pub struct JobResult {
     pub input: Option<serde_json::Value>,
     #[serde(default)]
     pub output: Option<serde_json::Value>,
+}
+
+
+pub async fn run(cmd: &str, args: Option<Vec<String>>) -> Result<(Vec<LogEntry>, ExitStatus), Error> {
+    let mut child= Command::new(cmd);
+    if let Some(args) = args {
+        child.args(args);
+    }
+    let mut child = child.stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+
+    let stdout = child.stdout.take().unwrap();
+    let stderr = child.stderr.take().unwrap();
+
+    let mut log_entries: Vec<LogEntry> = Vec::new();
+    let mut stdout_lines = BufReader::new(stdout).lines();
+    let mut stderr_lines = BufReader::new(stderr).lines();
+    let mut stdout_done = false;
+    let mut stderr_done = false;
+
+    loop {
+        if stdout_done && stderr_done {
+            break;
+        }
+        select! {
+            line = stdout_lines.next_line(), if !stdout_done => match line {
+                Ok(Some(line)) => {
+                    log_entries.push(LogEntry {
+                        timestamp: Utc::now(),
+                        is_stderr: false,
+                        message: line,
+                    });
+                }
+                Ok(None) => stdout_done = true,
+                Err(e) => {
+                    error!("Error reading stdout: {}", e);
+                    stdout_done = true; // Continue with stderr on error
+                }
+            },
+            line = stderr_lines.next_line(), if !stderr_done => match line {
+                Ok(Some(line)) => {
+                    log_entries.push(LogEntry {
+                        timestamp: Utc::now(),
+                        is_stderr: true,
+                        message: line,
+                    });
+                }
+                Ok(None) => stderr_done = true,
+                Err(e) => {
+                    error!("Error reading stderr: {}", e);
+                    stderr_done = true; // Continue with stdout on error
+                }
+            },
+        }
+    }
+
+    let status = child.wait().await?;
+    Ok((log_entries, status))
 }
