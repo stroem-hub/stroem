@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use tokio::net::TcpListener;
 use tracing::{info, error};
 use crate::Queue;
-use common::Job;
+use common::{Job, LogEntry, JobResult};
 use tar::Builder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
@@ -20,23 +20,6 @@ pub struct Api {
     pub workspace: PathBuf,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct JobResult {
-    worker_id: String,
-    job_id: String,
-    exit_status: i32,
-    logs: String,
-    start_datetime: DateTime<Utc>,
-    end_datetime: DateTime<Utc>,
-    #[serde(default)]
-    task: Option<String>,      // Optional for case 3
-    #[serde(default)]
-    action: Option<String>,    // Optional for case 3
-    #[serde(default)]
-    input: Option<serde_json::Value>,  // Optional for case 3
-    #[serde(default)]
-    output: Option<serde_json::Value>, // Optional for case 3
-}
 
 impl Api {
     pub fn new(queue: Queue, workspace: PathBuf) -> Self {
@@ -48,7 +31,7 @@ pub async fn run(api: Api, addr: &str) {
     let app = Router::new()
         .route("/jobs", post(enqueue_job))
         .route("/jobs/next", get(get_next_job))
-        .route("/jobs/results", post(post_job_result))  // Updated endpoint
+        .route("/jobs/results", post(post_job_result))
         .route("/files/workflows.tar.gz", get(serve_workspace_tarball))
         .with_state(api);
 
@@ -83,11 +66,10 @@ async fn post_job_result(
     Json(result): Json<JobResult>,
 ) -> Result<(), (StatusCode, String)> {
     info!(
-        "Received job result: worker_id={}, job_id={}, status={}, logs={}, start={}, end={}{}",
+        "Received job result: worker_id={}, job_id={}, status={}, start={}, end={}{}",
         result.worker_id,
         result.job_id,
         if result.exit_status == 0 { "success" } else { "failed" },
-        result.logs,
         result.start_datetime,
         result.end_datetime,
         if result.task.is_some() || result.action.is_some() {
@@ -99,6 +81,14 @@ async fn post_job_result(
             String::new()
         }
     );
+    for log in &result.logs {
+        info!(
+            "Log [{}]{}: {}",
+            log.timestamp,
+            if log.is_stderr { " (stderr)" } else { "" },
+            log.message
+        );
+    }
     // TODO: Store result (e.g., file, database)
     Ok(())
 }

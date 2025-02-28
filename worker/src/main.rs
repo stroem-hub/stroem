@@ -4,11 +4,11 @@ use tracing::{info, error, debug};
 use tracing_subscriber;
 use tokio::time::{self, Duration};
 use reqwest::Client;
-use common::Job;
+use common::{Job, LogEntry};
 use std::path::PathBuf;
 use std::env;
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
+use chrono::{Utc, DateTime};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -106,27 +106,51 @@ async fn execute_job(client: &Client, job: &Job, server: &str, worker_id: &str) 
         .map_err(|e| {
             let error_msg = format!("Failed to spawn runner at {:?}: {}", runner_path, e);
             let end_time = Utc::now();
-            // Use -1 as exit status since no process ran
-            let _ = send_result(client, server, uuid, worker_id, -1, &error_msg, start_time, end_time);
+            let logs = vec![LogEntry {
+                timestamp: Utc::now(),
+                is_stderr: true,
+                message: error_msg.clone(),
+            }];
+            let _ = send_result(client, server, uuid, worker_id, -1, &logs, start_time, end_time);
             error_msg
         })?;
 
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    let stdout_lines: Vec<LogEntry> = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .map(|line| LogEntry {
+            timestamp: Utc::now(),
+            is_stderr: false,
+            message: line.to_string(),
+        })
+        .collect();
+
+    let stderr_lines: Vec<LogEntry> = String::from_utf8_lossy(&output.stderr)
+        .lines()
+        .map(|line| LogEntry {
+            timestamp: Utc::now(),
+            is_stderr: true,
+            message: line.to_string(),
+        })
+        .collect();
+
+    let mut logs = Vec::new();
+    logs.extend(stdout_lines);
+    logs.extend(stderr_lines);
+
     let end_time = Utc::now();
 
     if output.status.success() {
-        info!("Runner output: {}", stdout);
-        send_result(client, server, uuid, worker_id, output.status.code().unwrap_or(0), &stdout, start_time, end_time).await?;
+        info!("Runner completed successfully");
+        send_result(client, server, uuid, worker_id, output.status.code().unwrap_or(0), &logs, start_time, end_time).await?;
         Ok(())
     } else {
-        let error_msg = format!("Runner failed: {}", stderr);
-        send_result(client, server, uuid, worker_id, output.status.code().unwrap_or(-1), &error_msg, start_time, end_time).await?;
+        let error_msg = "Runner failed".to_string();
+        send_result(client, server, uuid, worker_id, output.status.code().unwrap_or(-1), &logs, start_time, end_time).await?;
         Err(error_msg)
     }
 }
 
-async fn send_result(client: &Client, server: &str, job_id: &str, worker_id: &str, exit_status: i32, logs: &str, start_time: DateTime<Utc>, end_time: DateTime<Utc>) -> Result<(), String> {
+async fn send_result(client: &Client, server: &str, job_id: &str, worker_id: &str, exit_status: i32, logs: &[LogEntry], start_time: DateTime<Utc>, end_time: DateTime<Utc>) -> Result<(), String> {
     let url = format!("{}/jobs/results", server);
     let body = serde_json::json!({
         "worker_id": worker_id,
