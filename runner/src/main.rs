@@ -145,7 +145,7 @@ async fn main() {
         output,
     };
 
-    send_result(&client, &args.server, &result).await.unwrap_or_else(|e| {
+    common::send_result(&client, &args.server, &result).await.unwrap_or_else(|e| {
         error!("Failed to send result: {}", e);
         std::process::exit(1);
     });
@@ -261,14 +261,4 @@ async fn execute_action(action: &Action, _input: &Option<Value>) -> (Vec<LogEntr
         .map(|log| Value::String(log.message.clone()));
 
     (logs, status, output)
-}
-
-async fn send_result(client: &Client, server: &str, result: &JobResult) -> Result<(), String> {
-    let url = format!("{}/jobs/results", server);
-    client.post(&url)
-        .json(result)
-        .send()
-        .await
-        .map_err(|e| format!("Failed to send result: {}", e))?;
-    Ok(())
 }

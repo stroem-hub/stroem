@@ -7,6 +7,7 @@ use tokio::process::{Command};
 use std::process::Stdio;
 use tokio::select;
 use tracing::{error, info};
+use reqwest::Client;
 
 pub mod workspace;
 
@@ -157,4 +158,14 @@ pub async fn run(cmd: &str, args: Option<Vec<String>>) -> (Vec<LogEntry>, bool) 
     };
 
     (log_entries, status)
+}
+
+pub async fn send_result(client: &Client, server: &str, result: &JobResult) -> Result<(), String> {
+    let url = format!("{}/jobs/results", server);
+    client.post(&url)
+        .json(result)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to send result: {}", e))?;
+    Ok(())
 }

@@ -1,23 +1,43 @@
-use std::env;
 // workflow-worker/src/runner_local.rs
-use tokio::process::Command;
-use std::path::PathBuf;
-use std::process::ExitStatus;
-use common::{run, Job};
+use std::env;
+use common::{run, Job, LogEntry};
 use chrono::Utc;
 use tracing::{info, error};
 
-pub async fn start(job: &Job, server: &str, worker_id: &str) -> Result<(Vec<common::LogEntry>, bool), String> {
-    let worker_path = env::current_exe()
-        .map_err(|e| format!("Failed to get current executable path: {}", e))?;
-    let runner_path = worker_path.parent()
-        .unwrap_or_else(|| {
+pub async fn start(job: &Job, server: &str, worker_id: &str) -> (Vec<LogEntry>, bool) {
+    let worker_path = match env::current_exe() {
+        Ok(path) => path,
+        Err(e) => {
+            error!("Failed to get current executable path: {}", e);
+            return (vec![LogEntry {
+                timestamp: Utc::now(),
+                is_stderr: true,
+                message: format!("Failed to get current executable path: {}", e),
+            }], false);
+        }
+    };
+    let runner_path = match worker_path.parent() {
+        Some(path) => path.join("workflow-runner"),
+        None => {
             error!("Failed to get parent directory of worker binary");
-            std::process::exit(1);
-        })
-        .join("workflow-runner");
+            return (vec![LogEntry {
+                timestamp: Utc::now(),
+                is_stderr: true,
+                message: "Failed to get parent directory of worker binary".to_string(),
+            }], false);
+        }
+    };
 
-    let uuid = job.uuid.as_ref().ok_or("Job missing UUID")?;
+    let uuid = match job.uuid.as_ref() {
+        Some(uuid) => uuid,
+        None => {
+            return (vec![LogEntry {
+                timestamp: Utc::now(),
+                is_stderr: true,
+                message: "Job missing UUID".to_string(),
+            }], false);
+        }
+    };
     info!("Starting runner for job with UUID: {}", uuid);
 
     let mut runner_args = vec![
@@ -33,15 +53,29 @@ pub async fn start(job: &Job, server: &str, worker_id: &str) -> Result<(Vec<comm
         runner_args.push("--action".to_string());
         runner_args.push(action.clone());
     } else {
-        return Err("Job must specify either task or action".to_string());
+        return (vec![LogEntry {
+            timestamp: Utc::now(),
+            is_stderr: true,
+            message: "Job must specify either task or action".to_string(),
+        }], false);
     }
 
     if let Some(input) = &job.input {
-        let input_str = serde_json::to_string(input)
-            .map_err(|e| format!("Failed to serialize input: {}", e))?;
-        runner_args.push("--input".to_string());
-        runner_args.push(input_str);
+        match serde_json::to_string(input) {
+            Ok(input_str) => {
+                runner_args.push("--input".to_string());
+                runner_args.push(input_str);
+            }
+            Err(e) => {
+                return (vec![LogEntry {
+                    timestamp: Utc::now(),
+                    is_stderr: true,
+                    message: format!("Failed to serialize input: {}", e),
+                }], false);
+            }
+        }
     }
 
-    Ok(run(runner_path.to_str().unwrap(), Some(runner_args)).await)
+    let (logs, success) = run(runner_path.to_str().unwrap(), Some(runner_args)).await;
+    (logs, success)
 }

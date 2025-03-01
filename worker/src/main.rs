@@ -4,7 +4,7 @@ use tracing::{info, error, debug};
 use tracing_subscriber;
 use tokio::time::{self, Duration};
 use reqwest::Client;
-use common::Job;
+use common::{Job, JobResult};
 use std::env;
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
@@ -75,47 +75,32 @@ async fn execute_job(client: &Client, job: &Job, server: &str, worker_id: &str) 
     let uuid = job.uuid.as_ref().ok_or("Job missing UUID")?;
     let start_time = Utc::now();
 
-    let (log_entries, status) = runner_local::start(job, server, worker_id)
-        .await
-        .map_err(|e| {
-            let end_time = Utc::now();
-            let logs = vec![common::LogEntry {
-                timestamp: Utc::now(),
-                is_stderr: true,
-                message: e.clone(),
-            }];
-            let _ = send_result(client, server, uuid, worker_id, false, &logs, start_time, end_time);
-            e
-        })?;
-
+    let (log_entries, status) = runner_local::start(job, server, worker_id).await;
     let end_time = Utc::now();
+
+    let result = JobResult {
+            worker_id: worker_id.to_string(),
+            job_id: uuid.to_string(),
+            exit_success: status,
+            logs: log_entries,
+            start_datetime: start_time,
+            end_datetime: end_time,
+            task: job.task.clone(),
+            action: job.action.clone(),
+            input: job.input.clone(),
+            output: None
+    };
+
+    common::send_result(client, server, &result).await
+        .map_err(|e| {
+            error!("Failed to send result for job {}: {}", uuid, e);
+            e
+    })?;
 
     if status {
         info!("Runner completed successfully");
-        send_result(client, server, uuid, worker_id, status, &log_entries, start_time, end_time).await?;
         Ok(())
     } else {
-        let error_msg = "Runner failed".to_string();
-        send_result(client, server, uuid, worker_id, status, &log_entries, start_time, end_time).await?;
-        Err(error_msg)
+        Err("Runner failed".to_string())
     }
-}
-
-async fn send_result(client: &Client, server: &str, job_id: &str, worker_id: &str, exit_success: bool, logs: &[common::LogEntry], start_time: DateTime<Utc>, end_time: DateTime<Utc>) -> Result<(), String> {
-    let url = format!("{}/jobs/results", server);
-    let body = serde_json::json!({
-        "worker_id": worker_id,
-        "job_id": job_id,
-        "exit_success": exit_success,
-        "logs": logs,
-        "start_datetime": start_time,
-        "end_datetime": end_time
-    });
-
-    client.post(&url)
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| format!("Failed to send result: {}", e))?;
-    Ok(())
 }
