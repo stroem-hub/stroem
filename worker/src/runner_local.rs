@@ -43,11 +43,5 @@ pub async fn start(job: &Job, server: &str, worker_id: &str) -> Result<(Vec<comm
         runner_args.push(input_str);
     }
 
-    run(runner_path.to_str().unwrap(), Some(runner_args))
-        .await
-        .map_err(|e| {
-            let error_msg = format!("Failed to run runner at {:?}: {}", runner_path, e);
-            error!("{}", error_msg);
-            error_msg
-        })
+    Ok(run(runner_path.to_str().unwrap(), Some(runner_args)).await)
 }

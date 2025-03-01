@@ -203,7 +203,7 @@ async fn execute_task(flow: &HashMap<String, common::workspace::FlowStep>, confi
         }
     }
     pending.extend(incoming.iter()
-        .filter(|(_, count)| **count == 0)  // Fixed reference pattern
+        .filter(|(_, count)| **count == 0)
         .map(|(step, _)| step.clone()));
 
     while let Some(step_name) = pending.pop() {
@@ -253,15 +253,7 @@ async fn execute_action(action: &Action, _input: &Option<Value>) -> (Vec<LogEntr
     let default_cmd = format!("echo Simulated SSH: {}", action.action_type);
     let cmd = action.content.as_ref()
         .unwrap_or(&default_cmd);
-    let (logs, status) = run("sh", Some(vec!["-c".to_string(), cmd.to_string()])).await
-        .unwrap_or_else(|e| {
-            error!("Failed to run action '{}': {}", action.action_type, e);
-            (vec![LogEntry {
-                timestamp: Utc::now(),
-                is_stderr: true,
-                message: e.to_string(),
-            }], false)
-        });
+    let (logs, status) = run("sh", Some(vec!["-c".to_string(), cmd.to_string()])).await;
 
     let output = logs.iter()
         .filter(|log| !log.is_stderr)

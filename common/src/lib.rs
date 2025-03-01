@@ -5,9 +5,8 @@ use tokio::io::{AsyncWriteExt, BufReader};
 use tokio::io::AsyncBufReadExt;
 use tokio::process::{Command};
 use std::process::Stdio;
-use anyhow::Error;
 use tokio::select;
-use tracing::error;
+use tracing::{error, info};
 
 pub mod workspace;
 
@@ -44,17 +43,50 @@ pub struct JobResult {
     pub output: Option<serde_json::Value>,
 }
 
-pub async fn run(cmd: &str, args: Option<Vec<String>>) -> Result<(Vec<LogEntry>, bool), Error> {
+pub async fn run(cmd: &str, args: Option<Vec<String>>) -> (Vec<LogEntry>, bool) {
     let mut child = Command::new(cmd);
     if let Some(args) = args {
         child.args(args);
     }
-    let mut child = child.stdout(Stdio::piped())
+    let mut child = match child.stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .spawn()?;
+        .spawn() {
+        Ok(child) => child,
+        Err(e) => {
+            let msg = format!("Failed to spawn command '{}': {}", cmd, e);
+            error!(msg);
+            return (vec![LogEntry {
+                timestamp: Utc::now(),
+                is_stderr: true,
+                message: msg,
+            }], false);
+        }
+    };
 
-    let stdout = child.stdout.take().unwrap();
-    let stderr = child.stderr.take().unwrap();
+    let stdout = match child.stdout.take() {
+        Some(stdout) => stdout,
+        None => {
+            let msg = format!("Failed to capture stdout for '{}'", cmd);
+            error!(msg);
+            return (vec![LogEntry {
+                timestamp: Utc::now(),
+                is_stderr: true,
+                message: msg,
+            }], false);
+        }
+    };
+    let stderr = match child.stderr.take() {
+        Some(stderr) => stderr,
+        None => {
+            let msg = format!("Failed to capture stderr for '{}'", cmd);
+            error!(msg);
+            return (vec![LogEntry {
+                timestamp: Utc::now(),
+                is_stderr: true,
+                message: msg,
+            }], false);
+        }
+    };
 
     let mut log_entries: Vec<LogEntry> = Vec::new();
     let mut stdout_lines = BufReader::new(stdout).lines();
@@ -77,7 +109,13 @@ pub async fn run(cmd: &str, args: Option<Vec<String>>) -> Result<(Vec<LogEntry>,
                 }
                 Ok(None) => stdout_done = true,
                 Err(e) => {
-                    error!("Error reading stdout: {}", e);
+                    let msg = format!("Error reading stdout: {}", e);
+                    error!(msg);
+                    log_entries.push(LogEntry {
+                        timestamp: Utc::now(),
+                        is_stderr: true,
+                        message: msg,
+                    });
                     stdout_done = true;
                 }
             },
@@ -91,13 +129,32 @@ pub async fn run(cmd: &str, args: Option<Vec<String>>) -> Result<(Vec<LogEntry>,
                 }
                 Ok(None) => stderr_done = true,
                 Err(e) => {
-                    error!("Error reading stderr: {}", e);
+                    let msg = format!("Error reading stderr: {}", e);
+                    error!(msg);
+                    log_entries.push(LogEntry {
+                        timestamp: Utc::now(),
+                        is_stderr: true,
+                        message: msg,
+                    });
                     stderr_done = true;
                 }
             },
         }
     }
 
-    let status = child.wait().await?;
-    Ok((log_entries, status.success()))  // Return bool based on success
+    let status = match child.wait().await {
+        Ok(status) => status.success(),
+        Err(e) => {
+            let msg = format!("Failed to wait for command '{}': {}", cmd, e);
+            error!(msg);
+            log_entries.push(LogEntry {
+                timestamp: Utc::now(),
+                is_stderr: true,
+                message: msg,
+            });
+            false
+        }
+    };
+
+    (log_entries, status)
 }
