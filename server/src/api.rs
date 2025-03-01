@@ -69,7 +69,7 @@ async fn post_job_result(
         "Received job result: worker_id={}, job_id={}, status={}, start={}, end={}{}",
         result.worker_id,
         result.job_id,
-        if result.exit_status == 0 { "success" } else { "failed" },
+        if result.exit_success { "success" } else { "failed" },
         result.start_datetime,
         result.end_datetime,
         if result.task.is_some() || result.action.is_some() {

@@ -1,15 +1,15 @@
-pub mod workspace;
-
 // common/src/lib.rs
 use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
 use tokio::io::{AsyncWriteExt, BufReader};
 use tokio::io::AsyncBufReadExt;
 use tokio::process::{Command};
-use std::process::{ExitStatus, Stdio};
+use std::process::Stdio;
 use anyhow::Error;
 use tokio::select;
-use tracing::{error, info};
+use tracing::error;
+
+pub mod workspace;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Job {
@@ -26,12 +26,11 @@ pub struct LogEntry {
     pub message: String,
 }
 
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct JobResult {
     pub worker_id: String,
     pub job_id: String,
-    pub exit_status: i32,
+    pub exit_success: bool,
     pub logs: Vec<LogEntry>,
     pub start_datetime: DateTime<Utc>,
     pub end_datetime: DateTime<Utc>,
@@ -45,9 +44,8 @@ pub struct JobResult {
     pub output: Option<serde_json::Value>,
 }
 
-
-pub async fn run(cmd: &str, args: Option<Vec<String>>) -> Result<(Vec<LogEntry>, ExitStatus), Error> {
-    let mut child= Command::new(cmd);
+pub async fn run(cmd: &str, args: Option<Vec<String>>) -> Result<(Vec<LogEntry>, bool), Error> {
+    let mut child = Command::new(cmd);
     if let Some(args) = args {
         child.args(args);
     }
@@ -80,7 +78,7 @@ pub async fn run(cmd: &str, args: Option<Vec<String>>) -> Result<(Vec<LogEntry>,
                 Ok(None) => stdout_done = true,
                 Err(e) => {
                     error!("Error reading stdout: {}", e);
-                    stdout_done = true; // Continue with stderr on error
+                    stdout_done = true;
                 }
             },
             line = stderr_lines.next_line(), if !stderr_done => match line {
@@ -94,12 +92,12 @@ pub async fn run(cmd: &str, args: Option<Vec<String>>) -> Result<(Vec<LogEntry>,
                 Ok(None) => stderr_done = true,
                 Err(e) => {
                     error!("Error reading stderr: {}", e);
-                    stderr_done = true; // Continue with stdout on error
+                    stderr_done = true;
                 }
             },
         }
     }
 
     let status = child.wait().await?;
-    Ok((log_entries, status))
+    Ok((log_entries, status.success()))  // Return bool based on success
 }
