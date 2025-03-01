@@ -9,6 +9,8 @@ use std::env;
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
 use std::path::PathBuf;
+use std::sync::Arc;
+use tokio::sync::Semaphore;
 mod runner_local;
 
 #[derive(Parser, Debug)]
@@ -18,6 +20,8 @@ struct Args {
     server: String,
     #[arg(short, long)]
     verbose: bool,
+    #[arg(long, default_value = "5")]
+    max_runners: usize,
 }
 
 #[tokio::main]
@@ -30,24 +34,40 @@ async fn main() {
 
     let client = Client::new();
     let worker_id = Uuid::new_v4().to_string();
-    info!("Worker started with ID: {}, polling jobs from {}", worker_id, args.server);
+    info!("Worker started with ID: {}, polling jobs from {}, max runners: {}", worker_id, args.server, args.max_runners);
 
-
+    let semaphore = Arc::new(Semaphore::new(args.max_runners));
 
     loop {
+        let permit = match semaphore.clone().acquire_owned().await {
+            Ok(permit) => permit,
+            Err(e) => {
+                error!("Semaphore acquire failed: {}", e);
+                time::sleep(Duration::from_secs(5)).await;
+                continue;
+            }
+        };
+
         match poll_job(&client, &args.server, &worker_id).await {
             Ok(Some(job)) => {
-                match execute_job(&client, &job, &args.server, &worker_id).await {
-                    Ok(_) => info!("Job {} executed successfully", job.uuid.as_ref().unwrap_or(&"unknown".to_string())),
-                    Err(e) => error!("Failed to execute job {:?}: {}", job, e),
-                }
+                let client_clone = client.clone();
+                let server = args.server.clone();
+                let worker_id_clone = worker_id.clone();
+                tokio::spawn(async move {
+                    let _permit = permit;  // Hold the permit until this task completes
+                    if let Err(e) = execute_job(&client_clone, &job, &server, &worker_id_clone).await {
+                        error!("Failed to execute job {:?}: {}", job, e);
+                    }
+                });
             }
             Ok(None) => {
                 debug!("No jobs available, waiting...");
+                drop(permit);  // Release the permit if no job is available
                 time::sleep(Duration::from_secs(2)).await;
             }
             Err(e) => {
                 error!("Error polling job: {}", e);
+                drop(permit);  // Release the permit on error
                 time::sleep(Duration::from_secs(5)).await;
             }
         }
