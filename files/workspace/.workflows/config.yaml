@@ -27,7 +27,7 @@ actions:
     content: |
       #!/bin/sh
       
-      echo '{"test": "ggg"}'
+      echo 'OUTPUT: {"test": "ggg"}'
 
     input:
       vvv:
@@ -43,7 +43,7 @@ actions:
     content: |
       #!/bin/sh
       
-      echo '{"test": "ggg"}'
+      echo 'OUTPUT: {"test": "ggg"}'
 
     input:
       vvv:

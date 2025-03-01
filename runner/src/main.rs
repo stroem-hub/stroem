@@ -11,6 +11,7 @@ use chrono::Utc;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use common::{run, JobResult, LogEntry};
+use tera::Tera;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -249,16 +250,52 @@ async fn execute_task(flow: &HashMap<String, common::workspace::FlowStep>, confi
     (logs, success, task_output)
 }
 
-async fn execute_action(action: &Action, _input: &Option<Value>) -> (Vec<LogEntry>, bool, Option<Value>) {
+async fn execute_action(action: &Action, input: &Option<Value>) -> (Vec<LogEntry>, bool, Option<Value>) {
     let default_cmd = format!("echo Simulated SSH: {}", action.action_type);
-    let cmd = action.content.as_ref()
+    let cmd_template = action.content.as_ref()
         .unwrap_or(&default_cmd);
-    let (logs, status) = run("sh", Some(vec!["-c".to_string(), cmd.to_string()])).await;
 
-    let output = logs.iter()
-        .filter(|log| !log.is_stderr)
-        .last()
-        .map(|log| Value::String(log.message.clone()));
+    let mut tera = Tera::default();
+    tera.add_raw_template("cmd", cmd_template).unwrap_or_else(|e| {
+        error!("Failed to add command template: {}", e);
+    });
+
+    let mut context = tera::Context::new();
+    if let Some(input_value) = input {
+        context.insert("input", input_value);
+    }
+
+    let cmd = match tera.render("cmd", &context) {
+        Ok(rendered) => rendered,
+        Err(e) => {
+            let errmsg = format!("Failed to render command template: {}", e);
+            error!(errmsg);
+            return (vec![LogEntry {
+                timestamp: Utc::now(),
+                is_stderr: true,
+                message: errmsg,
+            }], false, None);
+        }
+    };
+
+    let (logs, status) = run("sh", Some(vec!["-c".to_string(), cmd])).await;
+
+    let mut output_lines = Vec::new();
+    for log in logs.iter().filter(|log| !log.is_stderr && log.message.starts_with("OUTPUT:")) {
+        output_lines.push(log.message.strip_prefix("OUTPUT:").unwrap().trim());
+    }
+    let output = if output_lines.is_empty() {
+        None
+    } else {
+        let joined_output = output_lines.join("\n");
+        match serde_json::from_str(&joined_output) {
+            Ok(json) => Some(json),
+            Err(e) => {
+                error!("Failed to parse OUTPUT as JSON: {}", e);
+                Some(Value::String(joined_output))
+            }
+        }
+    };
 
     (logs, status, output)
 }
