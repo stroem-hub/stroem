@@ -12,7 +12,7 @@ use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use common::{run, JobResult, LogEntry};
 use tera::Tera;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::fs::{self, File};
 use std::io::{self, Write, Read};
 
@@ -65,7 +65,7 @@ async fn main() {
         std::process::exit(1);
     });
 
-    let mut workspace_config = WorkspaceConfiguration::new(&args.workspace_dir);
+    let mut workspace_config = WorkspaceConfiguration::new(PathBuf::from(&args.workspace_dir));
     workspace_config.reread().unwrap_or_else(|e| {
         error!("Failed to read workspace config: {}", e);
         std::process::exit(1);

@@ -41,7 +41,7 @@ async fn main() {
 
     let workflows_path = workspace.join(".workflows");
     let mut workspace_config = WorkspaceConfiguration::new(
-        workflows_path.to_str().unwrap()
+        PathBuf::from(workflows_path.to_str().unwrap())
     );
     if let Err(e) = workspace_config.reread() {
         error!("Failed to load workspace configurations: {}", e);

@@ -1,13 +1,20 @@
 // common/src/workspace.rs
 use std::path::PathBuf;
-use config::{Config, File, FileFormat};
+use config::{Config, FileFormat};
 use globwalker::GlobWalkerBuilder;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, Map};
 use std::collections::HashMap;
-use anyhow::Error;
-use tracing::debug;
+use std::fs;
+use anyhow::{bail, Error};
+use tracing::{debug, error, info};
 use tera::Tera;
+use blake2::{Blake2b512, Blake2s256, Digest};
+use tar::{Builder, Archive};
+use std::fs::{File};
+use std::io::Write;
+use flate2::write::GzEncoder;
+use flate2::Compression;
 
 pub trait WorkspaceConfigurationTrait {
     fn reread(&mut self) -> Result<(), Error>;
@@ -99,7 +106,7 @@ pub struct WorkspaceConfiguration {
 }
 
 impl WorkspaceConfiguration {
-    pub fn new(path: &str) -> Self {
+    pub fn new(path: PathBuf) -> Self {
         Self {
             path: PathBuf::from(path),
             config: Config::default(),
@@ -135,4 +142,102 @@ impl WorkspaceConfigurationTrait for WorkspaceConfiguration {
 
         Ok(())
     }
+}
+
+pub struct Workspace {
+    pub path: PathBuf,
+    pub config: Option<WorkspaceConfiguration>,
+    pub revision: Option<String>,
+}
+
+impl Workspace {
+    pub fn new(path: &str) -> Self {
+        fs::create_dir_all(path).unwrap_or_default();
+        let path = PathBuf::from(path);
+        let mut s = Self {
+            path,
+            config: None,
+            revision: None,
+        };
+        s.read_config().unwrap_or(Default::default());
+        s
+    }
+    pub fn read_config(&mut self) -> Result<(), Error> {
+        let workflows_path = self.path.join(".workflows");
+        if !workflows_path.exists() {
+            bail!("Workspace configuration not found");
+        }
+        let mut config = WorkspaceConfiguration::new(workflows_path);
+        config.reread()?;
+        info!("Loaded workspace configurations: {:?}", &config);
+        Ok(())
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.path.read_dir().map(|mut i| i.next().is_none()).unwrap_or(false)
+    }
+
+    pub fn get_revision(&mut self) -> String {
+        let mut hasher = Blake2b512::new();
+
+        let walker = GlobWalkerBuilder::from_patterns(&self.path, &["**/*"])
+            .max_depth(10)
+            .follow_links(true)
+            .build()
+            .unwrap();
+
+        let mut entries: Vec<_> = walker.into_iter().filter_map(Result::ok).collect();
+        entries.sort_by(|a, b| a.path().cmp(b.path())); // Ensure deterministic order
+
+        for entry in entries {
+            let path = entry.path();
+            if path.is_file() {
+                let relative_path = path.strip_prefix(&self.path).unwrap().to_string_lossy();
+                hasher.update(relative_path.as_bytes());
+
+                match fs::read(path) {
+                    Ok(contents) => hasher.update(&contents),
+                    Err(e) => {
+                        error!("Failed to read file {}: {}", path.display(), e);
+                        hasher.update(format!("error:{}", e).as_bytes()); // Include error in hash
+                    }
+                }
+            }
+        }
+
+        let revision = format!("{:x}", hasher.finalize());
+        self.revision = Some(revision.clone());
+        revision
+    }
+
+    pub fn build_tarball(&mut self) -> Vec<u8> {
+        let mut tarball = Vec::new();
+        let mut builder = Builder::new(&mut tarball);
+
+        let walker = GlobWalkerBuilder::from_patterns(&self.path, &["**/*"])
+            .max_depth(10)
+            .follow_links(true)
+            .build()
+            .unwrap();
+
+        for entry in walker.into_iter().filter_map(Result::ok) {
+            let file_path = entry.path();
+            if file_path.is_file() {
+                let relative_path = file_path.strip_prefix(&self.path).unwrap();
+                let mut file = File::open(file_path).unwrap();
+                builder.append_file(relative_path, &mut file).unwrap();
+            }
+        }
+
+        builder.finish().unwrap();
+        drop(builder); // Explicitly drop builder to release mutable borrow
+
+        let mut gzipped = Vec::new();
+        let mut encoder = GzEncoder::new(&mut gzipped, Compression::default());
+        encoder.write_all(&tarball).unwrap();
+        encoder.finish().unwrap();
+
+        gzipped
+    }
+
 }
