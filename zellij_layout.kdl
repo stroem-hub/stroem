@@ -1,0 +1,13 @@
+layout {
+    pane split_direction="vertical" {
+        pane command="./target/debug/workflow-server" {
+            args "-v" "--workspace" "/Users/ala/workspace/personal/workflow-engine/files/workspace"
+        }
+        pane split_direction="horizontal" {
+            pane command="./target/debug/workflow-worker" {
+                args "--server" "http://localhost:8080" "--verbose"
+            }
+            pane // Empty pane for curl
+        }
+    }
+}
