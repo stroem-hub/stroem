@@ -108,7 +108,8 @@ async fn execute_job(client: &Client, job: &Job, server: &str, worker_id: &str) 
             task: job.task.clone(),
             action: job.action.clone(),
             input: job.input.clone(),
-            output: None
+            output: None,
+            revision: None,
     };
 
     common::send_result(client, server, &result).await

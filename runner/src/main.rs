@@ -12,6 +12,9 @@ use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use common::{run, JobResult, LogEntry};
 use tera::Tera;
+use std::path::Path;
+use std::fs::{self, File};
+use std::io::{self, Write, Read};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -30,6 +33,8 @@ struct Args {
     input: Option<String>,
     #[arg(long, required = true)]
     worker_id: String,
+    #[arg(long, default_value = "/tmp/workspace")]
+    workspace_dir: String,
 }
 
 #[tokio::main]
@@ -55,12 +60,12 @@ async fn main() {
             std::process::exit(1);
         });
 
-    fetch_and_unpack_workspace(&args.server, cache_dir.path()).await.unwrap_or_else(|e| {
+    let revision = fetch_and_unpack_workspace(&args.server, &args.workspace_dir).await.unwrap_or_else(|e| {
         error!("Failed to fetch and unpack workspace: {}", e);
         std::process::exit(1);
     });
 
-    let mut workspace_config = WorkspaceConfiguration::new(cache_dir.path().to_str().unwrap());
+    let mut workspace_config = WorkspaceConfiguration::new(&args.workspace_dir);
     workspace_config.reread().unwrap_or_else(|e| {
         error!("Failed to read workspace config: {}", e);
         std::process::exit(1);
@@ -144,6 +149,7 @@ async fn main() {
         action: args.action,
         input,
         output,
+        revision: Some(revision),
     };
 
     common::send_result(&client, &args.server, &result).await.unwrap_or_else(|e| {
@@ -152,9 +158,45 @@ async fn main() {
     });
 }
 
-async fn fetch_and_unpack_workspace(server: &str, dest_dir: &std::path::Path) -> Result<(), String> {
+async fn fetch_and_unpack_workspace(server: &str, workspace_dir: &String) -> Result<String, String> {
     let client = Client::new();
-    let url = format!("{}/files/workflows.tar.gz", server);
+    let url = format!("{}/files/workspace.tar.gz", server);
+
+    // Check revision with HEAD request
+    let head_response = client.head(&url)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to fetch workspace revision: {}", e))?;
+
+    if !head_response.status().is_success() {
+        return Err(format!("Server returned error on HEAD request: {}", head_response.status()));
+    }
+
+    let revision = head_response.headers()
+        .get("X-Revision")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| "unknown".to_string());
+
+    let rev_file = format!("{}.rev", workspace_dir);
+    let should_download = if Path::new(&rev_file).exists() {
+        let mut current_rev = String::new();
+        File::open(&rev_file)
+            .and_then(|mut f| f.read_to_string(&mut current_rev))
+            .map(|_| current_rev.trim() != revision)
+            .unwrap_or(true)
+    } else {
+        true
+    };
+
+    if !should_download {
+        info!("Workspace already up-to-date with revision {}", revision);
+        return Ok(revision);
+    }
+
+    fs::create_dir_all(workspace_dir)
+        .map_err(|e| format!("Failed to create workspace dir: {}", e))?;
+
     let response = client.get(&url)
         .send()
         .await
@@ -163,17 +205,20 @@ async fn fetch_and_unpack_workspace(server: &str, dest_dir: &std::path::Path) ->
     if !response.status().is_success() {
         return Err(format!("Server returned error: {}", response.status()));
     }
-
     let tar_gz = response.bytes()
         .await
         .map_err(|e| format!("Failed to read tarball bytes: {}", e))?;
     let tar = GzDecoder::new(&tar_gz[..]);
     let mut archive = Archive::new(tar);
-    archive.unpack(dest_dir)
-        .map_err(|e| format!("Failed to unpack workspace tar: {}", e))?;
+    archive.unpack(workspace_dir)
+        .map_err(|e| format!("Failed to unpack workspace tar to {:?}: {}", workspace_dir, e))?;
 
-    info!("Workspace tarball unpacked to {:?}", dest_dir);
-    Ok(())
+    File::create(&rev_file)
+        .and_then(|mut f| f.write_all(revision.as_bytes()))
+        .map_err(|e| format!("Failed to write revision file {}: {}", rev_file, e))?;
+
+    info!("Workspace tarball unpacked to {:?} with revision {}", workspace_dir, revision);
+    Ok(revision)
 }
 
 async fn execute_task(flow: &HashMap<String, common::workspace::FlowStep>, config: &WorkspaceConfiguration, input: &Option<Value>) -> (Vec<LogEntry>, bool, Option<Value>) {

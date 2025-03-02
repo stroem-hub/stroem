@@ -42,6 +42,8 @@ pub struct JobResult {
     pub input: Option<serde_json::Value>,
     #[serde(default)]
     pub output: Option<serde_json::Value>,
+    #[serde(default)]
+    pub revision: Option<String>,  // New field
 }
 
 pub async fn run(cmd: &str, args: Option<Vec<String>>) -> (Vec<LogEntry>, bool) {

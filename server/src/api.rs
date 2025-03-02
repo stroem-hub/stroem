@@ -14,6 +14,8 @@ use std::io::{Write, Cursor};
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 
+use sha2::{Sha256, Digest};
+
 #[derive(Clone)]
 pub struct Api {
     pub queue: Queue,
@@ -32,7 +34,7 @@ pub async fn run(api: Api, addr: &str) {
         .route("/jobs", post(enqueue_job))
         .route("/jobs/next", get(get_next_job))
         .route("/jobs/results", post(post_job_result))
-        .route("/files/workflows.tar.gz", get(serve_workspace_tarball))
+        .route("/files/workspace.tar.gz", get(serve_workspace_tarball))
         .with_state(api);
 
     let listener = TcpListener::bind(addr).await.unwrap();
@@ -132,12 +134,20 @@ async fn serve_workspace_tarball(
     encoder.finish()
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to finish gzip: {}", e)))?;
 
+    let mut hasher = Sha256::new();
+    hasher.update(&gzipped);
+    let digest = hasher.finalize();
+    let revision = format!("{:x}", digest);
+
+    let headers = [
+        ("Content-Type", "application/gzip".to_string()),
+        ("Content-Disposition", "attachment; filename=\"workspace.tar.gz\"".to_string()),
+        ("X-Revision", revision.to_string()),
+    ];
+
     Ok((
         StatusCode::OK,
-        [
-            ("Content-Type", "application/gzip"),
-            ("Content-Disposition", "attachment; filename=\"workspace.tar.gz\""),
-        ],
+        headers,
         gzipped,
     ))
 }

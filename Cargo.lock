@@ -2959,6 +2959,7 @@ dependencies = [
  "globwalker",
  "serde",
  "serde_json",
+ "sha2",
  "tar",
  "tera",
  "tokio",
