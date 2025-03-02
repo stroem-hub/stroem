@@ -25,6 +25,9 @@ impl Scheduler {
         let mut schedules: Vec<(Schedule, Job, String, Option<DateTime<Utc>>, Option<DateTime<Utc>>)> = Vec::new();
         if let Some(triggers) = &config.workflow_data.triggers {
             for (trigger_name, trigger) in triggers.iter() {
+                if !trigger.enabled.unwrap_or(true) {
+                    continue;
+                }
                 if trigger.trigger_type == "cron" {
                     if let Some(cron_expr) = &trigger.cron {
                         match Schedule::from_str(cron_expr) {

@@ -1,5 +1,5 @@
 actions:
-  allunite.test:
+  allunite.ddd:
     type: cmd
     path: run/last.sh
     args: "--var ${inputs.varname}"
@@ -22,12 +22,9 @@ actions:
         valid:
           type: boolean
 
-  allunite.two:
+  allunite.action1:
     type: cmd
-    content: |
-      #!/bin/sh
-      
-      echo 'OUTPUT: {"test": "ggg"}'
+    cmd: "echo \"A1 Input: {{ input.vvv }}\" && echo 'OUTPUT:{\"result\": \"action1 output\"}'"
 
     input:
       vvv:
@@ -35,7 +32,20 @@ actions:
 
     output:
       properties:
-        test:
+        result:
+          type: string
+
+  allunite.action2:
+    type: cmd
+    cmd: "echo \"A2 Input: {{ input.vvv }}\" && echo 'OUTPUT:{\"result\": \"action2 output\"}'"
+
+    input:
+      vvv:
+        type: string
+
+    output:
+      properties:
+        result:
           type: string
 
   core.mail:
@@ -64,30 +74,25 @@ tasks:
 
     flow:
       step1:
-        action: allunite.test
+        action: allunite.action1
         input:
-          varname: "test"
+          vvv: "test - {{ input.field1 }}"
         on_success: step2
 
       step2:
-        action: allunite.two
+        action: allunite.action2
         input:
-          vvv: "${step1.output.id}"
-        on_fail: _exit
-        on_success: step3
+          vvv: "{{ step1.output.result }}"
 
-      step3:
-        action: core.mail
-        input:
-          value: "${step2.output.test}"
 
 triggers:
   trigger01:
+    enabled: false
     type: "cron"
-    cron: "0 10 5 * * *"
+    cron: "*/5 * * * * *"
     task: task1
     input:
-      field1: "123"
+      vvv: "123"
 
 globals:
   error_handler:

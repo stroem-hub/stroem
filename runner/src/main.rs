@@ -1,6 +1,6 @@
 // workflow-runner/src/main.rs
 use clap::Parser;
-use tracing::{info, error};
+use tracing::{info, error, debug};
 use tracing_subscriber;
 use common::workspace::{WorkspaceConfiguration, WorkspaceConfigurationTrait, Action};
 use reqwest::Client;
@@ -183,6 +183,7 @@ async fn execute_task(flow: &HashMap<String, common::workspace::FlowStep>, confi
     let mut pending = Vec::new();
     let mut success = true;
     let mut task_output = None;
+    let mut step_outputs: HashMap<String, Value> = HashMap::new();
 
     let mut graph: HashMap<String, Vec<String>> = HashMap::new();
     for (step_name, step) in flow {
@@ -207,6 +208,8 @@ async fn execute_task(flow: &HashMap<String, common::workspace::FlowStep>, confi
         .filter(|(_, count)| **count == 0)
         .map(|(step, _)| step.clone()));
 
+    debug!("Task input: {:?}", input);
+
     while let Some(step_name) = pending.pop() {
         if visited.contains(&step_name) {
             continue;
@@ -226,10 +229,54 @@ async fn execute_task(flow: &HashMap<String, common::workspace::FlowStep>, confi
             info!("Executing step: {}", step_name);
             let action = &step.action;
             if let Some(actions) = &config.workflow_data.actions {
-                let (mut step_logs, step_success, step_output) = execute_action(actions.get(action).unwrap(), input).await;
+
+                let mut tera = Tera::default();
+                let mut context = tera::Context::new();
+
+                // Add task inputs to context
+                if let Some(input_value) = input {
+                    context.insert("input", input_value);
+                }
+                // Add previous steps outputs
+                for (prev_step, output) in &step_outputs {
+                    let step_obj = serde_json::json!({"output": output});
+                    context.insert(prev_step, &step_obj);
+                }
+                debug!("Step input: {:?}", &step.input);
+                let step_input = if let Some(step_input) = &step.input {
+                    let mut rendered_input = HashMap::new();
+                    for (key, field) in step_input {
+                        debug!("Step input field: {}", key);
+                        let template_name = format!("{}.{}", step_name, key);
+                        tera.add_raw_template(&template_name, &field)
+                            .unwrap_or_else(|e| error!("Failed to add template for {}: {}", key, e));
+                        match tera.render(&template_name, &context) {
+                            Ok(value) => {
+                                rendered_input.insert(key.clone(), Value::String(value));
+                            }
+                            Err(e) => {
+                                error!("Failed to render step {}: {}", key, e);
+                                logs.push(LogEntry {
+                                    timestamp: Utc::now(),
+                                    is_stderr: true,
+                                    message: format!("Failed to render input '{}': {}", key, e),
+                                });
+                                success = false;
+                            }
+                        }
+                    }
+                    Some(Value::Object(rendered_input.into_iter().collect()))
+                } else {
+                    input.clone()
+                };
+
+                let (mut step_logs, step_success, step_output) = execute_action(actions.get(action).unwrap(), &step_input).await;
                 logs.append(&mut step_logs);
-                task_output = step_output;
+                task_output = step_output.clone();
                 if step_success {
+                    if let Some(output_value) = step_output {
+                        step_outputs.insert(step_name.clone(), output_value);
+                    }
                     if let Some(next) = &step.on_success {
                         pending.push(next.clone());
                     }
@@ -252,7 +299,7 @@ async fn execute_task(flow: &HashMap<String, common::workspace::FlowStep>, confi
 
 async fn execute_action(action: &Action, input: &Option<Value>) -> (Vec<LogEntry>, bool, Option<Value>) {
     let default_cmd = format!("echo Simulated SSH: {}", action.action_type);
-    let cmd_template = action.content.as_ref()
+    let cmd_template = action.cmd.as_ref()
         .unwrap_or(&default_cmd);
 
     let mut tera = Tera::default();
@@ -264,6 +311,9 @@ async fn execute_action(action: &Action, input: &Option<Value>) -> (Vec<LogEntry
     if let Some(input_value) = input {
         context.insert("input", input_value);
     }
+
+    debug!("Input: {:?}", input);
+    debug!("cmd template: {:?}", cmd_template);
 
     let cmd = match tera.render("cmd", &context) {
         Ok(rendered) => rendered,
@@ -278,12 +328,17 @@ async fn execute_action(action: &Action, input: &Option<Value>) -> (Vec<LogEntry
         }
     };
 
+
+    debug!("Executing command: {}", cmd);
+
+
     let (logs, status) = run("sh", Some(vec!["-c".to_string(), cmd])).await;
 
     let mut output_lines = Vec::new();
     for log in logs.iter().filter(|log| !log.is_stderr && log.message.starts_with("OUTPUT:")) {
         output_lines.push(log.message.strip_prefix("OUTPUT:").unwrap().trim());
     }
+    debug!("Output: {:?}", output_lines);
     let output = if output_lines.is_empty() {
         None
     } else {

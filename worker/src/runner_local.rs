@@ -44,6 +44,7 @@ pub async fn start(job: &Job, server: &str, worker_id: &str) -> (Vec<LogEntry>, 
         "--server".to_string(), server.to_string(),
         "--job-id".to_string(), uuid.to_string(),
         "--worker-id".to_string(), worker_id.to_string(),
+        "--verbose".to_string(),
     ];
 
     if let Some(task) = &job.task {

@@ -1,7 +1,8 @@
 triggers:
   trigger03:
+    enabled: false
     type: "cron"
-    cron: "*/5 * * * * *"
+    cron: "*/5 5 5 5 * *"
     task: task1
     input:
       field1: "123"

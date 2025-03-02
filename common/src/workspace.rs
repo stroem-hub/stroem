@@ -30,7 +30,7 @@ pub struct Action {
     pub description: Option<String>,
     #[serde(rename = "type")]
     pub action_type: String,
-    pub path: Option<String>,
+    pub cmd: Option<String>,
     pub content: Option<String>,
     pub args: Option<String>,
     pub input: Option<HashMap<String, InputField>>,
@@ -80,6 +80,7 @@ pub struct Trigger {
     pub cron: Option<String>,
     pub task: String,
     pub input: Option<HashMap<String, String>>,
+    pub enabled: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
