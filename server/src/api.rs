@@ -14,7 +14,6 @@ use std::io::{Write, Cursor};
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 
-use sha2::{Sha256, Digest};
 use common::workspace::Workspace;
 
 #[derive(Clone)]
@@ -106,11 +105,6 @@ async fn serve_workspace_tarball(
 
     let revision = api.workspace.get_revision()
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to calculate rev: {}", e)))?;
-
-    let mut hasher = Sha256::new();
-    hasher.update(&gzipped);
-    let digest = hasher.finalize();
-    let revision = format!("{:x}", digest);
 
     let headers = [
         ("Content-Type", "application/gzip".to_string()),

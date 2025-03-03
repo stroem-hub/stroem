@@ -17,6 +17,7 @@ use flate2::write::GzEncoder;
 use flate2::Compression;
 use flate2::read::GzDecoder;
 use reqwest::Client;
+use fs2::FileExt;
 
 pub trait WorkspaceConfigurationTrait {
     fn reread(&mut self) -> Result<(), Error>;
@@ -287,6 +288,33 @@ impl Workspace {
             return Ok(revision);
         }
 
+        // Use file lock to ensure exclusive access across processes
+        let lock_file = PathBuf::from(format!("{}.lock", self.path.to_string_lossy()));
+        fs::create_dir_all(&self.path)
+            .map_err(|e| anyhow!("Failed to create workspace dir: {}", e))?;
+        let lock = File::create(&lock_file)
+            .map_err(|e| anyhow!("Failed to create lock file {}: {}", lock_file.display(), e))?;
+        lock.lock_exclusive()
+            .map_err(|e| anyhow!("Failed to acquire lock on {}: {}", lock_file.display(), e))?;
+
+        // Re-check after locking to avoid race conditions
+        let should_download = if Path::new(&rev_file).exists() {
+            let mut current_rev = String::new();
+            File::open(&rev_file)
+                .and_then(|mut f| f.read_to_string(&mut current_rev))
+                .map(|_| current_rev.trim() != revision)
+                .unwrap_or(true)
+        } else {
+            true
+        };
+
+        if !should_download {
+            info!("Workspace already up-to-date with revision {} after lock", revision);
+            fs2::FileExt::unlock(&lock)
+                .map_err(|e| anyhow!("Failed to release lock on {}: {}", lock_file.display(), e))?;
+            return Ok(revision);
+        }
+
         fs::create_dir_all(&self.path)
             .map_err(|e| anyhow!("Failed to create workspace dir: {}", e))?;
 
@@ -309,6 +337,9 @@ impl Workspace {
         File::create(&rev_file)
             .and_then(|mut f| f.write_all(revision.as_bytes()))
             .map_err(|e| anyhow!("Failed to write revision file {}: {}", rev_file, e))?;
+
+        fs2::FileExt::unlock(&lock)
+            .map_err(|e| anyhow!("Failed to release lock on {}: {}", lock_file.display(), e))?;
 
         info!("Workspace tarball unpacked to {:?} with revision {}", &self.path, revision);
         Ok(revision)
