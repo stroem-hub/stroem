@@ -10,7 +10,7 @@ mod queue;
 mod api;
 
 use common::Job;
-use common::workspace::{WorkspaceConfiguration, WorkspaceConfigurationTrait};
+use common::workspace::{Workspace, WorkspaceConfiguration, WorkspaceConfigurationTrait};
 use scheduler::Scheduler;
 use queue::Queue;
 
@@ -31,33 +31,23 @@ async fn main() {
         .with_max_level(log_level)
         .init();
 
-    let workspace = PathBuf::from(&args.workspace);
-    if !workspace.exists() || !workspace.is_dir() {
+    let workspace_dir = PathBuf::from(&args.workspace);
+    if !workspace_dir.exists() || !workspace_dir.is_dir() {
         error!("Workspace path '{}' does not exist or is not a directory", args.workspace);
         return;
     }
-    std::fs::create_dir_all(workspace.join("results")).unwrap();
-    std::fs::create_dir_all(workspace.join("logs")).unwrap();
 
-    let workflows_path = workspace.join(".workflows");
-    let mut workspace_config = WorkspaceConfiguration::new(
-        PathBuf::from(workflows_path.to_str().unwrap())
-    );
-    if let Err(e) = workspace_config.reread() {
-        error!("Failed to load workspace configurations: {}", e);
-        return;
-    }
-    info!("Loaded workspace configurations: {:?}", workspace_config);
+    let workspace = Workspace::new(workspace_dir);
 
     // Create Queue
     let queue = Queue::new(100);
 
     // Create Scheduler
-    let mut scheduler = Scheduler::new(queue.clone(), &workspace_config);
+    let mut scheduler = Scheduler::new(queue.clone(), workspace.config.as_ref().unwrap());
     scheduler.run().await;
 
     // Create Api
-    let server = api::Api::new(queue.clone(), workspace.clone());
+    let server = api::Api::new(queue.clone(), workspace);
     tokio::spawn(async move {
         api::run(server, "0.0.0.0:8080").await;
     });

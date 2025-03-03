@@ -1,38 +1,40 @@
 // common/src/workspace.rs
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use config::{Config, FileFormat};
 use globwalker::GlobWalkerBuilder;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, Map};
 use std::collections::HashMap;
 use std::fs;
-use anyhow::{bail, Error};
+use anyhow::{anyhow, bail, Error};
 use tracing::{debug, error, info};
 use tera::Tera;
 use blake2::{Blake2b512, Blake2s256, Digest};
 use tar::{Builder, Archive};
 use std::fs::{File};
-use std::io::Write;
+use std::io::{Read, Write};
 use flate2::write::GzEncoder;
 use flate2::Compression;
+use flate2::read::GzDecoder;
+use reqwest::Client;
 
 pub trait WorkspaceConfigurationTrait {
     fn reread(&mut self) -> Result<(), Error>;
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Globals {
     pub base_path: Option<String>,
     pub error_handler: Option<ErrorHandler>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ErrorHandler {
     pub path: String,
     pub description: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Action {
     pub description: Option<String>,
     #[serde(rename = "type")]
@@ -44,7 +46,7 @@ pub struct Action {
     pub output: Option<OutputSpec>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct InputField {
     #[serde(rename = "type")]
     pub field_type: String,
@@ -54,25 +56,25 @@ pub struct InputField {
     pub order: Option<i32>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct OutputSpec {
     pub properties: HashMap<String, OutputProperty>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct OutputProperty {
     #[serde(rename = "type")]
     pub property_type: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Task {
     pub description: Option<String>,
     pub input: Option<HashMap<String, InputField>>,
     pub flow: HashMap<String, FlowStep>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct FlowStep {
     pub action: String,
     pub input: Option<HashMap<String, String>>,
@@ -80,7 +82,7 @@ pub struct FlowStep {
     pub on_fail: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Trigger {
     #[serde(rename = "type")]
     pub trigger_type: String,
@@ -90,7 +92,7 @@ pub struct Trigger {
     pub enabled: Option<bool>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct WorkflowData {
     pub globals: Option<Globals>,
     pub actions: Option<HashMap<String, Action>>,
@@ -98,7 +100,7 @@ pub struct WorkflowData {
     pub triggers: Option<HashMap<String, Trigger>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct WorkspaceConfiguration {
     path: PathBuf,
     config: Config,
@@ -118,10 +120,8 @@ impl WorkspaceConfiguration {
             },
         }
     }
-}
 
-impl WorkspaceConfigurationTrait for WorkspaceConfiguration {
-    fn reread(&mut self) -> Result<(), Error> {
+    pub fn reread(&mut self) -> Result<(), Error> {
         let gw = GlobWalkerBuilder::from_patterns(&self.path, &["*.yaml"])
             .max_depth(10)
             .follow_links(true)
@@ -142,8 +142,18 @@ impl WorkspaceConfigurationTrait for WorkspaceConfiguration {
 
         Ok(())
     }
+
+    pub fn get_action(&self, name: &str) -> Option<&Action> {
+        self.workflow_data.actions.as_ref()?.get(name)
+    }
+
+    pub fn get_task(&self, name: &str) -> Option<&Task> {
+        self.workflow_data.tasks.as_ref()?.get(name)
+    }
 }
 
+
+#[derive(Clone)]
 pub struct Workspace {
     pub path: PathBuf,
     pub config: Option<WorkspaceConfiguration>,
@@ -151,9 +161,8 @@ pub struct Workspace {
 }
 
 impl Workspace {
-    pub fn new(path: &str) -> Self {
-        fs::create_dir_all(path).unwrap_or_default();
-        let path = PathBuf::from(path);
+    pub fn new(path: PathBuf) -> Self {
+        fs::create_dir_all(&path).unwrap_or_default();
         let mut s = Self {
             path,
             config: None,
@@ -170,6 +179,8 @@ impl Workspace {
         let mut config = WorkspaceConfiguration::new(workflows_path);
         config.reread()?;
         info!("Loaded workspace configurations: {:?}", &config);
+        self.config = Some(config);
+
         Ok(())
     }
 
@@ -177,19 +188,25 @@ impl Workspace {
         self.path.read_dir().map(|mut i| i.next().is_none()).unwrap_or(false)
     }
 
-    pub fn get_revision(&mut self) -> String {
-        let mut hasher = Blake2b512::new();
-
+    fn walk_files(&self) -> Vec<globwalker::DirEntry> {
         let walker = GlobWalkerBuilder::from_patterns(&self.path, &["**/*"])
             .max_depth(10)
             .follow_links(true)
             .build()
             .unwrap();
-
         let mut entries: Vec<_> = walker.into_iter().filter_map(Result::ok).collect();
-        entries.sort_by(|a, b| a.path().cmp(b.path())); // Ensure deterministic order
+        entries.sort_by(|a, b| a.path().cmp(b.path()));
+        entries
+    }
 
-        for entry in entries {
+    pub fn get_revision(&mut self) -> Result<String, Error> {
+        if self.revision.is_some() {
+            return Ok(self.revision.clone().unwrap());
+        }
+
+        let mut hasher = Blake2b512::new();
+
+        for entry in self.walk_files() {
             let path = entry.path();
             if path.is_file() {
                 let relative_path = path.strip_prefix(&self.path).unwrap().to_string_lossy();
@@ -207,20 +224,14 @@ impl Workspace {
 
         let revision = format!("{:x}", hasher.finalize());
         self.revision = Some(revision.clone());
-        revision
+        Ok(revision)
     }
 
-    pub fn build_tarball(&mut self) -> Vec<u8> {
+    pub fn build_tarball(&mut self) -> Result<Vec<u8>, Error> {
         let mut tarball = Vec::new();
         let mut builder = Builder::new(&mut tarball);
 
-        let walker = GlobWalkerBuilder::from_patterns(&self.path, &["**/*"])
-            .max_depth(10)
-            .follow_links(true)
-            .build()
-            .unwrap();
-
-        for entry in walker.into_iter().filter_map(Result::ok) {
+        for entry in self.walk_files() {
             let file_path = entry.path();
             if file_path.is_file() {
                 let relative_path = file_path.strip_prefix(&self.path).unwrap();
@@ -234,10 +245,73 @@ impl Workspace {
 
         let mut gzipped = Vec::new();
         let mut encoder = GzEncoder::new(&mut gzipped, Compression::default());
-        encoder.write_all(&tarball).unwrap();
-        encoder.finish().unwrap();
+        encoder.write_all(&tarball)?;
+        encoder.finish()?;
 
-        gzipped
+        Ok(gzipped)
+    }
+
+    pub async fn sync(&mut self, server: &str) -> Result<String, Error> {
+        let client = Client::new();
+        let url = format!("{}/files/workspace.tar.gz", server);
+
+        // Check revision with HEAD request
+        let head_response = client.head(&url)
+            .send()
+            .await
+            .map_err(|e| anyhow!("Failed to fetch workspace revision: {}", e))?;
+
+        if !head_response.status().is_success() {
+            bail!("Server returned error on HEAD request: {}", head_response.status());
+        }
+
+        let revision = head_response.headers()
+            .get("X-Revision")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "unknown".to_string());
+
+        let rev_file = format!("{}.rev", self.path.to_string_lossy());
+        let should_download = if Path::new(&rev_file).exists() {
+            let mut current_rev = String::new();
+            File::open(&rev_file)
+                .and_then(|mut f| f.read_to_string(&mut current_rev))
+                .map(|_| current_rev.trim() != revision)
+                .unwrap_or(true)
+        } else {
+            true
+        };
+
+        if !should_download {
+            info!("Workspace already up-to-date with revision {}", revision);
+            return Ok(revision);
+        }
+
+        fs::create_dir_all(&self.path)
+            .map_err(|e| anyhow!("Failed to create workspace dir: {}", e))?;
+
+        let response = client.get(&url)
+            .send()
+            .await
+            .map_err(|e| anyhow!("Failed to fetch workspace tar: {}", e))?;
+
+        if !response.status().is_success() {
+            bail!("Server returned error: {}", response.status());
+        }
+        let tar_gz = response.bytes()
+            .await
+            .map_err(|e| anyhow!("Failed to read tarball bytes: {}", e))?;
+        let tar = GzDecoder::new(&tar_gz[..]);
+        let mut archive = Archive::new(tar);
+        archive.unpack(&self.path)
+            .map_err(|e| anyhow!("Failed to unpack workspace tar to {:?}: {}", &self.path, e))?;
+
+        File::create(&rev_file)
+            .and_then(|mut f| f.write_all(revision.as_bytes()))
+            .map_err(|e| anyhow!("Failed to write revision file {}: {}", rev_file, e))?;
+
+        info!("Workspace tarball unpacked to {:?} with revision {}", &self.path, revision);
+        Ok(revision)
     }
 
 }

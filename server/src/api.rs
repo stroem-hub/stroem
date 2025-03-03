@@ -15,16 +15,17 @@ use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 
 use sha2::{Sha256, Digest};
+use common::workspace::Workspace;
 
 #[derive(Clone)]
 pub struct Api {
     pub queue: Queue,
-    pub workspace: PathBuf,
+    pub workspace: Workspace,
 }
 
 
 impl Api {
-    pub fn new(queue: Queue, workspace: PathBuf) -> Self {
+    pub fn new(queue: Queue, workspace: Workspace) -> Self {
         Self { queue, workspace }
     }
 }
@@ -97,42 +98,14 @@ async fn post_job_result(
 
 #[axum::debug_handler]
 async fn serve_workspace_tarball(
-    State(api): State<Api>,
+    State(mut api): State<Api>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
-    let mut tarball = Vec::new();
-    let mut builder = Builder::new(&mut tarball);
 
-    let walker = GlobWalkerBuilder::from_patterns(&api.workspace, &["**/*"])
-        .max_depth(10)
-        .follow_links(true)
-        .build()
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to build walker: {}", e)))?;
+    let gzipped = api.workspace.build_tarball()
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to build tarball: {}", e)))?;
 
-    for entry in walker.into_iter().filter_map(Result::ok) {
-        let path = entry.path();
-        if path.is_file() {
-            let relative_path = path.strip_prefix(&api.workspace)
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to get relative path: {}", e)))?;
-            let mut file = File::open(path)
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to open file: {}", e)))?;
-            builder.append_file(
-                relative_path,
-                &mut file,
-            )
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to append file to tar: {}", e)))?;
-        }
-    }
-
-    builder.finish()
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to finish tar: {}", e)))?;
-    drop(builder);
-
-    let mut gzipped = Vec::new();
-    let mut encoder = GzEncoder::new(&mut gzipped, Compression::default());
-    encoder.write_all(&tarball)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to write to gzip: {}", e)))?;
-    encoder.finish()
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to finish gzip: {}", e)))?;
+    let revision = api.workspace.get_revision()
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to calculate rev: {}", e)))?;
 
     let mut hasher = Sha256::new();
     hasher.update(&gzipped);
