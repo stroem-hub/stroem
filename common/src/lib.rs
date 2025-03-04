@@ -1,3 +1,4 @@
+use std::path::Path;
 // common/src/lib.rs
 use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
@@ -46,7 +47,7 @@ pub struct JobResult {
     pub revision: Option<String>,  // New field
 }
 
-pub async fn run(cmd: &str, args: Option<Vec<String>>) -> (Vec<LogEntry>, bool) {
+pub async fn run(cmd: &str, args: Option<Vec<String>>, working_dir: Option<&Path>) -> (Vec<LogEntry>, bool) {
     let mut child = Command::new(cmd);
     if let Some(args) = args {
         child.args(args);

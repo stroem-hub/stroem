@@ -77,6 +77,6 @@ pub async fn start(job: &Job, server: &str, worker_id: &str) -> (Vec<LogEntry>, 
         }
     }
 
-    let (logs, success) = run(runner_path.to_str().unwrap(), Some(runner_args)).await;
+    let (logs, success) = run(runner_path.to_str().unwrap(), Some(runner_args), None).await;
     (logs, success)
 }
