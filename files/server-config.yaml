@@ -1,2 +1,6 @@
-results_folder: /Users/ala/workspace/personal/workflow-engine/files/results
-logs_folder: /Users/ala/workspace/personal/workflow-engine/files/logs
+db:
+  host:
+  port:
+  database:
+  username:
+  password:

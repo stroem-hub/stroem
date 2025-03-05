@@ -54,16 +54,9 @@ impl Runner {
         Runner { server, job_id, worker_id, task, action, input, workspace, workspace_revision, client: Client::new() }
     }
 
-    async fn sync_workspace(&mut self) -> String {
-        self.workspace.sync(&self.server).await.unwrap_or_else(|e| {
-            error!("Failed to get workspace: {}", e);
-            std::process::exit(1);
-        })
-    }
-
     async fn execute(&mut self) -> JobResult {
         let start_time = Utc::now();
-        let revision = self.sync_workspace().await;
+
         let mut all_logs = Vec::new();
         let mut output = None;
         let mut exit_success = true;
@@ -123,7 +116,7 @@ impl Runner {
             action: self.action.clone(),
             input: self.input.clone(),
             output,
-            revision: Some(revision),
+            revision: Some(self.workspace_revision.clone()),
         }
     }
 

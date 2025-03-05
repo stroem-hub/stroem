@@ -28,3 +28,9 @@ reqwest = { version = "0.12.12", features = ["json", "rustls-tls"] }
 notify = "8.0.0"
 blake2 = "0.10.6"
 fs2 = "0.4.3"
+sqlx = { version = "0.8.3", features = ["runtime-tokio", "tls-rustls", "postgres", "chrono", "json"] }
+refinery = { version = "0.8", features = ["tokio-postgres"] }
+tokio-postgres = { version = "0.7.13", features = ["with-chrono-0_4", "with-serde_json-1"] }
+deadpool-postgres = { version = "0.14.1", features = ["serde"] }
+futures = "0.3.31"
+tokio-stream = { version = "0.1.17", features = ["io-util"] }
