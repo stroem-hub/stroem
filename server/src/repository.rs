@@ -1,7 +1,7 @@
 use deadpool_postgres::Pool;
 use std::path::{Path, PathBuf};
 use tracing::{info, error, debug};
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use serde_json::Value;
 use anyhow::{Error, anyhow, bail};
 use tokio::fs::{File, OpenOptions};
@@ -66,13 +66,17 @@ impl JobRepository {
         Ok(None)
     }
 
-    pub async fn update_start_time(&self, job_id: &str, worker_id: &str) -> Result<(), Error> {
+    pub async fn update_start_time(&self, job_id: &str, worker_id: &str, start_time: DateTime<Utc>, input: Option<Value>) -> Result<(), Error> {
         let client = self.pool.get().await?;
         let rows_affected = client.execute(
             "UPDATE job
-             SET start_datetime = NOW()
-             WHERE job_id = $1 AND worker_id = $2 AND status = 'running'",
-            &[&job_id, &worker_id],
+             SET start_datetime = $1, input = $2
+             WHERE job_id = $3 AND worker_id = $4 AND status = 'running'",
+            &[
+                &start_time,
+                &input,
+                &job_id, &worker_id
+            ],
         ).await?;
 
         if rows_affected == 0 {
@@ -85,17 +89,17 @@ impl JobRepository {
         Ok(())
     }
 
-    pub async fn update_step_start_time(&self, job_id: &str, step_name: &str, worker_id: &str) -> Result<(), Error> {
+    pub async fn update_step_start_time(&self, job_id: &str, step_name: &str, worker_id: &str, start_time: DateTime<Utc>, input: Option<Value>) -> Result<(), Error> {
         let client = self.pool.get().await?;
         let rows_affected = client.execute(
-            "INSERT INTO job_steps (job_id, step_name, start_datetime)
-             VALUES ($1, $2, NOW())
+            "INSERT INTO job_steps (job_id, step_name, start_datetime, input)
+             VALUES ($1, $2, $4, $5)
              ON CONFLICT (job_id, step_name)
              DO UPDATE SET start_datetime = NOW()
              WHERE job_steps.job_id = $1 AND EXISTS (
                  SELECT 1 FROM job WHERE job_id = $1 AND worker_id = $3 AND status = 'running'
              )",
-            &[&job_id, &step_name, &worker_id],
+            &[&job_id, &step_name, &worker_id, &start_time, &input],
         ).await?;
 
         if rows_affected == 0 {
@@ -108,50 +112,57 @@ impl JobRepository {
         Ok(())
     }
 
-    pub async fn update_step_result(&self, job_id: &str, step_name: &str, worker_id: &str, output: Option<&Value>, success: bool) -> Result<(), anyhow::Error> {
+    pub async fn update_step_result(&self, job_id: &str, step_name: &str, result: &JobResult) -> Result<(), anyhow::Error> {
         let client = self.pool.get().await?;
         let rows_affected = client.execute(
             "UPDATE job_steps
-             SET output = $1, success = $2, end_datetime = NOW()
-             WHERE job_id = $3 AND step_name = $4 AND EXISTS (
-                 SELECT 1 FROM job WHERE job_id = $3 AND worker_id = $5 AND status = 'running'
+             SET start_datetime = $1, end_datetime = $2, output = $3, success = $4
+             WHERE job_id = $5 AND step_name = $6 AND EXISTS (
+                 SELECT 1 FROM job WHERE job_id = $5 AND status = 'running'
              )",
-            &[&output, &success, &job_id, &step_name, &worker_id],
-        ).await?;
-
-        if rows_affected == 0 {
-            let msg = format!("Failed to update step result for job_id {}, step_name {}: step not found or job not running for worker {}", job_id, step_name, worker_id);
-            error!(msg);
-            bail!(msg);
-        }
-
-        info!("Updated result for job_id {}, step_name {} by worker {}", job_id, step_name, worker_id);
-        Ok(())
-    }
-
-    pub async fn update_job_result(&self, result: &JobResult) -> Result<(), anyhow::Error> {
-        let client = self.pool.get().await?;
-        let rows_affected = client.execute(
-            "UPDATE job
-             SET worker_id = $1, end_datetime = $2, output = $3, success = $4, status = $5
-             WHERE job_id = $6",
             &[
-                &result.worker_id,
+                &result.start_datetime,
                 &result.end_datetime,
                 &result.output,
                 &result.exit_success,
-                &if result.exit_success { "completed" } else { "failed" },
-                &result.job_id,
+                &job_id,
+                &step_name,
             ],
         ).await?;
 
         if rows_affected == 0 {
-            let msg = format!("Failed to update job result for job_id {}: not found", result.job_id);
+            let msg = format!("Failed to update step result for job_id {}, step_name {}: step not found or job not running", job_id, step_name);
             error!(msg);
             bail!(msg);
         }
 
-        info!("Stored job result: job_id={}", result.job_id);
+        info!("Updated result for job_id {}, step_name {}", job_id, step_name);
+        Ok(())
+    }
+
+    pub async fn update_job_result(&self, job_id: &str, result: &JobResult) -> Result<(), anyhow::Error> {
+        let client = self.pool.get().await?;
+        let rows_affected = client.execute(
+            "UPDATE job
+             SET start_datetime = $1, end_datetime = $2, output = $3, success = $4, status = $5
+             WHERE job_id = $6",
+            &[
+                &result.start_datetime,
+                &result.end_datetime,
+                &result.output,
+                &result.exit_success,
+                &if result.exit_success { "completed" } else { "failed" },
+                &job_id,
+            ],
+        ).await?;
+
+        if rows_affected == 0 {
+            let msg = format!("Failed to update job result for job_id {}: not found", &job_id);
+            error!(msg);
+            bail!(msg);
+        }
+
+        info!("Stored job result: job_id={}", &job_id);
         Ok(())
     }
 }

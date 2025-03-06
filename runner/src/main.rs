@@ -106,14 +106,9 @@ impl Runner {
 
         let end_time = Utc::now();
         JobResult {
-            worker_id: self.worker_id.clone(),
-            job_id: self.job_id.clone(),
             exit_success,
-            logs: all_logs,
             start_datetime: start_time,
             end_datetime: end_time,
-            task: self.task.clone(),
-            action: self.action.clone(),
             input: self.input.clone(),
             output,
             revision: Some(self.workspace_revision.clone()),

@@ -11,6 +11,9 @@ use chrono::{DateTime, Utc};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Semaphore;
+use anyhow::{bail, Error};
+use serde_json::json;
+
 mod runner_local;
 
 #[derive(Parser, Debug)]
@@ -74,54 +77,75 @@ async fn main() {
     }
 }
 
-async fn poll_job(client: &Client, server: &str, worker_id: &str) -> Result<Option<Job>, String> {
+async fn poll_job(client: &Client, server: &str, worker_id: &str) -> Result<Option<Job>, Error> {
     let url = format!("{}/jobs/next?worker_id={}", server, worker_id);
     let response = client.get(&url)
         .send()
-        .await
-        .map_err(|e| format!("Failed to poll job: {}", e))?;
+        .await?;
+        // .map_err(|e| format!("Failed to poll job: {}", e))?;
 
     if response.status().is_success() {
         let job = response.json::<Option<Job>>()
-            .await
-            .map_err(|e| format!("Failed to parse job: {}", e))?;
+            .await?;
+            //.map_err(|e| format!("Failed to parse job: {}", e))?;
         Ok(job)
     } else {
-        Err(format!("Server error: {}", response.status()))
+        bail!("Server error: {}", response.status())
     }
 }
 
-async fn execute_job(client: &Client, job: &Job, server: &str, worker_id: &str) -> Result<(), String> {
-    let uuid = job.uuid.as_ref().ok_or("Job missing UUID")?;
+async fn execute_job(client: &Client, job: &Job, server: &str, worker_id: &str) -> Result<(), Error> {
+    let uuid = job.uuid.as_ref().unwrap();
     let start_time = Utc::now();
+
+    // TODO: Render input variables
+
+    let payload = json!({
+        "start_datetime": start_time,
+        "input": &job.input,
+    });
+
+    if job.task.is_none() {
+        client.post(format!("{}/jobs/{}/start?worker_id={}", server, uuid, worker_id))
+            .json(&payload)
+            .send()
+            .await?;
+            //.map_err(|e| format!("Failed to update job start: {}", e))?
+            //.error_for_status()
+            //.map_err(|e| format!("Job start update failed: {}", e))?;
+    }
 
     let (log_entries, status) = runner_local::start(job, server, worker_id).await;
     let end_time = Utc::now();
 
     let result = JobResult {
-            worker_id: worker_id.to_string(),
-            job_id: uuid.to_string(),
             exit_success: status,
-            logs: log_entries,
             start_datetime: start_time,
             end_datetime: end_time,
-            task: job.task.clone(),
-            action: job.action.clone(),
-            input: job.input.clone(),
+            input: job.input.clone(), // probably also not needed
             output: None,
             revision: None,
     };
 
-    common::send_result(client, server, &result).await
-        .map_err(|e| {
-            error!("Failed to send result for job {}: {}", uuid, e);
-            e
-    })?;
+    let url = format!("{}/jobs/{}/results?worker_id={}", server, uuid, worker_id);
+    debug!("{}", url);
+    let result = client.post(&url)
+        .json(&result)
+        .send()
+        .await?;
+    debug!("{:?}", result);
+    debug!("{:?}", result.text().await?);
+
+    // common::send_result(client, server, &result).await?;
+    //    .map_err(|e| {
+    //        error!("Failed to send result for job {}: {}", uuid, e);
+    //        e
+    // })?;
 
     if status {
         info!("Runner completed successfully");
         Ok(())
     } else {
-        Err("Runner failed".to_string())
+        bail!("Runner failed".to_string())
     }
 }

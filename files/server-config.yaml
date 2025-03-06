@@ -1,6 +1,6 @@
 db:
-  host:
-  port:
-  database:
-  username:
-  password:
+  host: 127.0.0.1
+  port: 5432
+  database: workflow
+  username: workflow
+  password: workflow

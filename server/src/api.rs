@@ -9,7 +9,7 @@ use axum::{
 };
 use std::path::PathBuf;
 use tokio::net::TcpListener;
-use tracing::{info, error};
+use tracing::{info, error, debug};
 use crate::Queue;
 use common::{Job, LogEntry, JobResult};
 use tar::Builder;
@@ -21,7 +21,7 @@ use std::io::{Write, Cursor};
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 use anyhow::{anyhow, Error};
-
+use serde_json::Value;
 use common::workspace::Workspace;
 use crate::repository::JobRepository;
 use crate::error::AppError;
@@ -45,10 +45,10 @@ pub async fn run(api: Api, addr: &str) {
     let app = Router::new()
         .route("/jobs", post(enqueue_job))
         .route("/jobs/next", get(get_next_job))
-        .route("/jobs/:job_id/start", post(update_job_start))
-        .route("/jobs/:job_id/results", post(update_job_result))
-        .route("/jobs/:job_id/steps/:step_name/start", post(update_step_start))
-        .route("/jobs/:job_id/steps/:step_name/results", post(update_step_result))
+        .route("/jobs/{:job_id}/start", post(update_job_start))
+        .route("/jobs/{:job_id}/results", post(update_job_result))
+        .route("/jobs/{:job_id}/steps/{:step_name}/start", post(update_step_start))
+        .route("/jobs/{:job_id}/steps/{:step_name}/results", post(update_step_result))
         .route("/files/workspace.tar.gz", get(serve_workspace_tarball))
         .with_state(api);
 
@@ -82,10 +82,16 @@ async fn update_job_start(
     State(api): State<Api>,
     Path(job_id): Path<String>,
     Query(params): Query<HashMap<String, String>>,
+    Json(payload): Json<Value>,
 ) -> Result<(), AppError> {
     let worker_id = params.get("worker_id").unwrap();
+
+    let start_datetime_str = payload.get("start_datetime").and_then(|v| v.as_str()).unwrap();
+    let start_datetime = DateTime::parse_from_rfc3339(start_datetime_str).map(|dt| dt.with_timezone(&Utc))?;
+
+    let input = payload.get("input").cloned();
     api.job_repository
-        .update_start_time(&job_id, worker_id)
+        .update_start_time(&job_id, worker_id, start_datetime, input)
         .await?;
     Ok(())
 }
@@ -96,11 +102,15 @@ async fn update_job_result(
     State(api): State<Api>,
     Path(job_id): Path<String>,
     Query(params): Query<HashMap<String, String>>,
-    Json(result): Json<JobResult>,
+    Json(payload): Json<JobResult>,
 ) -> Result<(), AppError> {
+    debug!("Payload: {:?}", payload);
     let worker_id = params.get("worker_id").unwrap();
+    let output = payload.output.as_ref();
+    debug!("Worker id: {}", worker_id);
+    debug!("Output: {:?}", output);
     api.job_repository
-        .update_job_result(&result)
+        .update_job_result(&job_id, &payload)
         .await?;
     Ok(())
 }
@@ -110,11 +120,16 @@ async fn update_step_start(
     State(api): State<Api>,
     Path((job_id, step_name)): Path<(String, String)>,
     Query(params): Query<HashMap<String, String>>,
-    Json(payload): Json<serde_json::Value>,
+    Json(payload): Json<Value>,
 ) -> Result<(), AppError> {
     let worker_id = params.get("worker_id").unwrap();
+    let start_datetime_str = payload.get("start_datetime").and_then(|v| v.as_str()).unwrap();
+    let start_datetime = DateTime::parse_from_rfc3339(start_datetime_str).map(|dt| dt.with_timezone(&Utc))?;
+
+    let input = payload.get("input").cloned();
+
     api.job_repository
-        .update_step_start_time(&job_id, &step_name, &worker_id)
+        .update_step_start_time(&job_id, &step_name, &worker_id, start_datetime, input)
         .await?;
     Ok(())
 }
@@ -124,13 +139,12 @@ async fn update_step_result(
     State(api): State<Api>,
     Path((job_id, step_name)): Path<(String, String)>,
     Query(params): Query<HashMap<String, String>>,
-    Json(payload): Json<serde_json::Value>,
+    Json(payload): Json<JobResult>,
 ) -> Result<(), AppError> {
     let worker_id = params.get("worker_id").unwrap();
-    let output = payload.get("output");
-    let success = payload.get("success").unwrap().as_bool().unwrap();
+    debug!("Payload: {:?}", payload);
     api.job_repository
-        .update_step_result(&job_id, &step_name, &worker_id, output, success)
+        .update_step_result(&job_id, &step_name, &payload)
         .await?;
     Ok(())
 }

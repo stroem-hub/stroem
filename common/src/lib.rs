@@ -9,6 +9,7 @@ use std::process::Stdio;
 use tokio::select;
 use tracing::{error, info};
 use reqwest::Client;
+use anyhow::Error;
 
 pub mod workspace;
 
@@ -29,16 +30,16 @@ pub struct LogEntry {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct JobResult {
-    pub worker_id: String,
-    pub job_id: String,
+    // pub worker_id: String, // --
+    // pub job_id: String, // --
     pub exit_success: bool,
-    pub logs: Vec<LogEntry>,
+    // pub logs: Vec<LogEntry>, // --
     pub start_datetime: DateTime<Utc>,
     pub end_datetime: DateTime<Utc>,
-    #[serde(default)]
-    pub task: Option<String>,
-    #[serde(default)]
-    pub action: Option<String>,
+    // #[serde(default)]
+    // pub task: Option<String>, // --
+    // #[serde(default)]
+    // pub action: Option<String>, // --
     #[serde(default)]
     pub input: Option<serde_json::Value>,
     #[serde(default)]
@@ -163,12 +164,12 @@ pub async fn run(cmd: &str, args: Option<Vec<String>>, working_dir: Option<&Path
     (log_entries, status)
 }
 
-pub async fn send_result(client: &Client, server: &str, result: &JobResult) -> Result<(), String> {
+pub async fn send_result(client: &Client, server: &str, result: &JobResult) -> Result<(), Error> {
     let url = format!("{}/jobs/results", server);
     client.post(&url)
         .json(result)
         .send()
-        .await
-        .map_err(|e| format!("Failed to send result: {}", e))?;
+        .await?;
+        //.map_err(|e| format!("Failed to send result: {}", e))?;
     Ok(())
 }
