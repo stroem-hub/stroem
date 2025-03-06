@@ -118,6 +118,8 @@ async fn execute_job(client: &Client, job: &Job, server: &str, worker_id: &str) 
     let (log_entries, status) = runner_local::start(job, server, worker_id).await;
     let end_time = Utc::now();
 
+    debug!("Log: {:?}", log_entries);
+
     let result = JobResult {
             exit_success: status,
             start_datetime: start_time,

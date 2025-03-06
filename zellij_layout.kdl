@@ -1,7 +1,7 @@
 layout {
     pane split_direction="vertical" {
         pane command="./target/debug/workflow-server" {
-            args "-v" "--workspace" "/Users/ala/workspace/personal/workflow-engine/files/workspace"
+            args "-v" "--workspace" "/Users/ala/workspace/personal/workflow-engine/files/workspace" "--config" "/Users/ala/workspace/personal/workflow-engine/files/server-config.yaml"
         }
         pane split_direction="horizontal" {
             pane command="./target/debug/workflow-worker" {

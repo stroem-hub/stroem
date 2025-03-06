@@ -3,6 +3,7 @@ use std::env;
 use common::{run, Job, LogEntry};
 use chrono::Utc;
 use tracing::{info, error};
+use tracing::log::debug;
 
 pub async fn start(job: &Job, server: &str, worker_id: &str) -> (Vec<LogEntry>, bool) {
     let worker_path = match env::current_exe() {
@@ -76,6 +77,8 @@ pub async fn start(job: &Job, server: &str, worker_id: &str) -> (Vec<LogEntry>, 
             }
         }
     }
+
+    debug!("Executing: {:?} {:?}", runner_path, runner_args);
 
     let (logs, success) = run(runner_path.to_str().unwrap(), Some(runner_args), None).await;
     (logs, success)

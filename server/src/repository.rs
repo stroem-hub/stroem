@@ -75,8 +75,9 @@ impl JobRepository {
             &[
                 &start_time,
                 &input,
-                &job_id, &worker_id
-            ],
+                &job_id,
+                &worker_id
+            ]
         ).await?;
 
         if rows_affected == 0 {
@@ -92,14 +93,12 @@ impl JobRepository {
     pub async fn update_step_start_time(&self, job_id: &str, step_name: &str, worker_id: &str, start_time: DateTime<Utc>, input: Option<Value>) -> Result<(), Error> {
         let client = self.pool.get().await?;
         let rows_affected = client.execute(
-            "INSERT INTO job_steps (job_id, step_name, start_datetime, input)
-             VALUES ($1, $2, $4, $5)
+            "INSERT INTO job_step (job_id, step_name, start_datetime, input)
+             VALUES ($1, $2, $3, $4)
              ON CONFLICT (job_id, step_name)
              DO UPDATE SET start_datetime = NOW()
-             WHERE job_steps.job_id = $1 AND EXISTS (
-                 SELECT 1 FROM job WHERE job_id = $1 AND worker_id = $3 AND status = 'running'
-             )",
-            &[&job_id, &step_name, &worker_id, &start_time, &input],
+             WHERE job_step.job_id = $1 AND job_step.step_name=$2", // AND EXISTS ( SELECT 1 FROM job WHERE job_id = $1 AND worker_id = $5 AND status = 'running' )
+            &[&job_id, &step_name, &start_time, &input]
         ).await?;
 
         if rows_affected == 0 {
@@ -115,11 +114,9 @@ impl JobRepository {
     pub async fn update_step_result(&self, job_id: &str, step_name: &str, result: &JobResult) -> Result<(), anyhow::Error> {
         let client = self.pool.get().await?;
         let rows_affected = client.execute(
-            "UPDATE job_steps
+            "UPDATE job_step
              SET start_datetime = $1, end_datetime = $2, output = $3, success = $4
-             WHERE job_id = $5 AND step_name = $6 AND EXISTS (
-                 SELECT 1 FROM job WHERE job_id = $5 AND status = 'running'
-             )",
+             WHERE job_id = $5 AND step_name = $6 ", //AND EXISTS (SELECT 1 FROM job WHERE job_id = $5 AND status = 'running')",
             &[
                 &result.start_datetime,
                 &result.end_datetime,

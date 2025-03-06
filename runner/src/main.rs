@@ -1,20 +1,15 @@
-// workflow-runner/src/main.rs
 use clap::Parser;
 use tracing::{info, error, debug};
 use tracing_subscriber;
-use common::workspace::{WorkspaceConfiguration, WorkspaceConfigurationTrait, Action, Workspace};
+use common::workspace::{WorkspaceConfiguration, WorkspaceConfigurationTrait, Action, Workspace, FlowStep};
 use reqwest::Client;
-use tar::Archive;
-use flate2::read::GzDecoder;
-use tempdir::TempDir;
 use chrono::Utc;
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
 use common::{run, JobResult, LogEntry};
 use tera::Tera;
 use std::path::{Path, PathBuf};
-use std::fs::{self, File};
-use std::io::{self, Write, Read};
+use anyhow::Result;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -51,47 +46,52 @@ struct Runner {
 
 impl Runner {
     fn new(server: String, job_id: String, worker_id: String, task: Option<String>, action: Option<String>, input: Option<Value>, workspace: Workspace, workspace_revision: String) -> Self {
-        Runner { server, job_id, worker_id, task, action, input, workspace, workspace_revision, client: Client::new() }
+        Runner {
+            server,
+            job_id,
+            worker_id,
+            task,
+            action,
+            input,
+            workspace,
+            workspace_revision,
+            client: Client::new(),
+        }
     }
 
-    async fn execute(&mut self) -> JobResult {
-        let start_time = Utc::now();
-
+    async fn execute(&mut self) -> Result<(Vec<LogEntry>, bool)> {
         let mut all_logs = Vec::new();
-        let mut output = None;
-        let mut exit_success = true;
+        let mut success = true;
 
         match (self.task.clone(), self.action.clone()) {
             (Some(task), None) => {
                 info!("Running task: {} with job_id: {}, worker_id: {}", task, self.job_id, self.worker_id);
                 if let Some(task_def) = self.workspace.config.as_ref().unwrap().get_task(&task) {
-                    let (logs, success, task_output) = self.execute_task(&task_def.flow, &self.workspace.config.as_ref().unwrap(), &self.input).await;
+                    let (logs, task_success) = self.execute_task(&task_def.flow, self.workspace.config.as_ref().unwrap()).await?;
                     all_logs.extend(logs);
-                    output = task_output;
-                    exit_success = success;
+                    success = task_success;
                 } else {
                     all_logs.push(LogEntry {
                         timestamp: Utc::now(),
                         is_stderr: true,
                         message: format!("Task '{}' not found in workspace config", task),
                     });
-                    exit_success = false;
+                    success = false;
                 }
             }
             (None, Some(action_name)) => {
                 info!("Running action: {} with job_id: {}, worker_id: {}", action_name, self.job_id, self.worker_id);
                 if let Some(action_def) = self.workspace.config.as_ref().unwrap().get_action(&action_name) {
-                    let (logs, success, action_output) = self.execute_action(&action_name, action_def, &self.input).await.unwrap();
+                    let (logs, action_success, _) = self.execute_action(&action_name, action_def, self.input.clone()).await?;
                     all_logs.extend(logs);
-                    output = action_output;
-                    exit_success = success;
+                    success = action_success;
                 } else {
                     all_logs.push(LogEntry {
                         timestamp: Utc::now(),
                         is_stderr: true,
                         message: format!("Action '{}' not found in workspace config", action_name),
                     });
-                    exit_success = false;
+                    success = false;
                 }
             }
             _ => {
@@ -100,28 +100,19 @@ impl Runner {
                     is_stderr: true,
                     message: "Must specify either --task or --action".to_string(),
                 });
-                exit_success = false;
+                success = false;
             }
         }
 
-        let end_time = Utc::now();
-        JobResult {
-            exit_success,
-            start_datetime: start_time,
-            end_datetime: end_time,
-            input: self.input.clone(),
-            output,
-            revision: Some(self.workspace_revision.clone()),
-        }
+        Ok((all_logs, success))
     }
 
-    async fn execute_task(&self, flow: &HashMap<String, common::workspace::FlowStep>, config: &WorkspaceConfiguration, input: &Option<Value>) -> (Vec<LogEntry>, bool, Option<Value>) {
+    async fn execute_task(&self, flow: &HashMap<String, FlowStep>, config: &WorkspaceConfiguration) -> Result<(Vec<LogEntry>, bool)> {
         let mut logs = Vec::new();
         let mut visited = HashSet::new();
         let mut stack = Vec::new();
         let mut pending = Vec::new();
         let mut success = true;
-        let mut task_output = None;
         let mut step_outputs: HashMap<String, Value> = HashMap::new();
 
         let mut graph: HashMap<String, Vec<String>> = HashMap::new();
@@ -147,7 +138,7 @@ impl Runner {
             .filter(|(_, count)| **count == 0)
             .map(|(step, _)| step.clone()));
 
-        debug!("Task input: {:?}", input);
+        debug!("Task input: {:?}", self.input);
 
         while let Some(step_name) = pending.pop() {
             if visited.contains(&step_name) { continue; }
@@ -168,20 +159,20 @@ impl Runner {
 
                 let mut tera = Tera::default();
                 let mut context = tera::Context::new();
-                if let Some(input_value) = input {
+                if let Some(input_value) = &self.input {
                     context.insert("input", input_value);
                 }
                 for (prev_step, output) in &step_outputs {
                     let step_obj = serde_json::json!({"output": output});
                     context.insert(prev_step, &step_obj);
                 }
-                debug!("Step input: {:?}", &step.input);
+                debug!("Step input template: {:?}", &step.input);
                 let step_input = if let Some(step_input) = &step.input {
                     let mut rendered_input = HashMap::new();
                     for (key, field) in step_input {
                         debug!("Step input field: {}", key);
                         let template_name = format!("{}.{}", step_name, key);
-                        tera.add_raw_template(&template_name, field).unwrap_or_else(|e| error!("Failed to add template for {}: {}", key, e));
+                        tera.add_raw_template(&template_name, field)?;
                         match tera.render(&template_name, &context) {
                             Ok(value) => rendered_input.insert(key.clone(), Value::String(value)),
                             Err(e) => {
@@ -198,12 +189,11 @@ impl Runner {
                     }
                     Some(Value::Object(rendered_input.into_iter().collect()))
                 } else {
-                    input.clone()
+                    self.input.clone()
                 };
 
-                let (mut step_logs, step_success, step_output) = self.execute_action(&step_name, config.get_action(action_name).unwrap(), &step_input).await.unwrap();
+                let (mut step_logs, step_success, step_output) = self.execute_action(&step_name, config.get_action(action_name).unwrap(), step_input).await?;
                 logs.append(&mut step_logs);
-                task_output = step_output.clone();
                 if step_success {
                     if let Some(output_value) = step_output {
                         step_outputs.insert(step_name.clone(), output_value);
@@ -224,37 +214,38 @@ impl Runner {
             visited.insert(step_name);
         }
 
-        (logs, success, task_output)
+        Ok((logs, success))
     }
 
-    async fn execute_action(&self, step_name: &str, action: &Action, input: &Option<Value>) -> Result<(Vec<LogEntry>, bool, Option<Value>), anyhow::Error> {
+    async fn execute_action(&self, step_name: &str, action: &Action, input: Option<Value>) -> Result<(Vec<LogEntry>, bool, Option<Value>)> {
         // Send start
         let start_time = Utc::now();
         let payload = json!({
-            "start_datetime": start_time,
+            "start_datetime": start_time.to_rfc3339(),
             "input": &input,
         });
 
-        self.client.post(format!("{}/jobs/{}/steps/{}/start?worker_id={}", &self.server, &self.job_id, &step_name, &self.worker_id))
+        let result = self.client.post(format!("{}/jobs/{}/steps/{}/start?worker_id={}", &self.server, &self.job_id, step_name, &self.worker_id))
             .json(&payload)
             .send()
             .await?;
+
+        debug!("{:?}", result);
+        debug!("{:?}", result.text().await?);
 
 
         let default_cmd = format!("echo Simulated SSH: {}", action.action_type);
         let cmd_template = action.cmd.as_ref().unwrap_or(&default_cmd);
 
         let mut tera = Tera::default();
-        tera.add_raw_template("cmd", cmd_template).unwrap_or_else(|e| {
-            error!("Failed to add command template: {}", e);
-        });
+        tera.add_raw_template("cmd", cmd_template)?;
 
         let mut context = tera::Context::new();
-        if let Some(input_value) = input {
+        if let Some(input_value) = &input {
             context.insert("input", input_value);
         }
 
-        debug!("Input: {:?}", input);
+        debug!("Input: {:?}", self.input);
         debug!("cmd template: {:?}", cmd_template);
 
         let cmd = tera.render("cmd", &context)?;
@@ -282,14 +273,16 @@ impl Runner {
 
         let end_time = Utc::now();
 
+
         let result = JobResult {
             exit_success: status,
             start_datetime: start_time,
             end_datetime: end_time,
             input: input.clone(), // probably also not needed
             output: output.clone(),
-            revision: Some(self.workspace_revision.clone()),
+            revision: None,
         };
+
 
         let url = format!("{}/jobs/{}/steps/{}/results?worker_id={}", self.server, self.job_id, step_name, self.worker_id);
         debug!("{}", url);
@@ -297,13 +290,13 @@ impl Runner {
             .json(&result)
             .send()
             .await?;
+
         debug!("{:?}", result);
         debug!("{:?}", result.text().await?);
 
 
         Ok((logs, status, output))
     }
-
 }
 
 #[tokio::main]
@@ -322,7 +315,6 @@ async fn main() {
             std::process::exit(1);
         }));
 
-
     let mut workspace = Workspace::new(PathBuf::from(&args.workspace_dir));
     let revision = workspace.sync(&args.server).await.unwrap_or_else(|e| {
         error!("Failed to get workspace: {}", e);
@@ -339,10 +331,16 @@ async fn main() {
         workspace,
         revision,
     );
-    let result = runner.execute().await;
+    let (logs, success) = runner.execute().await.unwrap_or_else(|e| {
+        error!("Execution failed: {}", e);
+        (vec![LogEntry {
+            timestamp: Utc::now(),
+            is_stderr: true,
+            message: format!("Execution failed: {}", e),
+        }], false)
+    });
 
-    // common::send_result(&runner.client, &runner.server, &result).await.unwrap_or_else(|e| {
-    //     error!("Failed to send result: {}", e);
-    //     std::process::exit(1);
-    // });
+    if !success {
+        std::process::exit(1);
+    }
 }
