@@ -8,7 +8,7 @@ use tar::Archive;
 use flate2::read::GzDecoder;
 use tempdir::TempDir;
 use chrono::Utc;
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
 use common::{run, JobResult, LogEntry};
 use tera::Tera;
@@ -81,7 +81,7 @@ impl Runner {
             (None, Some(action_name)) => {
                 info!("Running action: {} with job_id: {}, worker_id: {}", action_name, self.job_id, self.worker_id);
                 if let Some(action_def) = self.workspace.config.as_ref().unwrap().get_action(&action_name) {
-                    let (logs, success, action_output) = self.execute_action(action_def, &self.input).await;
+                    let (logs, success, action_output) = self.execute_action(&action_name, action_def, &self.input).await.unwrap();
                     all_logs.extend(logs);
                     output = action_output;
                     exit_success = success;
@@ -201,7 +201,7 @@ impl Runner {
                     input.clone()
                 };
 
-                let (mut step_logs, step_success, step_output) = self.execute_action(config.get_action(action_name).unwrap(), &step_input).await;
+                let (mut step_logs, step_success, step_output) = self.execute_action(&step_name, config.get_action(action_name).unwrap(), &step_input).await.unwrap();
                 logs.append(&mut step_logs);
                 task_output = step_output.clone();
                 if step_success {
@@ -227,7 +227,20 @@ impl Runner {
         (logs, success, task_output)
     }
 
-    async fn execute_action(&self, action: &Action, input: &Option<Value>) -> (Vec<LogEntry>, bool, Option<Value>) {
+    async fn execute_action(&self, step_name: &str, action: &Action, input: &Option<Value>) -> Result<(Vec<LogEntry>, bool, Option<Value>), anyhow::Error> {
+        // Send start
+        let start_time = Utc::now();
+        let payload = json!({
+            "start_datetime": start_time,
+            "input": &input,
+        });
+
+        self.client.post(format!("{}/jobs/{}/steps/{}/start?worker_id={}", &self.server, &self.job_id, &step_name, &self.worker_id))
+            .json(&payload)
+            .send()
+            .await?;
+
+
         let default_cmd = format!("echo Simulated SSH: {}", action.action_type);
         let cmd_template = action.cmd.as_ref().unwrap_or(&default_cmd);
 
@@ -244,19 +257,7 @@ impl Runner {
         debug!("Input: {:?}", input);
         debug!("cmd template: {:?}", cmd_template);
 
-        let cmd = match tera.render("cmd", &context) {
-            Ok(rendered) => rendered,
-            Err(e) => {
-                let errmsg = format!("Failed to render command template: {}", e);
-                error!("{}", errmsg);
-                return (vec![LogEntry {
-                    timestamp: Utc::now(),
-                    is_stderr: true,
-                    message: errmsg,
-                }], false, None);
-            }
-        };
-
+        let cmd = tera.render("cmd", &context)?;
         debug!("Executing command: {}", cmd);
 
         let (logs, status) = run("sh", Some(vec!["-c".to_string(), cmd]), Some(&self.workspace.path)).await;
@@ -279,7 +280,28 @@ impl Runner {
             }
         };
 
-        (logs, status, output)
+        let end_time = Utc::now();
+
+        let result = JobResult {
+            exit_success: status,
+            start_datetime: start_time,
+            end_datetime: end_time,
+            input: input.clone(), // probably also not needed
+            output: output.clone(),
+            revision: Some(self.workspace_revision.clone()),
+        };
+
+        let url = format!("{}/jobs/{}/steps/{}/results?worker_id={}", self.server, self.job_id, step_name, self.worker_id);
+        debug!("{}", url);
+        let result = self.client.post(&url)
+            .json(&result)
+            .send()
+            .await?;
+        debug!("{:?}", result);
+        debug!("{:?}", result.text().await?);
+
+
+        Ok((logs, status, output))
     }
 
 }
@@ -319,8 +341,8 @@ async fn main() {
     );
     let result = runner.execute().await;
 
-    common::send_result(&runner.client, &runner.server, &result).await.unwrap_or_else(|e| {
-        error!("Failed to send result: {}", e);
-        std::process::exit(1);
-    });
+    // common::send_result(&runner.client, &runner.server, &result).await.unwrap_or_else(|e| {
+    //     error!("Failed to send result: {}", e);
+    //     std::process::exit(1);
+    // });
 }
