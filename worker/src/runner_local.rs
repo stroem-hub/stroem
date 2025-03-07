@@ -7,7 +7,7 @@ use tracing::log::debug;
 use anyhow::Error;
 use serde_json::Value;
 
-pub async fn start(job: &Job, server: &str, worker_id: &str, log_collector: &LogCollector) -> Result<(bool, Option<Value>), Error> {
+pub async fn start(job: &Job, server: &str, worker_id: &str, mut log_collector: LogCollector) -> Result<(bool, Option<Value>), Error> {
     let worker_path = match env::current_exe() {
         Ok(path) => path,
         Err(e) => {

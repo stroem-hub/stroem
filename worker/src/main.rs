@@ -121,7 +121,7 @@ async fn execute_job(client: &Client, job: &Job, server: &str, worker_id: &str) 
         //.error_for_status()
         //.map_err(|e| format!("Job start update failed: {}", e))?;
 
-    let (exit_success, output) = runner_local::start(job, server, worker_id, &log_collector).await?;
+    let (exit_success, output) = runner_local::start(job, server, worker_id, log_collector).await?;
     let end_time = Utc::now();
 
     let result = JobResult {

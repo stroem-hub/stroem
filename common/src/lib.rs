@@ -18,7 +18,7 @@ use regex::Regex;
 
 pub mod workspace;
 pub mod log_collector;
-use log_collector::LogCollector;
+use log_collector::{LogCollector, LogEntry};
 
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -57,7 +57,7 @@ fn strip_ansi(input: &str) -> String {
     ANSI_REGEX.replace_all(input, "").to_string()
 }
 
-pub async fn run(cmd: &str, args: Option<Vec<String>>, cwd: Option<&PathBuf>, log_collector: &LogCollector) -> Result<(bool, Option<Value>), Error> {
+pub async fn run(cmd: &str, args: Option<Vec<String>>, cwd: Option<&PathBuf>, mut log_collector: LogCollector) -> Result<(bool, Option<Value>), Error> {
     let mut command = TokioCommand::new(cmd);
     if let Some(args) = args {
         command.args(args);
@@ -74,32 +74,58 @@ pub async fn run(cmd: &str, args: Option<Vec<String>>, cwd: Option<&PathBuf>, lo
     let stdout = child.stdout.take().unwrap();
     let stderr = child.stderr.take().unwrap();
 
-    let log_collector_stdout = log_collector.clone();
-    let log_collector_stderr = log_collector.clone();
+    // Channel for LogEntry from stdout/stderr to writer
+    let (log_tx, mut log_rx) = mpsc::channel::<LogEntry>(100);
+    // Channel for OUTPUT: lines
+    let (output_tx, mut output_rx) = mpsc::channel::<String>(100);
 
-    let (tx, mut rx) = mpsc::channel::<String>(100); // Channel for collecting OUTPUT: lines
+    // Stdout task
+    let log_tx_stdout = log_tx.clone();
     tokio::spawn(async move {
         let mut stdout_reader = BufReader::new(stdout).lines();
         while let Some(line) = stdout_reader.next_line().await.unwrap_or(None) {
             let clean_line = strip_ansi(&line);
-            log_collector_stdout.log(Utc::now(), false, clean_line.clone()).await.unwrap_or_else(|e| error!("Failed to log stdout: {}", e));
+            let entry = LogEntry {
+                timestamp: Utc::now(),
+                is_stderr: false,
+                message: clean_line,
+            };
+            log_tx_stdout.send(entry).await.unwrap_or_else(|e| error!("Failed to send stdout log: {}", e));
             if line.starts_with("OUTPUT:") {
-                tx.send(line).await.unwrap_or_else(|e| error!("Failed to send output line: {}", e));
+                output_tx.send(line).await.unwrap_or_else(|e| error!("Failed to send output line: {}", e));
             }
         }
     });
 
+    // Stderr task
+    let log_tx_stderr = log_tx.clone();
     tokio::spawn(async move {
         let mut stderr_reader = BufReader::new(stderr).lines();
         while let Some(line) = stderr_reader.next_line().await.unwrap_or(None) {
             let clean_line = strip_ansi(&line);
-            log_collector_stderr.log(Utc::now(), true, clean_line).await.unwrap_or_else(|e| error!("Failed to log stderr: {}", e));
+            let entry = LogEntry {
+                timestamp: Utc::now(),
+                is_stderr: true,
+                message: clean_line,
+            };
+            log_tx_stderr.send(entry).await.unwrap_or_else(|e| error!("Failed to send stderr log: {}", e));
         }
+    });
+
+    // Single writer task to LogCollector
+    tokio::spawn(async move {
+        while let Some(entry) = log_rx.recv().await {
+            log_collector.log(entry.timestamp, entry.is_stderr, entry.message)
+                .await
+                .unwrap_or_else(|e| error!("Failed to log entry: {}", e));
+        }
+        // Flush remaining logs when channel closes
+        log_collector.flush().await.unwrap_or_else(|e| error!("Failed to flush logs: {}", e));
     });
 
     let status = child.wait().await?;
     let mut output_lines = Vec::new();
-    while let Some(line) = rx.recv().await {
+    while let Some(line) = output_rx.recv().await {
         output_lines.push(line.strip_prefix("OUTPUT:").unwrap().trim().to_string());
     }
     let output = if output_lines.is_empty() {

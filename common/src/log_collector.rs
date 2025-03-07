@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::sync::Arc;
 use anyhow::{bail, Error, anyhow};
 use chrono::{DateTime, Utc};
 use reqwest::Client;
@@ -16,55 +17,41 @@ pub struct LogEntry {
 }
 
 
-#[derive(Clone)]
 pub struct LogCollector {
-    sender: Sender<LogEntry>,
+    client: Client,
+    url: String,
+    buffer: VecDeque<LogEntry>,
+    buffer_size: usize,
 }
 
 impl LogCollector {
     pub fn new(server: String, job_id: String, worker_id: String, step_name: Option<String>, buffer_size: Option<usize>) -> Self {
-        let (sender, mut receiver) = mpsc::channel::<LogEntry>(buffer_size.unwrap_or(10) * 2);
-        let client = Client::new();
+        let url = match step_name {
+            Some(step) => format!("{}/jobs/{}/steps/{}/logs?worker_id={}", server, job_id, step, worker_id),
+            None => format!("{}/jobs/{}/logs?worker_id={}", server, job_id, worker_id),
+        };
         let buffer_size = buffer_size.unwrap_or(10);
-
-        tokio::spawn(async move {
-            let mut buffer = VecDeque::with_capacity(buffer_size);
-            let url = match &step_name {
-                Some(step) => format!("{}/jobs/{}/steps/{}/logs?worker_id={}", server, job_id, step, worker_id),
-                None => format!("{}/jobs/{}/logs?worker_id={}", server, job_id, worker_id),
-            };
-
-            while let Some(log) = receiver.recv().await {
-                buffer.push_back(log);
-                if buffer.len() >= buffer_size {
-                    if let Err(e) = Self::send_logs(&client, &url, &buffer).await {
-                        error!("Failed to send logs: {}", e);
-                    }
-                    buffer.clear();
-                }
-            }
-
-            // Final flush
-            if !buffer.is_empty() {
-                debug!("Flushing {} remaining logs for {}", buffer.len(), url);
-                if let Err(e) = Self::send_logs(&client, &url, &buffer).await {
-                    error!("Failed to flush remaining logs: {} - {:?}", e, buffer);
-                }
-            }
-        });
-
-        LogCollector { sender }
+        LogCollector {
+            client: Client::new(),
+            url,
+            buffer: VecDeque::with_capacity(buffer_size),
+            buffer_size,
+        }
     }
 
-    pub async fn log(&self, timestamp: DateTime<Utc>, is_stderr: bool, message: String) -> Result<(), Error> {
+    pub async fn log(&mut self, timestamp: DateTime<Utc>, is_stderr: bool, message: String) -> Result<(), Error> {
         let entry = LogEntry { timestamp, is_stderr, message };
-        self.sender.send(entry).await?;
+        self.buffer.push_back(entry);
+        if self.buffer.len() >= self.buffer_size {
+            self.send_logs().await?;
+            self.buffer.clear();
+        }
         Ok(())
     }
 
-    async fn send_logs(client: &Client, url: &str, buffer: &VecDeque<LogEntry>) -> Result<(), Error> {
-        let logs: Vec<LogEntry> = buffer.iter().cloned().collect();
-        let response = client.post(url)
+    async fn send_logs(&self) -> Result<(), Error> {
+        let logs: Vec<LogEntry> = self.buffer.iter().cloned().collect();
+        let response = self.client.post(&self.url)
             .json(&logs)
             .send()
             .await;
@@ -72,27 +59,28 @@ impl LogCollector {
         match response {
             Ok(resp) => {
                 if resp.status().is_success() {
-                    info!("Sent {} logs to {}", logs.len(), url);
+                    info!("Sent {} logs to {}", logs.len(), self.url);
                     Ok(())
                 } else {
                     let status = resp.status();
                     let body = resp.text().await.unwrap_or_else(|_| "No response body".to_string());
-                    error!("Failed to send logs to {}: {} - {}", url, status, body);
+                    error!("Failed to send logs to {}: {} - {}", self.url, status, body);
                     Err(anyhow!("Failed to send logs: {} - {}", status, body))
                 }
             }
             Err(e) => {
-                error!("Failed to send logs to {}: {}", url, e);
+                error!("Failed to send logs to {}: {}", self.url, e);
                 Err(anyhow!("Failed to send logs: {}", e))
             }
         }
     }
 
-    pub async fn flush(&self) -> Result<(), Error> {
-        // Drop the sender to close the channel and trigger flush
-        drop(self.sender.clone());
-        // Give the background task a moment to complete
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+    pub async fn flush(&mut self) -> Result<(), Error> {
+        if !self.buffer.is_empty() {
+            debug!("Flushing {} remaining logs for {}", self.buffer.len(), self.url);
+            self.send_logs().await?;
+            self.buffer.clear();
+        }
         Ok(())
     }
 }

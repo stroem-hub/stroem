@@ -220,17 +220,15 @@ impl Runner {
         let cmd = tera.render("cmd", &context)?;
         debug!("Executing command: {}", cmd);
 
-        let log_collector = LogCollector::new(
+        let mut log_collector = LogCollector::new(
             self.server.clone(),
             self.job_id.clone(),
             self.worker_id.clone(),
             Some(step_name.to_string()),
             Some(10),
         );
-        let (exit_success, output) = run("sh", Some(vec!["-c".to_string(), cmd]), Some(&self.workspace.path), &log_collector).await?;
+        let (exit_success, output) = run("sh", Some(vec!["-c".to_string(), cmd]), Some(&self.workspace.path), log_collector).await?;
         let end_time = Utc::now();
-
-        log_collector.flush().await?;
 
         let result = JobResult {
             exit_success: exit_success,
