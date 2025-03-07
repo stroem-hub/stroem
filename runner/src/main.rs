@@ -6,7 +6,7 @@ use reqwest::Client;
 use chrono::Utc;
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
-use common::{run, JobResult, LogCollector, LogEntry};
+use common::{run, JobResult, log_collector::LogCollector, log_collector::LogEntry};
 use tera::Tera;
 use std::path::{Path, PathBuf};
 use anyhow::Result;
@@ -228,8 +228,10 @@ impl Runner {
             Some(10),
         );
         let (exit_success, output) = run("sh", Some(vec!["-c".to_string(), cmd]), Some(&self.workspace.path), &log_collector).await?;
-
         let end_time = Utc::now();
+
+        log_collector.flush().await?;
+
         let result = JobResult {
             exit_success: exit_success,
             start_datetime: start_time,

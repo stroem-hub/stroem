@@ -11,7 +11,7 @@ use fs2::FileExt;
 use tokio_stream::{self, StreamExt, wrappers::LinesStream};
 use futures::Stream;
 
-use common::{Job, JobResult, LogEntry};
+use common::{Job, JobResult, log_collector::LogEntry};
 #[derive(Clone)]
 pub struct JobRepository {
     pool: Pool,
@@ -130,7 +130,8 @@ impl JobRepository {
         if rows_affected == 0 {
             let msg = format!("Failed to update step result for job_id {}, step_name {}: step not found or job not running", job_id, step_name);
             error!(msg);
-            bail!(msg);
+            return Ok(())
+            // bail!(msg);
         }
 
         info!("Updated result for job_id {}, step_name {}", job_id, step_name);

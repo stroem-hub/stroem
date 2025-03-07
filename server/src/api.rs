@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use tokio::net::TcpListener;
 use tracing::{info, error, debug};
 use crate::Queue;
-use common::{Job, LogEntry, JobResult};
+use common::{Job, log_collector::LogEntry, JobResult};
 use tar::Builder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
