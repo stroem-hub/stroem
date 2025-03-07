@@ -23,7 +23,7 @@ use chrono::{DateTime, Utc};
 use anyhow::{anyhow, Error};
 use serde_json::Value;
 use common::workspace::Workspace;
-use crate::repository::JobRepository;
+use crate::repository::{JobRepository, LogRepository};
 use crate::error::AppError;
 
 
@@ -32,12 +32,13 @@ pub struct Api {
     pub queue: Queue,
     pub workspace: Workspace,
     pub job_repository: JobRepository,
+    pub log_repository: LogRepository,
 }
 
 
 impl Api {
-    pub fn new(queue: Queue, workspace: Workspace, job_repository: JobRepository) -> Self {
-        Self { queue, workspace, job_repository }
+    pub fn new(queue: Queue, workspace: Workspace, job_repository: JobRepository, log_repository: LogRepository) -> Self {
+        Self { queue, workspace, job_repository, log_repository }
     }
 }
 
@@ -46,8 +47,10 @@ pub async fn run(api: Api, addr: &str) {
         .route("/jobs", post(enqueue_job))
         .route("/jobs/next", get(get_next_job))
         .route("/jobs/{:job_id}/start", post(update_job_start))
+        .route("/jobs/{:job_id}/logs", post(save_job_logs))
         .route("/jobs/{:job_id}/results", post(update_job_result))
         .route("/jobs/{:job_id}/steps/{:step_name}/start", post(update_step_start))
+        .route("/jobs/{:job_id}/steps/{:step_name}/logs", post(save_step_logs))
         .route("/jobs/{:job_id}/steps/{:step_name}/results", post(update_step_result))
         .route("/files/workspace.tar.gz", get(serve_workspace_tarball))
         .with_state(api);
@@ -146,6 +149,26 @@ async fn update_step_result(
     api.job_repository
         .update_step_result(&job_id, &step_name, &payload)
         .await?;
+    Ok(())
+}
+
+#[axum::debug_handler]
+async fn save_job_logs(
+    State(api): State<Api>,
+    Path(job_id): Path<String>,
+    Json(logs): Json<Vec<LogEntry>>,
+) -> Result<(), AppError> {
+    api.log_repository.save_logs(&job_id, None, logs).await?;
+    Ok(())
+}
+
+#[axum::debug_handler]
+async fn save_step_logs(
+    State(api): State<Api>,
+    Path((job_id, step_name)): Path<(String, String)>,
+    Json(logs): Json<Vec<LogEntry>>,
+) -> Result<(), AppError> {
+    api.log_repository.save_logs(&job_id, Some(&step_name), logs).await?;
     Ok(())
 }
 

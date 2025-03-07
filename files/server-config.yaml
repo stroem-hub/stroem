@@ -4,3 +4,6 @@ db:
   database: workflow
   username: workflow
   password: workflow
+
+logs:
+  folder: /tmp/workflow-logs/

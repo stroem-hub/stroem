@@ -164,6 +164,7 @@ impl JobRepository {
     }
 }
 
+#[derive(Clone)]
 pub struct LogRepository {
     logs_dir: PathBuf,
 }

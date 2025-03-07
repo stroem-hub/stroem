@@ -34,3 +34,5 @@ tokio-postgres = { version = "0.7.13", features = ["with-chrono-0_4", "with-serd
 deadpool-postgres = { version = "0.14.1", features = ["serde"] }
 futures = "0.3.31"
 tokio-stream = { version = "0.1.17", features = ["io-util"] }
+regex = "1.11.1"
+lazy_static = "1.5.0"

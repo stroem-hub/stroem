@@ -22,6 +22,7 @@ use common::workspace::{Workspace, WorkspaceConfiguration, WorkspaceConfiguratio
 use scheduler::Scheduler;
 use queue::Queue;
 use repository::JobRepository;
+use crate::repository::LogRepository;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -75,6 +76,7 @@ async fn main() -> Result<(), Error>{
 
     let workspace = Workspace::new(workspace_dir);
     let job_repo = JobRepository::new(db_pool);
+    let logs_repo = LogRepository::new(cfg.get_string("logs.folder").unwrap().parse()?);
 
     // Create Queue
     let queue = Queue::new(100);
@@ -84,7 +86,7 @@ async fn main() -> Result<(), Error>{
     scheduler.run().await;
 
     // Create Api
-    let server = api::Api::new(queue.clone(), workspace, job_repo);
+    let server = api::Api::new(queue.clone(), workspace, job_repo, logs_repo);
     tokio::spawn(async move {
         api::run(server, "0.0.0.0:8080").await;
     });

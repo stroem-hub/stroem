@@ -6,7 +6,7 @@ use reqwest::Client;
 use chrono::Utc;
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
-use common::{run, JobResult, LogEntry};
+use common::{run, JobResult, LogCollector, LogEntry};
 use tera::Tera;
 use std::path::{Path, PathBuf};
 use anyhow::Result;
@@ -59,56 +59,39 @@ impl Runner {
         }
     }
 
-    async fn execute(&mut self) -> Result<(Vec<LogEntry>, bool)> {
-        let mut all_logs = Vec::new();
+    async fn execute(&mut self) -> Result<bool> {
         let mut success = true;
 
         match (self.task.clone(), self.action.clone()) {
             (Some(task), None) => {
                 info!("Running task: {} with job_id: {}, worker_id: {}", task, self.job_id, self.worker_id);
                 if let Some(task_def) = self.workspace.config.as_ref().unwrap().get_task(&task) {
-                    let (logs, task_success) = self.execute_task(&task_def.flow, self.workspace.config.as_ref().unwrap()).await?;
-                    all_logs.extend(logs);
-                    success = task_success;
+                    success = self.execute_task(&task_def.flow, self.workspace.config.as_ref().unwrap()).await?;
                 } else {
-                    all_logs.push(LogEntry {
-                        timestamp: Utc::now(),
-                        is_stderr: true,
-                        message: format!("Task '{}' not found in workspace config", task),
-                    });
+                    error!("Task '{}' not found in workspace config", task);
                     success = false;
                 }
             }
             (None, Some(action_name)) => {
                 info!("Running action: {} with job_id: {}, worker_id: {}", action_name, self.job_id, self.worker_id);
                 if let Some(action_def) = self.workspace.config.as_ref().unwrap().get_action(&action_name) {
-                    let (logs, action_success, _) = self.execute_action(&action_name, action_def, self.input.clone()).await?;
-                    all_logs.extend(logs);
+                    let (action_success, _) = self.execute_action(&action_name, action_def, self.input.clone()).await?;
                     success = action_success;
                 } else {
-                    all_logs.push(LogEntry {
-                        timestamp: Utc::now(),
-                        is_stderr: true,
-                        message: format!("Action '{}' not found in workspace config", action_name),
-                    });
+                    error!("Action '{}' not found in workspace config", action_name);
                     success = false;
                 }
             }
             _ => {
-                all_logs.push(LogEntry {
-                    timestamp: Utc::now(),
-                    is_stderr: true,
-                    message: "Must specify either --task or --action".to_string(),
-                });
+                error!("Must specify either --task or --action");
                 success = false;
             }
         }
 
-        Ok((all_logs, success))
+        Ok(success)
     }
 
-    async fn execute_task(&self, flow: &HashMap<String, FlowStep>, config: &WorkspaceConfiguration) -> Result<(Vec<LogEntry>, bool)> {
-        let mut logs = Vec::new();
+    async fn execute_task(&self, flow: &HashMap<String, FlowStep>, config: &WorkspaceConfiguration) -> Result<bool> {
         let mut visited = HashSet::new();
         let mut stack = Vec::new();
         let mut pending = Vec::new();
@@ -143,11 +126,7 @@ impl Runner {
         while let Some(step_name) = pending.pop() {
             if visited.contains(&step_name) { continue; }
             if stack.contains(&step_name) {
-                logs.push(LogEntry {
-                    timestamp: Utc::now(),
-                    is_stderr: true,
-                    message: format!("Cycle detected at step '{}'", step_name),
-                });
+                error!("Cycle detected at step '{}'", step_name);
                 success = false;
                 break;
             }
@@ -163,7 +142,7 @@ impl Runner {
                     context.insert("input", input_value);
                 }
                 for (prev_step, output) in &step_outputs {
-                    let step_obj = serde_json::json!({"output": output});
+                    let step_obj = json!({"output": output});
                     context.insert(prev_step, &step_obj);
                 }
                 debug!("Step input template: {:?}", &step.input);
@@ -176,12 +155,7 @@ impl Runner {
                         match tera.render(&template_name, &context) {
                             Ok(value) => rendered_input.insert(key.clone(), Value::String(value)),
                             Err(e) => {
-                                error!("Failed to render step {}: {}", key, e);
-                                logs.push(LogEntry {
-                                    timestamp: Utc::now(),
-                                    is_stderr: true,
-                                    message: format!("Failed to render input '{}': {}", key, e),
-                                });
+                                error!("Failed to render input '{}': {}", key, e);
                                 success = false;
                                 None
                             }
@@ -192,8 +166,7 @@ impl Runner {
                     self.input.clone()
                 };
 
-                let (mut step_logs, step_success, step_output) = self.execute_action(&step_name, config.get_action(action_name).unwrap(), step_input).await?;
-                logs.append(&mut step_logs);
+                let (step_success, step_output) = self.execute_action(&step_name, config.get_action(action_name).unwrap(), step_input).await?;
                 if step_success {
                     if let Some(output_value) = step_output {
                         step_outputs.insert(step_name.clone(), output_value);
@@ -214,25 +187,21 @@ impl Runner {
             visited.insert(step_name);
         }
 
-        Ok((logs, success))
+        Ok(success)
     }
 
-    async fn execute_action(&self, step_name: &str, action: &Action, input: Option<Value>) -> Result<(Vec<LogEntry>, bool, Option<Value>)> {
-        // Send start
+    async fn execute_action(&self, step_name: &str, action: &Action, step_input: Option<Value>) -> Result<(bool, Option<Value>)> {
+        // Send start with step-specific input
         let start_time = Utc::now();
-        let payload = json!({
+        let start_payload = json!({
             "start_datetime": start_time.to_rfc3339(),
-            "input": &input,
+            "input": &step_input,
         });
 
-        let result = self.client.post(format!("{}/jobs/{}/steps/{}/start?worker_id={}", &self.server, &self.job_id, step_name, &self.worker_id))
-            .json(&payload)
+        self.client.post(format!("{}/jobs/{}/steps/{}/start?worker_id={}", &self.server, &self.job_id, step_name, &self.worker_id))
+            .json(&start_payload)
             .send()
             .await?;
-
-        debug!("{:?}", result);
-        debug!("{:?}", result.text().await?);
-
 
         let default_cmd = format!("echo Simulated SSH: {}", action.action_type);
         let cmd_template = action.cmd.as_ref().unwrap_or(&default_cmd);
@@ -241,61 +210,42 @@ impl Runner {
         tera.add_raw_template("cmd", cmd_template)?;
 
         let mut context = tera::Context::new();
-        if let Some(input_value) = &input {
+        if let Some(input_value) = &step_input {
             context.insert("input", input_value);
         }
 
-        debug!("Input: {:?}", self.input);
+        debug!("Step input: {:?}", step_input);
         debug!("cmd template: {:?}", cmd_template);
 
         let cmd = tera.render("cmd", &context)?;
         debug!("Executing command: {}", cmd);
 
-        let (logs, status) = run("sh", Some(vec!["-c".to_string(), cmd]), Some(&self.workspace.path)).await;
-
-        let mut output_lines = Vec::new();
-        for log in logs.iter().filter(|log| !log.is_stderr && log.message.starts_with("OUTPUT:")) {
-            output_lines.push(log.message.strip_prefix("OUTPUT:").unwrap().trim());
-        }
-        debug!("Output: {:?}", output_lines);
-        let output = if output_lines.is_empty() {
-            None
-        } else {
-            let joined_output = output_lines.join("\n");
-            match serde_json::from_str(&joined_output) {
-                Ok(json) => Some(json),
-                Err(e) => {
-                    error!("Failed to parse OUTPUT as JSON: {}", e);
-                    Some(Value::String(joined_output))
-                }
-            }
-        };
+        let log_collector = LogCollector::new(
+            self.server.clone(),
+            self.job_id.clone(),
+            self.worker_id.clone(),
+            Some(step_name.to_string()),
+            Some(10),
+        );
+        let (exit_success, output) = run("sh", Some(vec!["-c".to_string(), cmd]), Some(&self.workspace.path), &log_collector).await?;
 
         let end_time = Utc::now();
-
-
         let result = JobResult {
-            exit_success: status,
+            exit_success: exit_success,
             start_datetime: start_time,
             end_datetime: end_time,
-            input: input.clone(), // probably also not needed
+            input: step_input.clone(), // probably also not needed
             output: output.clone(),
             revision: None,
         };
 
 
-        let url = format!("{}/jobs/{}/steps/{}/results?worker_id={}", self.server, self.job_id, step_name, self.worker_id);
-        debug!("{}", url);
-        let result = self.client.post(&url)
+        self.client.post(format!("{}/jobs/{}/steps/{}/results?worker_id={}", self.server, self.job_id, step_name, self.worker_id))
             .json(&result)
             .send()
             .await?;
 
-        debug!("{:?}", result);
-        debug!("{:?}", result.text().await?);
-
-
-        Ok((logs, status, output))
+        Ok((exit_success, output))
     }
 }
 
@@ -331,13 +281,9 @@ async fn main() {
         workspace,
         revision,
     );
-    let (logs, success) = runner.execute().await.unwrap_or_else(|e| {
+    let success = runner.execute().await.unwrap_or_else(|e| {
         error!("Execution failed: {}", e);
-        (vec![LogEntry {
-            timestamp: Utc::now(),
-            is_stderr: true,
-            message: format!("Execution failed: {}", e),
-        }], false)
+        false
     });
 
     if !success {

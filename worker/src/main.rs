@@ -4,7 +4,7 @@ use tracing::{info, error, debug};
 use tracing_subscriber;
 use tokio::time::{self, Duration};
 use reqwest::Client;
-use common::{Job, JobResult};
+use common::{Job, JobResult, LogCollector};
 use std::env;
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
@@ -98,6 +98,14 @@ async fn execute_job(client: &Client, job: &Job, server: &str, worker_id: &str) 
     let uuid = job.uuid.as_ref().unwrap();
     let start_time = Utc::now();
 
+    let log_collector = LogCollector::new(
+        server.to_string(),
+        job.uuid.as_ref().unwrap().to_string(),
+        worker_id.to_string(),
+        None,
+        Some(10),
+    );
+
     // TODO: Render input variables
 
     let payload = json!({
@@ -105,27 +113,23 @@ async fn execute_job(client: &Client, job: &Job, server: &str, worker_id: &str) 
         "input": &job.input,
     });
 
-    if job.task.is_none() {
-        client.post(format!("{}/jobs/{}/start?worker_id={}", server, uuid, worker_id))
-            .json(&payload)
-            .send()
-            .await?;
-            //.map_err(|e| format!("Failed to update job start: {}", e))?
-            //.error_for_status()
-            //.map_err(|e| format!("Job start update failed: {}", e))?;
-    }
+    client.post(format!("{}/jobs/{}/start?worker_id={}", server, uuid, worker_id))
+        .json(&payload)
+        .send()
+        .await?;
+        //.map_err(|e| format!("Failed to update job start: {}", e))?
+        //.error_for_status()
+        //.map_err(|e| format!("Job start update failed: {}", e))?;
 
-    let (log_entries, status) = runner_local::start(job, server, worker_id).await;
+    let (exit_success, output) = runner_local::start(job, server, worker_id, &log_collector).await?;
     let end_time = Utc::now();
 
-    debug!("Log: {:?}", log_entries);
-
     let result = JobResult {
-            exit_success: status,
+            exit_success: exit_success,
             start_datetime: start_time,
             end_datetime: end_time,
             input: job.input.clone(), // probably also not needed
-            output: None,
+            output: output,
             revision: None,
     };
 
@@ -144,7 +148,7 @@ async fn execute_job(client: &Client, job: &Job, server: &str, worker_id: &str) 
     //        e
     // })?;
 
-    if status {
+    if exit_success {
         info!("Runner completed successfully");
         Ok(())
     } else {

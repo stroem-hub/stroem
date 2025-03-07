@@ -425,6 +425,8 @@ dependencies = [
  "flate2",
  "fs2",
  "globwalker",
+ "lazy_static",
+ "regex",
  "reqwest",
  "serde",
  "serde_json",
