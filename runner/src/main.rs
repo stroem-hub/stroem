@@ -97,7 +97,6 @@ impl Runner {
         let mut stack = Vec::new();
         let mut pending = Vec::new();
         let mut success = true;
-        let mut step_outputs: HashMap<String, Value> = HashMap::new();
 
         let mut graph: HashMap<String, Vec<String>> = HashMap::new();
         for (step_name, step) in flow {
@@ -122,7 +121,10 @@ impl Runner {
             .filter(|(_, count)| **count == 0)
             .map(|(step, _)| step.clone()));
 
-        debug!("Task input: {:?}", self.input);
+        let mut renderer = ParameterRenderer::new();
+        renderer.add_to_context(json!({
+            "input": self.input,
+        }))?;
 
         while let Some(step_name) = pending.pop() {
             if visited.contains(&step_name) { continue; }
@@ -137,40 +139,15 @@ impl Runner {
                 info!("Executing step: {}", step_name);
                 let action_name = &step.action;
 
-                let mut tera = Tera::default();
-                let mut context = tera::Context::new();
-                if let Some(input_value) = &self.input {
-                    context.insert("input", input_value);
-                }
-                for (prev_step, output) in &step_outputs {
-                    let step_obj = json!({"output": output});
-                    context.insert(prev_step, &step_obj);
-                }
                 debug!("Step input template: {:?}", &step.input);
-                let step_input = if let Some(step_input) = &step.input {
-                    let mut rendered_input = HashMap::new();
-                    for (key, field) in step_input {
-                        debug!("Step input field: {}", key);
-                        let template_name = format!("{}.{}", step_name, key);
-                        tera.add_raw_template(&template_name, field)?;
-                        match tera.render(&template_name, &context) {
-                            Ok(value) => rendered_input.insert(key.clone(), Value::String(value)),
-                            Err(e) => {
-                                error!("Failed to render input '{}': {}", key, e);
-                                success = false;
-                                None
-                            }
-                        };
-                    }
-                    Some(Value::Object(rendered_input.into_iter().collect()))
-                } else {
-                    self.input.clone()
-                };
+
+                let step_value = serde_json::to_value(&step.input)?;
+                let step_input = Some(renderer.render(step_value)?);
 
                 let (step_success, step_output) = self.execute_action(&step_name, config.get_action(action_name).unwrap(), step_input).await?;
                 if step_success {
                     if let Some(output_value) = step_output {
-                        step_outputs.insert(step_name.clone(), output_value);
+                        renderer.add_to_context(json!({step_name.clone(): {"output": output_value}}))?;
                     }
                     if let Some(next) = &step.on_success {
                         pending.push(next.clone());

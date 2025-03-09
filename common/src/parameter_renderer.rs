@@ -7,6 +7,20 @@ pub struct ParameterRenderer {
     engine: Engine<'static>,
 }
 
+fn merge(a: &mut Value, b: &Value) {
+    match (a, b) {
+        (&mut Value::Object(ref mut a), &Value::Object(ref b)) => {
+            for (k, v) in b {
+                merge(a.entry(k.clone()).or_insert(Value::Null), v);
+            }
+        }
+        (a, b) => {
+            *a = b.clone();
+        }
+    }
+}
+
+
 impl ParameterRenderer {
     /// Creates a new ParameterRenderer with an empty context.
     pub fn new() -> Self {
@@ -20,6 +34,8 @@ impl ParameterRenderer {
 
     /// Merges a new value into the internal context.
     pub fn add_to_context(&mut self, value: Value) -> Result<()> {
+        Ok(merge(&mut self.context, &value))
+        /*
         if let Value::Object(existing_map) = &mut self.context {
             if let Value::Object(new_map) = value {
                 for (key, val) in new_map {
@@ -32,6 +48,8 @@ impl ParameterRenderer {
         } else {
             Err(anyhow!("Context must be an object"))
         }
+
+         */
     }
 
     /// Renders a Value, processing any string values as templates using the context.
