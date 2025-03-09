@@ -9,7 +9,8 @@ use std::collections::{HashMap, HashSet};
 use common::{run, JobResult, log_collector::LogCollector, log_collector::LogEntry};
 use tera::Tera;
 use std::path::{Path, PathBuf};
-use anyhow::Result;
+use anyhow::{anyhow, Result};
+use common::parameter_renderer::ParameterRenderer;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -203,21 +204,19 @@ impl Runner {
             .send()
             .await?;
 
-        let default_cmd = format!("echo Simulated SSH: {}", action.action_type);
-        let cmd_template = action.cmd.as_ref().unwrap_or(&default_cmd);
-
-        let mut tera = Tera::default();
-        tera.add_raw_template("cmd", cmd_template)?;
-
-        let mut context = tera::Context::new();
+        // Initialize ParameterRenderer
+        let mut renderer = ParameterRenderer::new();
         if let Some(input_value) = &step_input {
-            context.insert("input", input_value);
+            // Add step_input to context (assuming it’s an object)
+            renderer.add_to_context(json!({"input": input_value}))?;
         }
 
-        debug!("Step input: {:?}", step_input);
-        debug!("cmd template: {:?}", cmd_template);
+        let action_value = serde_json::to_value(action)?;
+        let action = renderer.render(action_value)?;
 
-        let cmd = tera.render("cmd", &context)?;
+        debug!("Step input: {:?}", step_input);
+
+        let cmd = action["cmd"].as_str().unwrap();
         debug!("Executing command: {}", cmd);
 
         let mut log_collector = LogCollector::new(
@@ -227,18 +226,17 @@ impl Runner {
             Some(step_name.to_string()),
             Some(10),
         );
-        let (exit_success, output) = run("sh", Some(vec!["-c".to_string(), cmd]), Some(&self.workspace.path), log_collector).await?;
+        let (exit_success, output) = run("sh", Some(vec!["-c".to_string(), cmd.to_string()]), Some(&self.workspace.path), log_collector).await?;
         let end_time = Utc::now();
 
         let result = JobResult {
-            exit_success: exit_success,
+            exit_success,
             start_datetime: start_time,
             end_datetime: end_time,
-            input: step_input.clone(), // probably also not needed
+            input: step_input.clone(), // Probably not needed, but kept for now
             output: output.clone(),
             revision: None,
         };
-
 
         self.client.post(format!("{}/jobs/{}/steps/{}/results?worker_id={}", self.server, self.job_id, step_name, self.worker_id))
             .json(&result)

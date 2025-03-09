@@ -35,7 +35,7 @@ pub struct ErrorHandler {
     pub description: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Action {
     pub description: Option<String>,
     #[serde(rename = "type")]
@@ -47,7 +47,7 @@ pub struct Action {
     pub output: Option<OutputSpec>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct InputField {
     #[serde(rename = "type")]
     pub field_type: String,
@@ -57,25 +57,25 @@ pub struct InputField {
     pub order: Option<i32>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct OutputSpec {
     pub properties: HashMap<String, OutputProperty>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct OutputProperty {
     #[serde(rename = "type")]
     pub property_type: String,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Task {
     pub description: Option<String>,
     pub input: Option<HashMap<String, InputField>>,
     pub flow: HashMap<String, FlowStep>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FlowStep {
     pub action: String,
     pub input: Option<HashMap<String, String>>,

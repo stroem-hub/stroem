@@ -1,0 +1,5 @@
+- [ ] Update tracing configuration to output error messages to stdout
+- [ ] Use parameter_renderer
+- [ ] Move DAG to a separated function
+- [ ] Secrets
+- [ ] Resource types and Resources ?

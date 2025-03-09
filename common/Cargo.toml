@@ -26,3 +26,4 @@ blake2 = { workspace = true }
 fs2 = { workspace = true }
 regex = { workspace = true }
 lazy_static = { workspace = true }
+upon = { workspace = true }

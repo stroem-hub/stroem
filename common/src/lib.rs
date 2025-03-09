@@ -18,6 +18,7 @@ use regex::Regex;
 
 pub mod workspace;
 pub mod log_collector;
+pub mod parameter_renderer;
 use log_collector::{LogCollector, LogEntry};
 
 
