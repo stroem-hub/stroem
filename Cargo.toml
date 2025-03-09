@@ -15,7 +15,7 @@ serde_json = "1.0.139"
 tar = "0.4.44"
 flate2 = "1.1.0"
 tracing = "0.1.41"
-tracing-subscriber = "0.3.19"
+tracing-subscriber = { version = "0.3.19", features = ["fmt"] }
 config = "0.15.8"
 uuid = { version = "1.15.0", features = ["v4"] }
 clap = { version = "4.5.31", features = ["derive"] }

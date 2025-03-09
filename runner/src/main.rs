@@ -6,7 +6,7 @@ use reqwest::Client;
 use chrono::Utc;
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
-use common::{run, JobResult, log_collector::LogCollector, log_collector::LogEntry};
+use common::{run, JobResult, log_collector::LogCollector, log_collector::LogEntry, init_tracing};
 use tera::Tera;
 use std::path::{Path, PathBuf};
 use anyhow::{anyhow, Result};
@@ -227,10 +227,15 @@ impl Runner {
 #[tokio::main]
 async fn main() {
     let args = Args::parse();
+
+    init_tracing(args.verbose);
+    /*
     let log_level = if args.verbose { tracing::Level::TRACE } else { tracing::Level::INFO };
     tracing_subscriber::fmt()
         .with_max_level(log_level)
         .init();
+
+     */
 
     info!("Runner started for job_id: {}, worker_id: {}", args.job_id, args.worker_id);
 

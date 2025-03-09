@@ -15,6 +15,8 @@ use tokio::process::Command as TokioCommand;
 use tokio::sync::mpsc::{self, Sender};
 use serde_json::Value;
 use regex::Regex;
+use std::io;
+use tracing_subscriber::{self, fmt, prelude::*, filter::LevelFilter};
 
 pub mod workspace;
 pub mod log_collector;
@@ -152,3 +154,26 @@ pub async fn send_result(client: &Client, server: &str, result: &JobResult) -> R
     Ok(())
 }
 
+pub fn init_tracing(verbose: bool) {
+    // Configure tracing with split output
+    let stdout_writer = io::stdout; // For INFO and below
+    let stderr_writer = io::stderr; // For WARN and above
+
+    let log_level = if verbose { tracing::Level::TRACE } else { tracing::Level::INFO };
+
+    // Create a layer that writes ERROR and WARN to stderr
+    let stderr_layer = fmt::layer()
+        .with_writer(stderr_writer)
+        .with_filter(LevelFilter::WARN); // Includes WARN and ERROR
+
+    // Create a layer that writes INFO, DEBUG, TRACE to stdout
+    let stdout_layer = fmt::layer()
+        .with_writer(stdout_writer)
+        .with_filter(LevelFilter::from_level(log_level)); // Convert Level to LevelFilter
+
+    // Combine layers into the subscriber
+    tracing_subscriber::registry()
+        .with(stderr_layer)
+        .with(stdout_layer)
+        .init();
+}
