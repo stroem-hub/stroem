@@ -104,7 +104,7 @@ impl Runner {
             renderer.add_to_context(json!({"input": input_value.clone()}))?;
         }
 
-        let mut next_step = dag.get_next_step(None, true);
+        let mut next_step = dag.get_next_step(None);
         while let Some(step_name) = next_step {
             if let Some(step) = dag.get_step(&step_name) {
                 info!("Executing step: {}", step_name);
@@ -118,9 +118,13 @@ impl Runner {
                         renderer.add_to_context(json!({step_name.clone(): {"output": output_value}}))?;
                     }
                 }
+                else {
+                    success = false;
+                    break;
+                }
 
                 success &= step_success;
-                next_step = dag.get_next_step(Some(step_name), step_success);
+                next_step = dag.get_next_step(Some(step_name));
             } else {
                 error!("Step '{}' not found in DAG", step_name);
                 success = false;

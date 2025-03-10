@@ -3,8 +3,8 @@ use anyhow::{Result, anyhow};
 use crate::workspace::FlowStep;
 
 pub struct DagWalker {
-    graph: HashMap<String, Vec<String>>, // Step -> Next steps (on_success/on_fail)
-    incoming: HashMap<String, usize>,    // Step -> Number of incoming edges
+    graph: HashMap<String, Vec<String>>, // Step -> Steps that depend on it (outgoing edges)
+    incoming: HashMap<String, usize>,    // Step -> Number of unmet dependencies (incoming edges)
     flow: HashMap<String, FlowStep>,     // Step -> FlowStep definition
     visited: HashSet<String>,            // Tracks visited steps
 }
@@ -15,22 +15,23 @@ impl DagWalker {
         let mut graph: HashMap<String, Vec<String>> = HashMap::new();
         let mut incoming: HashMap<String, usize> = HashMap::new();
 
-        // Build the graph and incoming edge counts
-        for (step_name, step) in flow {
-            let mut next_steps = Vec::new();
-            if let Some(next) = &step.on_success {
-                next_steps.push(next.clone());
-            }
-            if let Some(next) = &step.on_fail {
-                next_steps.push(next.clone());
-            }
-            graph.insert(step_name.clone(), next_steps);
+        // Initialize all steps in incoming
+        for step_name in flow.keys() {
             incoming.entry(step_name.clone()).or_insert(0);
+            graph.entry(step_name.clone()).or_insert_with(Vec::new); // Ensure every step has an entry
         }
 
-        for (step, next_steps) in &graph {
-            for next in next_steps {
-                *incoming.entry(next.clone()).or_insert(0) += 1;
+        // Build the graph and incoming edge counts based on depends_on
+        for (step_name, step) in flow {
+            if let Some(depends_on) = &step.depends_on {
+                for dep in depends_on {
+                    // Add step_name as a dependent of dep (outgoing edge)
+                    graph.entry(dep.clone())
+                        .or_insert_with(Vec::new)
+                        .push(step_name.clone());
+                    // Increment incoming edges for step_name
+                    *incoming.entry(step_name.clone()).or_insert(0) += 1;
+                }
             }
         }
 
@@ -88,35 +89,42 @@ impl DagWalker {
         false
     }
 
-    /// Returns the next step to execute based on the last completed step and its success status.
-    /// If step_name is None, returns an initial step with no incoming edges that hasn’t been visited.
-    pub fn get_next_step(&mut self, step_name: Option<String>, success: bool) -> Option<String> {
-        let next = match step_name {
-            None => {
-                // Return the first unvisited step with no incoming edges
-                self.incoming.iter()
-                    .filter(|&(ref step, &count)| count == 0 && !self.visited.contains(*step))
-                    .map(|(step, _)| step.clone())
-                    .next()
-            }
-            Some(step) => {
-                if let Some(flow_step) = self.flow.get(&step) {
-                    self.visited.insert(step.clone());
-                    if success {
-                        flow_step.on_success.clone()
-                    } else {
-                        flow_step.on_fail.clone()
+    /// Returns the next step to execute based on the last completed step.
+    /// If step_name is None, returns an initial step with no unmet dependencies that hasn’t been visited.
+    /// Marks the completed step as visited and updates dependency counts.
+    fn next_steps(&mut self, step_name: Option<String>)-> impl Iterator<Item = String> {
+        if let Some(step) = step_name {
+            // Mark the step as visited
+            self.visited.insert(step.clone());
+            // Reduce incoming edge count for dependents
+            if let Some(dependents) = self.graph.get(&step) {
+                for dep in dependents {
+                    if let Some(count) = self.incoming.get_mut(dep) {
+                        *count -= 1;
                     }
-                } else {
-                    None // Step not found
                 }
             }
-        };
-        next
+        }
+
+        // Return the first unvisited step with no unmet dependencies
+        self.incoming.iter()
+            .filter(|&(ref step, &count)| count == 0 && !self.visited.contains(*step))
+            .map(|(step, _)| step.clone())
+    }
+
+    pub fn get_next_step(&mut self, step_name: Option<String>) -> Option<String> {
+        self.next_steps(step_name).next()
+    }
+
+    /// Returns all steps ready to execute based on the last completed step.
+    /// If step_name is None, returns initial steps with no unmet dependencies that haven’t been visited.
+    pub fn get_next_steps(&mut self, step_name: Option<String>) -> Vec<String> {
+        self.next_steps(step_name).collect()
     }
 
     /// Returns the FlowStep definition for a given step name.
     pub fn get_step(&self, step_name: &str) -> Option<&FlowStep> {
         self.flow.get(step_name)
     }
+
 }

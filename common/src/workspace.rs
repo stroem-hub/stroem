@@ -79,8 +79,7 @@ pub struct Task {
 pub struct FlowStep {
     pub action: String,
     pub input: Option<HashMap<String, String>>,
-    pub on_success: Option<String>,
-    pub on_fail: Option<String>,
+    pub depends_on: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize, Clone)]

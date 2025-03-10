@@ -77,12 +77,13 @@ tasks:
         action: allunite.action1
         input:
           vvv: "test - {{ input.field1 }}"
-        on_success: step2
 
       step2:
         action: allunite.action2
         input:
           vvv: "{{ step1.output.result }}"
+        depends_on:
+          - step1
 
 
 triggers:
