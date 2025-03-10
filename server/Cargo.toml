@@ -1,10 +1,10 @@
 [package]
-name = "workflow-server"
+name = "stroem-server"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-common = { path = "../common" }
+stroem-common = { path = "../common" }
 axum = { workspace = true }
 tokio = { workspace = true }
 serde = { workspace = true }

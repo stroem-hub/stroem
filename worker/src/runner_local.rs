@@ -1,6 +1,6 @@
 // workflow-worker/src/runner_local.rs
 use std::env;
-use common::{run, Job, log_collector::LogCollector, log_collector::LogEntry};
+use stroem_common::{run, Job, log_collector::LogCollector, log_collector::LogEntry};
 use chrono::Utc;
 use tracing::{info, error};
 use tracing::log::debug;

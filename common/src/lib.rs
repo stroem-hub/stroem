@@ -21,6 +21,7 @@ use tracing_subscriber::{self, fmt, prelude::*, filter::LevelFilter};
 pub mod workspace;
 pub mod log_collector;
 pub mod parameter_renderer;
+pub mod dag_walker;
 use log_collector::{LogCollector, LogEntry};
 
 

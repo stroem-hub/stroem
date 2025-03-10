@@ -1,5 +1,12 @@
-- [ ] Update tracing configuration to output error messages to stdout
-- [ ] Use parameter_renderer
-- [ ] Move DAG to a separated function
+- [x] Update tracing configuration to output error messages to stdout
+- [x] Use parameter_renderer
+- [x] Move DAG to a separated function
+- [ ] Name
+- [ ] "depends on" instead of "on_success"
+- [ ] global error handler
+- [ ] reload workspace webhook
+- [ ] workspace in git
+- [ ] config validator
 - [ ] Secrets
 - [ ] Resource types and Resources ?
+- [ ] helm-chart

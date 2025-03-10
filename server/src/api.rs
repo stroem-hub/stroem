@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use tokio::net::TcpListener;
 use tracing::{info, error, debug};
 use crate::Queue;
-use common::{Job, log_collector::LogEntry, JobResult};
+use stroem_common::{Job, log_collector::LogEntry, JobResult};
 use tar::Builder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 use anyhow::{anyhow, Error};
 use serde_json::Value;
-use common::workspace::Workspace;
+use stroem_common::workspace::Workspace;
 use crate::repository::{JobRepository, LogRepository};
 use crate::error::AppError;
 

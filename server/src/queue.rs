@@ -1,5 +1,5 @@
 // workflow-server/src/queue.rs
-use common::Job;
+use stroem_common::Job;
 use tokio::sync::mpsc::{self, Sender, Receiver};
 use std::sync::{Arc, Mutex};
 use tracing::{info, error, debug};

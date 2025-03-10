@@ -11,7 +11,7 @@ use fs2::FileExt;
 use tokio_stream::{self, StreamExt, wrappers::LinesStream};
 use futures::Stream;
 
-use common::{Job, JobResult, log_collector::LogEntry};
+use stroem_common::{Job, JobResult, log_collector::LogEntry};
 #[derive(Clone)]
 pub struct JobRepository {
     pool: Pool,

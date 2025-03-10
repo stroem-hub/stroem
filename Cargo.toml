@@ -1,5 +1,5 @@
 [workspace.package]
-name = "workflow-engine"
+name = "stroem"
 version = "0.1.0"
 edition = "2024"
 

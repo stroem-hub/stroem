@@ -1,7 +1,7 @@
 // workflow-server/src/scheduler.rs
 use crate::Queue;
-use common::Job;
-use common::workspace::{WorkspaceConfiguration, WorkspaceConfigurationTrait};
+use stroem_common::Job;
+use stroem_common::workspace::{WorkspaceConfiguration, WorkspaceConfigurationTrait};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::watch;
 use tracing::{info, error, debug};

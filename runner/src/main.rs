@@ -1,16 +1,19 @@
 use clap::Parser;
 use tracing::{info, error, debug};
 use tracing_subscriber;
-use common::workspace::{WorkspaceConfiguration, WorkspaceConfigurationTrait, Action, Workspace, FlowStep};
+use stroem_common::workspace::{WorkspaceConfiguration, WorkspaceConfigurationTrait, Action, Workspace, FlowStep};
 use reqwest::Client;
 use chrono::Utc;
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
-use common::{run, JobResult, log_collector::LogCollector, log_collector::LogEntry, init_tracing};
+use stroem_common::{run, JobResult, log_collector::LogCollector, log_collector::LogEntry, init_tracing};
 use tera::Tera;
 use std::path::{Path, PathBuf};
 use anyhow::{anyhow, Result};
-use common::parameter_renderer::ParameterRenderer;
+use stroem_common::parameter_renderer::ParameterRenderer;
+use stroem_common::dag_walker::DagWalker;
+
+
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -93,76 +96,36 @@ impl Runner {
     }
 
     async fn execute_task(&self, flow: &HashMap<String, FlowStep>, config: &WorkspaceConfiguration) -> Result<bool> {
-        let mut visited = HashSet::new();
-        let mut stack = Vec::new();
-        let mut pending = Vec::new();
+        let mut dag = DagWalker::new(flow)?; // Rename from DagExecutor
         let mut success = true;
 
-        let mut graph: HashMap<String, Vec<String>> = HashMap::new();
-        for (step_name, step) in flow {
-            let mut next_steps = Vec::new();
-            if let Some(next) = &step.on_success {
-                next_steps.push(next.clone());
-            }
-            if let Some(next) = &step.on_fail {
-                next_steps.push(next.clone());
-            }
-            graph.insert(step_name.clone(), next_steps);
-        }
-
-        let mut incoming: HashMap<String, usize> = HashMap::new();
-        for (step, next_steps) in &graph {
-            incoming.entry(step.clone()).or_insert(0);
-            for next in next_steps {
-                *incoming.entry(next.clone()).or_insert(0) += 1;
-            }
-        }
-        pending.extend(incoming.iter()
-            .filter(|(_, count)| **count == 0)
-            .map(|(step, _)| step.clone()));
-
         let mut renderer = ParameterRenderer::new();
-        renderer.add_to_context(json!({
-            "input": self.input,
-        }))?;
+        if let Some(input_value) = &self.input {
+            renderer.add_to_context(json!({"input": input_value.clone()}))?;
+        }
 
-        while let Some(step_name) = pending.pop() {
-            if visited.contains(&step_name) { continue; }
-            if stack.contains(&step_name) {
-                error!("Cycle detected at step '{}'", step_name);
-                success = false;
-                break;
-            }
-            stack.push(step_name.clone());
-
-            if let Some(step) = flow.get(&step_name) {
+        let mut next_step = dag.get_next_step(None, true);
+        while let Some(step_name) = next_step {
+            if let Some(step) = dag.get_step(&step_name) {
                 info!("Executing step: {}", step_name);
-                let action_name = &step.action;
-
-                debug!("Step input template: {:?}", &step.input);
 
                 let step_value = serde_json::to_value(&step.input)?;
                 let step_input = Some(renderer.render(step_value)?);
 
-                let (step_success, step_output) = self.execute_action(&step_name, config.get_action(action_name).unwrap(), step_input).await?;
+                let (step_success, step_output) = self.execute_action(&step_name, config.get_action(&step.action).unwrap(), step_input).await?;
                 if step_success {
                     if let Some(output_value) = step_output {
                         renderer.add_to_context(json!({step_name.clone(): {"output": output_value}}))?;
                     }
-                    if let Some(next) = &step.on_success {
-                        pending.push(next.clone());
-                    }
-                } else {
-                    success = false;
-                    if let Some(next) = &step.on_fail {
-                        pending.push(next.clone());
-                    } else {
-                        break;
-                    }
                 }
+
+                success &= step_success;
+                next_step = dag.get_next_step(Some(step_name), step_success);
+            } else {
+                error!("Step '{}' not found in DAG", step_name);
+                success = false;
+                break;
             }
-            stack.pop();
-            visited.insert(step_name);
         }
 
         Ok(success)

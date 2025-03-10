@@ -412,34 +412,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b63caa9aa9397e2d9480a9b13673856c78d8ac123288526c37d7839f2a86990"
 
 [[package]]
-name = "common"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "axum",
- "blake2",
- "chrono",
- "clap",
- "config",
- "cron",
- "flate2",
- "fs2",
- "globwalker",
- "lazy_static",
- "regex",
- "reqwest",
- "serde",
- "serde_json",
- "tar",
- "tera",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "upon",
- "uuid",
-]
-
-[[package]]
 name = "concurrent-queue"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2896,6 +2868,114 @@ dependencies = [
 ]
 
 [[package]]
+name = "stroem-common"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "blake2",
+ "chrono",
+ "clap",
+ "config",
+ "cron",
+ "flate2",
+ "fs2",
+ "globwalker",
+ "lazy_static",
+ "regex",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tar",
+ "tera",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "upon",
+ "uuid",
+]
+
+[[package]]
+name = "stroem-runner"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "chrono",
+ "clap",
+ "config",
+ "cron",
+ "flate2",
+ "fs2",
+ "globwalker",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "stroem-common",
+ "tar",
+ "tempdir",
+ "tera",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
+name = "stroem-server"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "chrono",
+ "clap",
+ "config",
+ "cron",
+ "deadpool-postgres",
+ "flate2",
+ "fs2",
+ "futures",
+ "globwalker",
+ "refinery",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "stroem-common",
+ "tar",
+ "tera",
+ "tokio",
+ "tokio-postgres",
+ "tokio-stream",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
+name = "stroem-worker"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "chrono",
+ "clap",
+ "config",
+ "cron",
+ "flate2",
+ "globwalker",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "stroem-common",
+ "tar",
+ "tera",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
 name = "strsim"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3936,86 +4016,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3268f3d866458b787f390cf61f4bbb563b922d091359f9608842999eaee3943c"
 dependencies = [
  "bitflags",
-]
-
-[[package]]
-name = "workflow-runner"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "axum",
- "chrono",
- "clap",
- "common",
- "config",
- "cron",
- "flate2",
- "fs2",
- "globwalker",
- "reqwest",
- "serde",
- "serde_json",
- "tar",
- "tempdir",
- "tera",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
-name = "workflow-server"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "axum",
- "chrono",
- "clap",
- "common",
- "config",
- "cron",
- "deadpool-postgres",
- "flate2",
- "fs2",
- "futures",
- "globwalker",
- "refinery",
- "serde",
- "serde_json",
- "sqlx",
- "tar",
- "tera",
- "tokio",
- "tokio-postgres",
- "tokio-stream",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
-name = "workflow-worker"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "axum",
- "chrono",
- "clap",
- "common",
- "config",
- "cron",
- "flate2",
- "globwalker",
- "reqwest",
- "serde",
- "serde_json",
- "tar",
- "tera",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "uuid",
 ]
 
 [[package]]

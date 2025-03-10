@@ -4,7 +4,7 @@ use tracing::{info, error, debug};
 use tracing_subscriber;
 use tokio::time::{self, Duration};
 use reqwest::Client;
-use common::{Job, JobResult, log_collector::LogCollector};
+use stroem_common::{Job, JobResult, log_collector::LogCollector};
 use std::env;
 use uuid::Uuid;
 use chrono::{DateTime, Utc};

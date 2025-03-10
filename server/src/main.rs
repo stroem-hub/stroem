@@ -17,8 +17,8 @@ mod api;
 mod repository;
 mod error;
 
-use common::Job;
-use common::workspace::{Workspace, WorkspaceConfiguration, WorkspaceConfigurationTrait};
+use stroem_common::Job;
+use stroem_common::workspace::{Workspace, WorkspaceConfiguration, WorkspaceConfigurationTrait};
 use scheduler::Scheduler;
 use queue::Queue;
 use repository::JobRepository;
