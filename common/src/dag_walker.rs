@@ -15,23 +15,21 @@ impl DagWalker {
         let mut graph: HashMap<String, Vec<String>> = HashMap::new();
         let mut incoming: HashMap<String, usize> = HashMap::new();
 
-        // Initialize all steps in incoming
+        // Initialize all steps in incoming and graph
         for step_name in flow.keys() {
             incoming.entry(step_name.clone()).or_insert(0);
-            graph.entry(step_name.clone()).or_insert_with(Vec::new); // Ensure every step has an entry
+            graph.entry(step_name.clone()).or_insert_with(Vec::new);
         }
 
         // Build the graph and incoming edge counts based on depends_on
         for (step_name, step) in flow {
-            if let Some(depends_on) = &step.depends_on {
-                for dep in depends_on {
-                    // Add step_name as a dependent of dep (outgoing edge)
-                    graph.entry(dep.clone())
-                        .or_insert_with(Vec::new)
-                        .push(step_name.clone());
-                    // Increment incoming edges for step_name
-                    *incoming.entry(step_name.clone()).or_insert(0) += 1;
-                }
+            for dep in step.depends_on.as_ref().unwrap_or(&vec![]) {
+                // Add step_name as a dependent of dep (outgoing edge)
+                graph.entry(dep.clone())
+                    .or_insert_with(Vec::new)
+                    .push(step_name.clone());
+                // Increment incoming edges for step_name
+                *incoming.entry(step_name.clone()).or_insert(0) += 1;
             }
         }
 
