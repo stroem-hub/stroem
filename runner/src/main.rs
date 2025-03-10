@@ -92,7 +92,45 @@ impl Runner {
             }
         }
 
+        if !success {
+            self.handle_error(None).await?;
+        }
+
         Ok(success)
+    }
+
+    async fn handle_error(&self, step_name: Option<&str>) -> Result<()> {
+
+        let error_input = json!({
+                "job_id": self.job_id,
+                "worker_id": self.worker_id,
+                "task": self.task,
+                "action": self.action,
+                "step_name": step_name,
+            });
+
+        if let Some(task) = &self.task {
+            let task = self.workspace.config.as_ref().unwrap().get_task(self.task.clone().unwrap().as_str()).unwrap();
+            let step = task.flow.get(step_name.unwrap()).unwrap();
+
+            if let Some(on_error_name) = &step.on_error {
+                if let Some(error_action) = self.workspace.config.as_ref().and_then(|config| config.get_action(on_error_name)) {
+                    debug!("Running step-specific error handler: {}", on_error_name);
+                    let _ = self.execute_action("step_error_handler", error_action, Some(error_input)).await?;
+                    return Ok(());
+                } else {
+                    debug!("Step-specific error handler '{}' not found", on_error_name);
+                }
+            }
+        }
+
+        // Fall back to global error handler
+        if let Some(error_handler_name) = &self.workspace.config.as_ref().unwrap().workflow_data.globals.as_ref().unwrap().error_handler {
+            debug!("Running global error handler: {}", error_handler_name);
+            let action = self.workspace.config.as_ref().unwrap().get_action(error_handler_name.as_str());
+            let _ = self.execute_action("global_error_handler", action.unwrap(), Some(error_input)).await?;
+        }
+        Ok(())
     }
 
     async fn execute_task(&self, flow: &HashMap<String, FlowStep>, config: &WorkspaceConfiguration) -> Result<bool> {
@@ -119,11 +157,13 @@ impl Runner {
                     }
                 }
                 else {
-                    success = false;
-                    break;
+                    self.handle_error(Some(step_name.as_str())).await?;
+                    if !step.continue_on_fail.unwrap_or(false) {
+                        success = false;
+                        break;
+                    }
                 }
 
-                success &= step_success;
                 next_step = dag.get_next_step(Some(step_name));
             } else {
                 error!("Step '{}' not found in DAG", step_name);

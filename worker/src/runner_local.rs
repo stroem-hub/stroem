@@ -18,7 +18,7 @@ pub async fn start(job: &Job, server: &str, worker_id: &str, mut log_collector: 
         }
     };
     let runner_path = match worker_path.parent() {
-        Some(path) => path.join("workflow-runner"),
+        Some(path) => path.join("stroem-runner"),
         None => {
             let msg = "Failed to get parent directory of worker binary".to_string();
             error!(msg);

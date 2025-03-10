@@ -26,13 +26,7 @@ pub trait WorkspaceConfigurationTrait {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Globals {
     pub base_path: Option<String>,
-    pub error_handler: Option<ErrorHandler>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ErrorHandler {
-    pub path: String,
-    pub description: Option<String>,
+    pub error_handler: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -75,11 +69,20 @@ pub struct Task {
     pub flow: HashMap<String, FlowStep>,
 }
 
+impl Task {
+    pub fn get_step(&self, name: &str) -> Option<&FlowStep> {
+        self.flow.get(name)
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FlowStep {
     pub action: String,
     pub input: Option<HashMap<String, String>>,
     pub depends_on: Option<Vec<String>>,
+    #[serde(default)]  // Ensures continue_on_fail defaults to false
+    pub continue_on_fail: Option<bool>,
+    pub on_error: Option<String>,  // Action name reference
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -168,7 +171,7 @@ impl Workspace {
             config: None,
             revision: None,
         };
-        s.read_config().unwrap_or(Default::default());
+        s.read_config().unwrap();
         s
     }
     pub fn read_config(&mut self) -> Result<(), Error> {

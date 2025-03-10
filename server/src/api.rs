@@ -29,7 +29,6 @@ use crate::error::AppError;
 
 #[derive(Clone)]
 pub struct Api {
-    pub queue: Queue,
     pub workspace: Workspace,
     pub job_repository: JobRepository,
     pub log_repository: LogRepository,
@@ -37,8 +36,8 @@ pub struct Api {
 
 
 impl Api {
-    pub fn new(queue: Queue, workspace: Workspace, job_repository: JobRepository, log_repository: LogRepository) -> Self {
-        Self { queue, workspace, job_repository, log_repository }
+    pub fn new(workspace: Workspace, job_repository: JobRepository, log_repository: LogRepository) -> Self {
+        Self { workspace, job_repository, log_repository }
     }
 }
 

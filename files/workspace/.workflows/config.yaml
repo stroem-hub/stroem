@@ -1,4 +1,8 @@
 actions:
+  error_handler:
+    type: shell
+    cmd: echo "ERROR! at {{ input.step_name }}"
+
   allunite.ddd:
     type: cmd
     path: run/last.sh
@@ -96,7 +100,5 @@ triggers:
       vvv: "123"
 
 globals:
-  error_handler:
-    path: global/error_handler.sh
-    # input: path, job_id, error
+  error_handler: error_handler
 

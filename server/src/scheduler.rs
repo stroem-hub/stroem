@@ -10,10 +10,11 @@ use std::str::FromStr;
 use tokio::time::{self, Duration};
 use std::collections::HashMap;
 use chrono::{Utc, DateTime};
+use crate::repository::JobRepository;
 
 pub struct Scheduler {
     schedules: Vec<(Schedule, Job, String, Option<DateTime<Utc>>, Option<DateTime<Utc>>)>,
-    queue: Queue,
+    job_repository: JobRepository,
     task: Option<tokio::task::JoinHandle<()>>,
     cancel_tx: watch::Sender<bool>,
 }
@@ -57,10 +58,10 @@ impl Scheduler {
         schedules
     }
 
-    pub fn new(queue: Queue, config: &WorkspaceConfiguration) -> Self {
+    pub fn new(job_repository: JobRepository, config: &WorkspaceConfiguration) -> Self {
         let (cancel_tx, _) = watch::channel(false);
         Self {
-            queue,
+            job_repository,
             schedules: Self::load_config(config),
             task: None,
             cancel_tx,
@@ -78,9 +79,10 @@ impl Scheduler {
             return;
         }
 
-        let queue = self.queue.clone();
         let mut schedules = self.schedules.clone();
         let mut cancel_rx = self.cancel_tx.subscribe();
+
+        let job_repo = self.job_repository.clone();
 
         let task = tokio::spawn(async move {
             loop {
@@ -101,7 +103,7 @@ impl Scheduler {
                                 input: job.input.clone(),
                                 uuid: None,
                             };
-                            if let Err(e) = queue.enqueue(job).await {
+                            if let Err(e) = job_repo.enqueue_job(&job, "trigger", Some(&trigger_name)).await {
                                 error!("Failed to enqueue job for trigger '{}': {}", trigger_name, e);
                             } else {
                                 info!("Enqueued job for trigger '{}'", trigger_name);

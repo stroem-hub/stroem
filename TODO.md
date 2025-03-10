@@ -3,7 +3,7 @@
 - [x] Move DAG to a separated function
 - [x] Name
 - [X] "depends on" instead of "on_success"
-- [ ] global error handler
+- [X] global error handler
 - [ ] reload workspace webhook
 - [ ] workspace in git
 - [ ] config validator

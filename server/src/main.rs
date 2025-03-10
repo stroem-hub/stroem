@@ -78,15 +78,12 @@ async fn main() -> Result<(), Error>{
     let job_repo = JobRepository::new(db_pool);
     let logs_repo = LogRepository::new(cfg.get_string("logs.folder").unwrap().parse()?);
 
-    // Create Queue
-    let queue = Queue::new(100);
-
     // Create Scheduler
-    let mut scheduler = Scheduler::new(queue.clone(), workspace.config.as_ref().unwrap());
+    let mut scheduler = Scheduler::new(job_repo.clone(), workspace.config.as_ref().unwrap());
     scheduler.run().await;
 
     // Create Api
-    let server = api::Api::new(queue.clone(), workspace, job_repo, logs_repo);
+    let server = api::Api::new(workspace, job_repo, logs_repo);
     tokio::spawn(async move {
         api::run(server, "0.0.0.0:8080").await;
     });
