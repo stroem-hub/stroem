@@ -5,11 +5,8 @@ use config::Config;
 use globwalker::GlobWalkerBuilder;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tracing::debug;
+use tracing::{debug, error};
 
-pub trait WorkspaceConfigurationTrait {
-    fn reread(&mut self) -> Result<(), Error>;
-}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Globals {
@@ -84,61 +81,60 @@ pub struct Trigger {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct WorkflowData {
+pub struct WorkspaceConfiguration {
     pub globals: Option<Globals>,
     pub actions: Option<HashMap<String, Action>>,
     pub tasks: Option<HashMap<String, Task>>,
     pub triggers: Option<HashMap<String, Trigger>>,
 }
 
-#[derive(Debug, Clone)]
-pub struct WorkspaceConfiguration {
-    path: PathBuf,
-    config: Config,
-    pub workflow_data: WorkflowData,
-}
-
 impl WorkspaceConfiguration {
-    pub fn new(path: PathBuf) -> Self {
-        Self {
-            path: PathBuf::from(path),
-            config: Config::default(),
-            workflow_data: WorkflowData {
-                globals: None,
-                actions: None,
-                tasks: None,
-                triggers: None,
-            },
-        }
-    }
-
-    pub fn reread(&mut self) -> Result<(), Error> {
-        let gw = GlobWalkerBuilder::from_patterns(&self.path, &["*.yaml"])
+    pub fn new(path: PathBuf) -> Option<Self> {
+        // Build the glob walker, handling potential errors
+        let gw = match GlobWalkerBuilder::from_patterns(&path, &["*.yaml"])
             .max_depth(10)
             .follow_links(true)
             .sort_by(|a, b| a.path().cmp(b.path()))
-            .build()?
-            .into_iter()
-            .filter_map(Result::ok)
-            .map(|entry| config::File::from(entry.path()))
-            .collect::<Vec<_>>();
+            .build()
+        {
+            Ok(walker) => walker
+                .into_iter()
+                .filter_map(Result::ok)
+                .map(|entry| config::File::from(entry.path()))
+                .collect::<Vec<_>>(),
+            Err(e) => {
+                error!("Failed to build glob walker: {}", e);
+                return None;
+            }
+        };
 
-        self.config = Config::builder()
-            .add_source(gw)
-            .build()?;
+        // Build the config, handling errors
+        let config = match Config::builder().add_source(gw).build() {
+            Ok(config) => config,
+            Err(e) => {
+                error!("Failed to build config: {}", e);
+                return None;
+            }
+        };
 
-        debug!("Merged config: {:?}", self.config);
+        debug!("Merged config: {:?}", config);
 
-        self.workflow_data = self.config.clone().try_deserialize::<WorkflowData>()?;
-
-        Ok(())
+        // Deserialize to Self, converting Result to Option
+        match config.try_deserialize::<Self>() {
+            Ok(cfg) => Some(cfg),
+            Err(e) => {
+                error!("Failed to deserialize config: {}", e);
+                None
+            }
+        }
     }
 
+
     pub fn get_action(&self, name: &str) -> Option<&Action> {
-        self.workflow_data.actions.as_ref()?.get(name)
+        self.actions.as_ref()?.get(name)
     }
 
     pub fn get_task(&self, name: &str) -> Option<&Task> {
-        self.workflow_data.tasks.as_ref()?.get(name)
+        self.tasks.as_ref()?.get(name)
     }
 }

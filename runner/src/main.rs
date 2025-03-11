@@ -1,7 +1,7 @@
 use clap::Parser;
 use tracing::{info, error, debug};
 use tracing_subscriber;
-use stroem_common::workspace_configuration::{WorkspaceConfiguration, WorkspaceConfigurationTrait, Action, FlowStep};
+use stroem_common::workspace_configuration::{WorkspaceConfiguration, Action, FlowStep};
 use stroem_common::workspace::Workspace;
 use reqwest::Client;
 use chrono::Utc;
@@ -126,7 +126,7 @@ impl Runner {
         }
 
         // Fall back to global error handler
-        if let Some(error_handler_name) = &self.workspace.config.as_ref().unwrap().workflow_data.globals.as_ref().unwrap().error_handler {
+        if let Some(error_handler_name) = &self.workspace.config.as_ref().unwrap().globals.as_ref().unwrap().error_handler {
             debug!("Running global error handler: {}", error_handler_name);
             let action = self.workspace.config.as_ref().unwrap().get_action(error_handler_name.as_str());
             let _ = self.execute_action("global_error_handler", action.unwrap(), Some(error_input)).await?;

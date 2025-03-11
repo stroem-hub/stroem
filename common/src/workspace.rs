@@ -27,8 +27,8 @@ pub struct Workspace {
     pub path: PathBuf,
     pub config: Option<WorkspaceConfiguration>,
     pub revision: Option<String>,
-    config_tx: watch::Sender<WorkspaceConfiguration>, // Add sender
-    config_rx: watch::Receiver<WorkspaceConfiguration>, // Add receiver
+    config_tx: watch::Sender<Option<WorkspaceConfiguration>>, // Add sender
+    config_rx: watch::Receiver<Option<WorkspaceConfiguration>>, // Add receiver
 }
 
 impl Workspace {
@@ -38,7 +38,7 @@ impl Workspace {
         let (config_tx, config_rx) = watch::channel(config.clone());
         let mut s = Self {
             path,
-            config: Some(config),
+            config: config,
             revision: None,
             config_tx,
             config_rx
@@ -52,9 +52,8 @@ impl Workspace {
             bail!("Workspace configuration not found");
         }
         let mut config = WorkspaceConfiguration::new(workflows_path);
-        config.reread()?;
         info!("Loaded workspace configurations: {:?}", &config);
-        self.config = Some(config.clone());
+        self.config = config.clone();
 
         self.config_tx.send(config)?;
 
@@ -65,7 +64,7 @@ impl Workspace {
         self.path.read_dir().map(|mut i| i.next().is_none()).unwrap_or(false)
     }
 
-    pub fn subscribe(&self) -> watch::Receiver<WorkspaceConfiguration> {
+    pub fn subscribe(&self) -> watch::Receiver<Option<WorkspaceConfiguration>> {
         self.config_rx.clone()
     }
 

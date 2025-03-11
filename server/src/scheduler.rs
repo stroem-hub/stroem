@@ -1,7 +1,7 @@
 // workflow-server/src/scheduler.rs
 use crate::Queue;
 use stroem_common::Job;
-use stroem_common::workspace_configuration::{WorkspaceConfiguration, WorkspaceConfigurationTrait};
+use stroem_common::workspace_configuration::{WorkspaceConfiguration};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::watch;
 use tracing::{info, error, debug};
@@ -16,16 +16,18 @@ pub struct Scheduler {
     job_repository: JobRepository,
     task: Option<tokio::task::JoinHandle<()>>,
     cancel_tx: watch::Sender<bool>,
-    config_rx: watch::Receiver<WorkspaceConfiguration>,
+    config_rx: watch::Receiver<Option<WorkspaceConfiguration>>,
 }
 
 impl Scheduler {
     fn load_config(
-        config: &WorkspaceConfiguration,
+        config: Option<WorkspaceConfiguration>,
         old_schedules: Option<&HashMap<String, (Schedule, Job, Option<DateTime<Utc>>, Option<DateTime<Utc>>)>>,
     ) -> HashMap<String, (Schedule, Job, Option<DateTime<Utc>>, Option<DateTime<Utc>>)> {
         let mut schedules = HashMap::new();
-        if let Some(triggers) = &config.workflow_data.triggers {
+        let Some(config) = config else { return schedules };
+
+        if let Some(triggers) = &config.triggers {
             for (trigger_name, trigger) in triggers.iter() {
                 if !trigger.enabled.unwrap_or(true) {
                     continue;
@@ -63,7 +65,7 @@ impl Scheduler {
         schedules
     }
 
-    pub fn new(job_repository: JobRepository, config: &WorkspaceConfiguration, config_rx: watch::Receiver<WorkspaceConfiguration>) -> Self {
+    pub fn new(job_repository: JobRepository, config: &WorkspaceConfiguration, config_rx: watch::Receiver<Option<WorkspaceConfiguration>>) -> Self {
         let (cancel_tx, _) = watch::channel(false);
         Self {
             job_repository,
@@ -84,7 +86,7 @@ impl Scheduler {
         let job_repo = self.job_repository.clone();
 
         let task = tokio::spawn(async move {
-            let mut schedules = Self::load_config(&config_rx.borrow(), None);
+            let mut schedules = Self::load_config(config_rx.borrow().clone(), None);
             loop {
                 let now = Utc::now();
                 let mut next_wakeup = None;
@@ -148,8 +150,8 @@ impl Scheduler {
                             }
                             _ = config_rx.changed() => {
                                 info!("Reloading scheduler due to workspace config change");
-                                let new_config = config_rx.borrow();
-                                schedules = Self::load_config(&new_config, Some(&schedules));
+                                let new_config = config_rx.borrow().clone();
+                                schedules = Self::load_config(new_config, Some(&schedules));
                             }
                         }
                     }
@@ -158,7 +160,7 @@ impl Scheduler {
                         tokio::select! {
                                 _ = config_rx.changed() => {
                                     info!("Config reloaded, checking for new schedules");
-                                    schedules = Self::load_config(&config_rx.borrow(), Some(&schedules));
+                                    schedules = Self::load_config(config_rx.borrow().clone(), Some(&schedules));
                                 }
                                 _ = cancel_rx.changed() => {
                                     if *cancel_rx.borrow() {
