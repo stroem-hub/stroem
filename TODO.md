@@ -4,7 +4,9 @@
 - [x] Name
 - [X] "depends on" instead of "on_success"
 - [X] global error handler
-- [ ] reload workspace webhook
+- [X] reload workspace webhook
+- [X] refactor scheduler
+- [ ] workspace watch changes
 - [ ] workspace in git
 - [ ] config validator
 - [ ] Secrets

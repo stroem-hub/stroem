@@ -13,7 +13,6 @@ use chrono::{Utc, DateTime};
 use crate::repository::JobRepository;
 
 pub struct Scheduler {
-    schedules: Vec<(Schedule, Job, String, Option<DateTime<Utc>>, Option<DateTime<Utc>>)>,
     job_repository: JobRepository,
     task: Option<tokio::task::JoinHandle<()>>,
     cancel_tx: watch::Sender<bool>,
@@ -21,10 +20,11 @@ pub struct Scheduler {
 }
 
 impl Scheduler {
-    fn load_config(config: &WorkspaceConfiguration)
-                   -> Vec<(Schedule, Job, String, Option<DateTime<Utc>>, Option<DateTime<Utc>>)>
-    {
-        let mut schedules: Vec<(Schedule, Job, String, Option<DateTime<Utc>>, Option<DateTime<Utc>>)> = Vec::new();
+    fn load_config(
+        config: &WorkspaceConfiguration,
+        old_schedules: Option<&HashMap<String, (Schedule, Job, Option<DateTime<Utc>>, Option<DateTime<Utc>>)>>,
+    ) -> HashMap<String, (Schedule, Job, Option<DateTime<Utc>>, Option<DateTime<Utc>>)> {
+        let mut schedules = HashMap::new();
         if let Some(triggers) = &config.workflow_data.triggers {
             for (trigger_name, trigger) in triggers.iter() {
                 if !trigger.enabled.unwrap_or(true) {
@@ -47,8 +47,12 @@ impl Scheduler {
                                         }),
                                     uuid: None,
                                 };
+                                // Use last_run from old_schedules if available, otherwise None
+                                let last_run = old_schedules
+                                    .and_then(|old| old.get(trigger_name))
+                                    .and_then(|(_, _, last, _)| *last);
                                 info!("Added trigger '{}' to scheduler: {}", trigger_name, cron_expr);
-                                schedules.push((schedule, job, trigger_name.clone(), None, None));
+                                schedules.insert(trigger_name.clone(), (schedule, job, last_run, None));
                             }
                             Err(e) => error!("Invalid cron expression for trigger '{}': {}", trigger_name, e),
                         }
@@ -63,7 +67,6 @@ impl Scheduler {
         let (cancel_tx, _) = watch::channel(false);
         Self {
             job_repository,
-            schedules: Self::load_config(config),
             task: None,
             cancel_tx,
             config_rx,
@@ -76,22 +79,17 @@ impl Scheduler {
             return;
         }
 
-        if self.schedules.is_empty() {
-            info!("No cron triggers found to schedule");
-            return;
-        }
-
-        let mut schedules = self.schedules.clone();
         let mut cancel_rx = self.cancel_tx.subscribe();
         let mut config_rx = self.config_rx.clone();
         let job_repo = self.job_repository.clone();
 
         let task = tokio::spawn(async move {
+            let mut schedules = Self::load_config(&config_rx.borrow(), None);
             loop {
                 let now = Utc::now();
                 let mut next_wakeup = None;
 
-                for (schedule, job, trigger_name, last_run, next_run) in &mut schedules {
+                for (trigger_name, (schedule, job, last_run, next_run)) in &mut schedules {
                     debug!("Processing trigger '{}'", trigger_name);
                     if next_run.is_none() {
                         *next_run = schedule.after(&last_run.unwrap_or(now)).next();
@@ -150,13 +148,25 @@ impl Scheduler {
                             }
                             _ = config_rx.changed() => {
                                 info!("Reloading scheduler due to workspace config change");
-                                schedules = Self::load_config(&config_rx.borrow());
+                                let new_config = config_rx.borrow();
+                                schedules = Self::load_config(&new_config, Some(&schedules));
                             }
                         }
                     }
                     None => {
-                        info!("No more valid schedules to run");
-                        break;
+                        info!("No valid schedules to run, waiting for config reload");
+                        tokio::select! {
+                                _ = config_rx.changed() => {
+                                    info!("Config reloaded, checking for new schedules");
+                                    schedules = Self::load_config(&config_rx.borrow(), Some(&schedules));
+                                }
+                                _ = cancel_rx.changed() => {
+                                    if *cancel_rx.borrow() {
+                                        info!("Scheduler stopping due to cancellation signal");
+                                        break;
+                                    }
+                                }
+                            }
                     }
                 }
             }
