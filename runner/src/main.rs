@@ -1,7 +1,8 @@
 use clap::Parser;
 use tracing::{info, error, debug};
 use tracing_subscriber;
-use stroem_common::workspace::{WorkspaceConfiguration, WorkspaceConfigurationTrait, Action, Workspace, FlowStep};
+use stroem_common::workspace_configuration::{WorkspaceConfiguration, WorkspaceConfigurationTrait, Action, FlowStep};
+use stroem_common::workspace::Workspace;
 use reqwest::Client;
 use chrono::Utc;
 use serde_json::{json, Value};

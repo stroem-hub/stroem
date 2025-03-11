@@ -94,7 +94,7 @@ triggers:
   trigger01:
     enabled: false
     type: "cron"
-    cron: "*/5 * * * * *"
+    cron: "*/20 * * * * *"
     task: task1
     input:
       vvv: "123"

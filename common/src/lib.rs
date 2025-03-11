@@ -22,6 +22,8 @@ pub mod workspace;
 pub mod log_collector;
 pub mod parameter_renderer;
 pub mod dag_walker;
+pub mod workspace_configuration;
+
 use log_collector::{LogCollector, LogEntry};
 
 
