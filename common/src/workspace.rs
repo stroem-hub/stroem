@@ -18,6 +18,7 @@ use flate2::Compression;
 use flate2::read::GzDecoder;
 use reqwest::Client;
 use fs2::FileExt;
+use tokio::sync::watch;
 
 pub trait WorkspaceConfigurationTrait {
     fn reread(&mut self) -> Result<(), Error>;
@@ -161,15 +162,21 @@ pub struct Workspace {
     pub path: PathBuf,
     pub config: Option<WorkspaceConfiguration>,
     pub revision: Option<String>,
+    config_tx: watch::Sender<WorkspaceConfiguration>, // Add sender
+    config_rx: watch::Receiver<WorkspaceConfiguration>, // Add receiver
 }
 
 impl Workspace {
     pub fn new(path: PathBuf) -> Self {
         fs::create_dir_all(&path).unwrap_or_default();
+        let config = WorkspaceConfiguration::new(path.clone());
+        let (config_tx, config_rx) = watch::channel(config.clone());
         let mut s = Self {
             path,
-            config: None,
+            config: Some(config),
             revision: None,
+            config_tx,
+            config_rx
         };
         s.read_config().unwrap();
         s
@@ -182,13 +189,19 @@ impl Workspace {
         let mut config = WorkspaceConfiguration::new(workflows_path);
         config.reread()?;
         info!("Loaded workspace configurations: {:?}", &config);
-        self.config = Some(config);
+        self.config = Some(config.clone());
+
+        self.config_tx.send(config)?;
 
         Ok(())
     }
 
     pub fn is_empty(&self) -> bool {
         self.path.read_dir().map(|mut i| i.next().is_none()).unwrap_or(false)
+    }
+
+    pub fn subscribe(&self) -> watch::Receiver<WorkspaceConfiguration> {
+        self.config_rx.clone()
     }
 
     fn walk_files(&self) -> Vec<globwalker::DirEntry> {

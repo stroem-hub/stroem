@@ -79,7 +79,7 @@ async fn main() -> Result<(), Error>{
     let logs_repo = LogRepository::new(cfg.get_string("logs.folder").unwrap().parse()?);
 
     // Create Scheduler
-    let mut scheduler = Scheduler::new(job_repo.clone(), workspace.config.as_ref().unwrap());
+    let mut scheduler = Scheduler::new(job_repo.clone(), workspace.config.as_ref().unwrap(), workspace.subscribe());
     scheduler.run().await;
 
     // Create Api

@@ -17,6 +17,7 @@ pub struct Scheduler {
     job_repository: JobRepository,
     task: Option<tokio::task::JoinHandle<()>>,
     cancel_tx: watch::Sender<bool>,
+    config_rx: watch::Receiver<WorkspaceConfiguration>,
 }
 
 impl Scheduler {
@@ -58,13 +59,14 @@ impl Scheduler {
         schedules
     }
 
-    pub fn new(job_repository: JobRepository, config: &WorkspaceConfiguration) -> Self {
+    pub fn new(job_repository: JobRepository, config: &WorkspaceConfiguration, config_rx: watch::Receiver<WorkspaceConfiguration>) -> Self {
         let (cancel_tx, _) = watch::channel(false);
         Self {
             job_repository,
             schedules: Self::load_config(config),
             task: None,
             cancel_tx,
+            config_rx,
         }
     }
 
@@ -81,7 +83,7 @@ impl Scheduler {
 
         let mut schedules = self.schedules.clone();
         let mut cancel_rx = self.cancel_tx.subscribe();
-
+        let mut config_rx = self.config_rx.clone();
         let job_repo = self.job_repository.clone();
 
         let task = tokio::spawn(async move {
@@ -145,6 +147,10 @@ impl Scheduler {
                                     info!("Scheduler stopping due to cancellation signal");
                                     break;
                                 }
+                            }
+                            _ = config_rx.changed() => {
+                                info!("Reloading scheduler due to workspace config change");
+                                schedules = Self::load_config(&config_rx.borrow());
                             }
                         }
                     }

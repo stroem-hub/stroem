@@ -52,6 +52,7 @@ pub async fn run(api: Api, addr: &str) {
         .route("/jobs/{:job_id}/steps/{:step_name}/logs", post(save_step_logs))
         .route("/jobs/{:job_id}/steps/{:step_name}/results", post(update_step_result))
         .route("/files/workspace.tar.gz", get(serve_workspace_tarball))
+        .route("/reload", post(reload_workspace))
         .with_state(api);
 
     let listener = TcpListener::bind(addr).await.unwrap();
@@ -59,6 +60,15 @@ pub async fn run(api: Api, addr: &str) {
     axum::serve(listener, app.into_make_service())
         .await
         .unwrap();
+}
+
+#[axum::debug_handler]
+async fn reload_workspace(
+    State(mut api): State<Api>,
+) -> Result<Json<String>, AppError> {
+    api.workspace.read_config()?;
+    info!("Workspace reloaded and config broadcasted");
+    Ok(Json("Reloaded".to_string()))
 }
 
 #[axum::debug_handler]
