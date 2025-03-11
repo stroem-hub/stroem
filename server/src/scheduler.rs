@@ -65,7 +65,7 @@ impl Scheduler {
         schedules
     }
 
-    pub fn new(job_repository: JobRepository, config: &WorkspaceConfiguration, config_rx: watch::Receiver<Option<WorkspaceConfiguration>>) -> Self {
+    pub fn new(job_repository: JobRepository, config_rx: watch::Receiver<Option<WorkspaceConfiguration>>) -> Self {
         let (cancel_tx, _) = watch::channel(false);
         Self {
             job_repository,

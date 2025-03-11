@@ -19,6 +19,8 @@ use flate2::read::GzDecoder;
 use reqwest::Client;
 use fs2::FileExt;
 use tokio::sync::watch;
+use notify::{RecommendedWatcher, RecursiveMode, Watcher, Config as NotifyConfig}; // Add notify imports
+use tokio::time::{sleep, Duration}; // For watcher task loop
 
 use crate::workspace_configuration::WorkspaceConfiguration;
 
@@ -32,20 +34,60 @@ pub struct Workspace {
 }
 
 impl Workspace {
-    pub fn new(path: PathBuf) -> Self {
+    pub async fn new(path: PathBuf) -> Self {
         fs::create_dir_all(&path).unwrap_or_default();
         let config = WorkspaceConfiguration::new(path.clone());
         let (config_tx, config_rx) = watch::channel(config.clone());
         let mut s = Self {
             path,
-            config: config,
+            config,
             revision: None,
             config_tx,
-            config_rx
+            config_rx,
         };
         s.read_config().unwrap();
         s
     }
+
+    pub async fn watch(&self) {
+        let watch_path = self.path.clone();
+        let watcher_path = self.path.clone();
+        let config_tx = self.config_tx.clone();
+        tokio::spawn(async move {
+            let mut watcher = match RecommendedWatcher::new(
+                move |res: notify::Result<notify::Event>| {
+                    if let Ok(event) = res {
+                        debug!("Filesystem event: {:?}", event);
+                        let workflows_path = watcher_path.join(".workflows");
+                        let config = WorkspaceConfiguration::new(workflows_path);
+                        if let Some(cfg) = config {
+                            if let Err(e) = config_tx.send(Some(cfg)) {
+                                error!("Failed to broadcast config update: {}", e);
+                            }
+                        }
+                    }
+                },
+                NotifyConfig::default(),
+            ) {
+                Ok(w) => w,
+                Err(e) => {
+                    error!("Failed to create filesystem watcher: {}", e);
+                    return;
+                }
+            };
+
+            if let Err(e) = watcher.watch(watch_path.as_path(), RecursiveMode::Recursive) {
+                error!("Failed to watch directory {:?}: {}", watch_path, e);
+                return;
+            }
+
+            // Keep the task alive
+            loop {
+                sleep(Duration::from_secs(5)).await;
+            }
+        });
+    }
+
     pub fn read_config(&mut self) -> Result<(), Error> {
         let workflows_path = self.path.join(".workflows");
         if !workflows_path.exists() {
