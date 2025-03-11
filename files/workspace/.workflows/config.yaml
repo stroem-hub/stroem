@@ -97,7 +97,7 @@ triggers:
     cron: "*/20 * * * * *"
     task: task1
     input:
-      vvv: "123"
+      field1: "trigger"
 
 globals:
   error_handler: error_handler

@@ -140,6 +140,7 @@ impl Runner {
 
         let mut renderer = ParameterRenderer::new();
         if let Some(input_value) = &self.input {
+            debug!("Task input: {}", input_value);
             renderer.add_to_context(json!({"input": input_value.clone()}))?;
         }
 
@@ -149,7 +150,9 @@ impl Runner {
                 info!("Executing step: {}", step_name);
 
                 let step_value = serde_json::to_value(&step.input)?;
+                debug!("Step input before rendering: {}", step_value);
                 let step_input = Some(renderer.render(step_value)?);
+                debug!("Step input after rendering: {:?}", step_input);
 
                 let (step_success, step_output) = self.execute_action(&step_name, config.get_action(&step.action).unwrap(), step_input).await?;
                 if step_success {
@@ -253,7 +256,7 @@ async fn main() {
             std::process::exit(1);
         }));
 
-    let mut workspace = Workspace::new(PathBuf::from(&args.workspace_dir));
+    let mut workspace = Workspace::new(PathBuf::from(&args.workspace_dir)).await;
     let revision = workspace.sync(&args.server).await.unwrap_or_else(|e| {
         error!("Failed to get workspace: {}", e);
         std::process::exit(1);

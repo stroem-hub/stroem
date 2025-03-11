@@ -21,6 +21,7 @@ use fs2::FileExt;
 use tokio::sync::watch;
 use notify::{RecommendedWatcher, RecursiveMode, Watcher, Config as NotifyConfig}; // Add notify imports
 use tokio::time::{sleep, Duration}; // For watcher task loop
+use std::sync::{Arc, RwLock};
 
 use crate::workspace_configuration::WorkspaceConfiguration;
 
@@ -28,7 +29,7 @@ use crate::workspace_configuration::WorkspaceConfiguration;
 pub struct Workspace {
     pub path: PathBuf,
     pub config: Option<WorkspaceConfiguration>,
-    pub revision: Option<String>,
+    pub revision: Arc<RwLock<Option<String>>>,
     config_tx: watch::Sender<Option<WorkspaceConfiguration>>, // Add sender
     config_rx: watch::Receiver<Option<WorkspaceConfiguration>>, // Add receiver
 }
@@ -41,7 +42,7 @@ impl Workspace {
         let mut s = Self {
             path,
             config,
-            revision: None,
+            revision: Arc::new(RwLock::new(None)),
             config_tx,
             config_rx,
         };
@@ -52,6 +53,7 @@ impl Workspace {
     pub async fn watch(&self) {
         let watch_path = self.path.clone();
         let watcher_path = self.path.clone();
+        let revision = Arc::clone(&self.revision);
         let config_tx = self.config_tx.clone();
         tokio::spawn(async move {
             let mut watcher = match RecommendedWatcher::new(
@@ -63,6 +65,12 @@ impl Workspace {
                         if let Some(cfg) = config {
                             if let Err(e) = config_tx.send(Some(cfg)) {
                                 error!("Failed to broadcast config update: {}", e);
+                            }
+
+                            if let Ok(mut rev) = revision.write() {
+                                *rev = None;
+                            } else {
+                                error!("Failed to acquire write lock on revision");
                             }
                         }
                     }
@@ -121,32 +129,33 @@ impl Workspace {
         entries
     }
 
-    pub fn get_revision(&mut self) -> Result<String, Error> {
-        if self.revision.is_some() {
-            return Ok(self.revision.clone().unwrap());
-        }
+    pub fn get_revision(&self) -> Result<String, Error> {
+        let mut rev_guard = self.revision.write().map_err(|e| anyhow!("Failed to lock revision: {}", e))?;
+        if rev_guard.is_none() {
+            let mut hasher = Blake2b512::new();
 
-        let mut hasher = Blake2b512::new();
+            for entry in self.walk_files() {
+                let path = entry.path();
+                if path.is_file() {
+                    let relative_path = path.strip_prefix(&self.path).unwrap().to_string_lossy();
+                    hasher.update(relative_path.as_bytes());
 
-        for entry in self.walk_files() {
-            let path = entry.path();
-            if path.is_file() {
-                let relative_path = path.strip_prefix(&self.path).unwrap().to_string_lossy();
-                hasher.update(relative_path.as_bytes());
-
-                match fs::read(path) {
-                    Ok(contents) => hasher.update(&contents),
-                    Err(e) => {
-                        error!("Failed to read file {}: {}", path.display(), e);
-                        hasher.update(format!("error:{}", e).as_bytes()); // Include error in hash
+                    match fs::read(path) {
+                        Ok(contents) => hasher.update(&contents),
+                        Err(e) => {
+                            error!("Failed to read file {}: {}", path.display(), e);
+                            hasher.update(format!("error:{}", e).as_bytes());
+                        }
                     }
                 }
             }
-        }
 
-        let revision = format!("{:x}", hasher.finalize());
-        self.revision = Some(revision.clone());
-        Ok(revision)
+            let revision = format!("{:x}", hasher.finalize());
+            *rev_guard = Some(revision.clone());
+            Ok(revision)
+        } else {
+            Ok(rev_guard.clone().unwrap())
+        }
     }
 
     pub fn build_tarball(&mut self) -> Result<Vec<u8>, Error> {
