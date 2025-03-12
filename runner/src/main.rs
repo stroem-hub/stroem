@@ -7,12 +7,14 @@ use reqwest::Client;
 use chrono::Utc;
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
+use std::ops::Deref;
 use stroem_common::{run, JobResult, log_collector::LogCollector, log_collector::LogEntry, init_tracing};
 use tera::Tera;
 use std::path::{Path, PathBuf};
 use anyhow::{anyhow, Result};
 use stroem_common::parameter_renderer::ParameterRenderer;
 use stroem_common::dag_walker::DagWalker;
+use std::sync::{Arc, RwLock};
 
 
 
@@ -67,11 +69,16 @@ impl Runner {
     async fn execute(&mut self) -> Result<bool> {
         let mut success = true;
 
+        let workflows_guard = self.workspace.workflows.read()
+            .map_err(|e| anyhow!("Failed to acquire read lock on workflows: {}", e))?;
+
+        let workflows = workflows_guard.as_ref().unwrap();
+
         match (self.task.clone(), self.action.clone()) {
             (Some(task), None) => {
                 info!("Running task: {} with job_id: {}, worker_id: {}", task, self.job_id, self.worker_id);
-                if let Some(task_def) = self.workspace.config.as_ref().unwrap().get_task(&task) {
-                    success = self.execute_task(&task_def.flow, self.workspace.config.as_ref().unwrap()).await?;
+                if let Some(task_def) = workflows.get_task(&task) {
+                    success = self.execute_task(&task_def.flow, workflows).await?;
                 } else {
                     error!("Task '{}' not found in workspace config", task);
                     success = false;
@@ -79,7 +86,7 @@ impl Runner {
             }
             (None, Some(action_name)) => {
                 info!("Running action: {} with job_id: {}, worker_id: {}", action_name, self.job_id, self.worker_id);
-                if let Some(action_def) = self.workspace.config.as_ref().unwrap().get_action(&action_name) {
+                if let Some(action_def) = workflows.get_action(&action_name) {
                     let (action_success, _) = self.execute_action(&action_name, action_def, self.input.clone()).await?;
                     success = action_success;
                 } else {
@@ -110,12 +117,16 @@ impl Runner {
                 "step_name": step_name,
             });
 
+        let workflows_guard = self.workspace.workflows.read()
+            .map_err(|e| anyhow!("Failed to acquire read lock on workflows: {}", e))?;
+        let workflows = workflows_guard.as_ref().unwrap();
+
         if let Some(task) = &self.task {
-            let task = self.workspace.config.as_ref().unwrap().get_task(self.task.clone().unwrap().as_str()).unwrap();
+            let task = workflows.get_task(self.task.clone().unwrap().as_str()).unwrap();
             let step = task.flow.get(step_name.unwrap()).unwrap();
 
             if let Some(on_error_name) = &step.on_error {
-                if let Some(error_action) = self.workspace.config.as_ref().and_then(|config| config.get_action(on_error_name)) {
+                if let Some(error_action) = workflows.get_action(on_error_name) {
                     debug!("Running step-specific error handler: {}", on_error_name);
                     let _ = self.execute_action("step_error_handler", error_action, Some(error_input)).await?;
                     return Ok(());
@@ -126,9 +137,9 @@ impl Runner {
         }
 
         // Fall back to global error handler
-        if let Some(error_handler_name) = &self.workspace.config.as_ref().unwrap().globals.as_ref().unwrap().error_handler {
+        if let Some(error_handler_name) = &workflows.globals.as_ref().unwrap().error_handler {
             debug!("Running global error handler: {}", error_handler_name);
-            let action = self.workspace.config.as_ref().unwrap().get_action(error_handler_name.as_str());
+            let action = workflows.get_action(error_handler_name.as_str());
             let _ = self.execute_action("global_error_handler", action.unwrap(), Some(error_input)).await?;
         }
         Ok(())

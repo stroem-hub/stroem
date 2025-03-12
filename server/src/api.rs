@@ -25,18 +25,19 @@ use serde_json::Value;
 use stroem_common::workspace::Workspace;
 use crate::repository::{JobRepository, LogRepository};
 use crate::error::AppError;
+use std::sync::{Arc, RwLock};
 
 
 #[derive(Clone)]
 pub struct Api {
-    pub workspace: Workspace,
+    pub workspace: Arc<Workspace>,
     pub job_repository: JobRepository,
     pub log_repository: LogRepository,
 }
 
 
 impl Api {
-    pub fn new(workspace: Workspace, job_repository: JobRepository, log_repository: LogRepository) -> Self {
+    pub fn new(workspace: Arc<Workspace>, job_repository: JobRepository, log_repository: LogRepository) -> Self {
         Self { workspace, job_repository, log_repository }
     }
 }
@@ -66,7 +67,7 @@ pub async fn run(api: Api, addr: &str) {
 async fn reload_workspace(
     State(mut api): State<Api>,
 ) -> Result<Json<String>, AppError> {
-    api.workspace.read_config()?;
+    api.workspace.read_workflows()?;
     info!("Workspace reloaded and config broadcasted");
     Ok(Json("Reloaded".to_string()))
 }

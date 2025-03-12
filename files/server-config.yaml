@@ -10,9 +10,7 @@ logs:
 
 
 workspace:
-  type: folder
-  folder: ....
-  poll_interval: 30
+  folder: /Users/ala/workspace/personal/workflow-engine/files/workspace
 
 # workspace:
 #   type: git

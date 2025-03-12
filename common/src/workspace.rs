@@ -28,50 +28,36 @@ use crate::workflows_configuration::WorkflowsConfiguration;
 #[derive(Clone)]
 pub struct Workspace {
     pub path: PathBuf,
-    pub config: Option<WorkflowsConfiguration>,
+    pub workflows: Arc<RwLock<Option<WorkflowsConfiguration>>>,
     pub revision: Arc<RwLock<Option<String>>>,
-    config_tx: watch::Sender<Option<WorkflowsConfiguration>>, // Add sender
-    config_rx: watch::Receiver<Option<WorkflowsConfiguration>>, // Add receiver
+    workflows_tx: watch::Sender<Option<WorkflowsConfiguration>>, // Add sender
+    workflows_rx: watch::Receiver<Option<WorkflowsConfiguration>>, // Add receiver
 }
 
 impl Workspace {
     pub async fn new(path: PathBuf) -> Self {
         fs::create_dir_all(&path).unwrap_or_default();
-        let config = WorkflowsConfiguration::new(path.clone());
-        let (config_tx, config_rx) = watch::channel(config.clone());
-        let mut s = Self {
+        let workflows = WorkflowsConfiguration::new(path.clone());
+        let (workflows_tx, workflows_rx) = watch::channel(workflows.clone());
+        Self {
             path,
-            config,
+            workflows: Arc::new(RwLock::new(workflows)),
             revision: Arc::new(RwLock::new(None)),
-            config_tx,
-            config_rx,
-        };
-        s.read_config().unwrap();
-        s
+            workflows_tx,
+            workflows_rx,
+        }
     }
 
-    pub async fn watch(&self) {
+    pub async fn watch(self: Arc<Self>) {
+        let workspace = self.clone();
         let watch_path = self.path.clone();
-        let watcher_path = self.path.clone();
-        let revision = Arc::clone(&self.revision);
-        let config_tx = self.config_tx.clone();
         tokio::spawn(async move {
             let mut watcher = match RecommendedWatcher::new(
                 move |res: notify::Result<notify::Event>| {
                     if let Ok(event) = res {
                         debug!("Filesystem event: {:?}", event);
-                        let workflows_path = watcher_path.join(".workflows");
-                        let config = WorkflowsConfiguration::new(workflows_path);
-                        if let Some(cfg) = config {
-                            if let Err(e) = config_tx.send(Some(cfg)) {
-                                error!("Failed to broadcast config update: {}", e);
-                            }
-
-                            if let Ok(mut rev) = revision.write() {
-                                *rev = None;
-                            } else {
-                                error!("Failed to acquire write lock on revision");
-                            }
+                        if let Err(e) = workspace.read_workflows() {
+                            error!("Failed to reload workflows: {}", e);
                         }
                     }
                 },
@@ -89,24 +75,35 @@ impl Workspace {
                 return;
             }
 
-            // Keep the task alive
             loop {
                 sleep(Duration::from_secs(5)).await;
             }
         });
     }
 
-    pub fn read_config(&mut self) -> Result<(), Error> {
+    pub fn read_workflows(&self) -> Result<(), Error> { // Renamed and adjusted to &self
         let workflows_path = self.path.join(".workflows");
         if !workflows_path.exists() {
             bail!("Workspace configuration not found");
         }
-        let mut config = WorkflowsConfiguration::new(workflows_path);
-        info!("Loaded workspace configurations: {:?}", &config);
-        self.config = config.clone();
+        let new_workflows = WorkflowsConfiguration::new(workflows_path);
+        info!("Loaded workspace configurations: {:?}", &new_workflows);
 
-        self.config_tx.send(config)?;
+        if let Ok(mut workflows_guard) = self.workflows.write() {
+            *workflows_guard = new_workflows.clone();
+        } else {
+            error!("Failed to acquire write lock on workflows");
+            return Err(anyhow!("Failed to lock workflows for update"));
+        }
 
+        if let Ok(mut rev) = self.revision.write() {
+            *rev = None;
+        } else {
+            error!("Failed to acquire write lock on revision");
+            return Err(anyhow!("Failed to lock revision for reset"));
+        }
+
+        self.workflows_tx.send(new_workflows)?;
         Ok(())
     }
 
@@ -115,7 +112,7 @@ impl Workspace {
     }
 
     pub fn subscribe(&self) -> watch::Receiver<Option<WorkflowsConfiguration>> {
-        self.config_rx.clone()
+        self.workflows_rx.clone()
     }
 
     fn walk_files(&self) -> Vec<globwalker::DirEntry> {
@@ -158,7 +155,7 @@ impl Workspace {
         }
     }
 
-    pub fn build_tarball(&mut self) -> Result<Vec<u8>, Error> {
+    pub fn build_tarball(&self) -> Result<Vec<u8>, Error> {
         let mut tarball = Vec::new();
         let mut builder = Builder::new(&mut tarball);
 
@@ -182,7 +179,7 @@ impl Workspace {
         Ok(gzipped)
     }
 
-    pub async fn sync(&mut self, server: &str) -> Result<String, Error> {
+    pub async fn sync(&self, server: &str) -> Result<String, Error> {
         let client = Client::new();
         let url = format!("{}/files/workspace.tar.gz", server);
 

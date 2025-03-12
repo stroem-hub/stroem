@@ -26,6 +26,7 @@ use scheduler::Scheduler;
 use queue::Queue;
 use repository::JobRepository;
 use crate::repository::LogRepository;
+use std::sync::{Arc, RwLock};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -67,8 +68,8 @@ async fn main() -> Result<(), Error>{
     let workspace_dir = cfg.workspace.folder;
     create_dir_all(&workspace_dir)?;
 
-    let workspace = Workspace::new(workspace_dir).await;
-    workspace.watch().await;
+    let workspace = Arc::new(Workspace::new(workspace_dir).await);
+    workspace.clone().watch().await;
 
 
     let job_repo = JobRepository::new(db_pool);
