@@ -18,11 +18,12 @@ use regex::Regex;
 use std::io;
 use tracing_subscriber::{self, fmt, prelude::*, filter::LevelFilter};
 
-pub mod workspace;
+pub mod workspace_server;
 pub mod log_collector;
 pub mod parameter_renderer;
 pub mod dag_walker;
 pub mod workflows_configuration;
+pub mod workspace_client;
 
 use log_collector::{LogCollector, LogEntry};
 

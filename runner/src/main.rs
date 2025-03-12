@@ -2,7 +2,7 @@ use clap::Parser;
 use tracing::{info, error, debug};
 use tracing_subscriber;
 use stroem_common::workflows_configuration::{WorkflowsConfiguration, Action, FlowStep};
-use stroem_common::workspace::Workspace;
+use stroem_common::workspace_server::WorkspaceServer;
 use reqwest::Client;
 use chrono::Utc;
 use serde_json::{json, Value};
@@ -15,8 +15,7 @@ use anyhow::{anyhow, Result};
 use stroem_common::parameter_renderer::ParameterRenderer;
 use stroem_common::dag_walker::DagWalker;
 use std::sync::{Arc, RwLock};
-
-
+use stroem_common::workspace_client::WorkspaceClient;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -46,13 +45,13 @@ struct Runner {
     task: Option<String>,
     action: Option<String>,
     input: Option<Value>,
-    workspace: Workspace,
+    workspace: WorkspaceClient,
     workspace_revision: String,
     client: Client,
 }
 
 impl Runner {
-    fn new(server: String, job_id: String, worker_id: String, task: Option<String>, action: Option<String>, input: Option<Value>, workspace: Workspace, workspace_revision: String) -> Self {
+    fn new(server: String, job_id: String, worker_id: String, task: Option<String>, action: Option<String>, input: Option<Value>, workspace: WorkspaceClient, workspace_revision: String) -> Self {
         Runner {
             server,
             job_id,
@@ -69,10 +68,7 @@ impl Runner {
     async fn execute(&mut self) -> Result<bool> {
         let mut success = true;
 
-        let workflows_guard = self.workspace.workflows.read()
-            .map_err(|e| anyhow!("Failed to acquire read lock on workflows: {}", e))?;
-
-        let workflows = workflows_guard.as_ref().unwrap();
+        let workflows = self.workspace.workflows.as_ref().unwrap();
 
         match (self.task.clone(), self.action.clone()) {
             (Some(task), None) => {
@@ -117,9 +113,7 @@ impl Runner {
                 "step_name": step_name,
             });
 
-        let workflows_guard = self.workspace.workflows.read()
-            .map_err(|e| anyhow!("Failed to acquire read lock on workflows: {}", e))?;
-        let workflows = workflows_guard.as_ref().unwrap();
+        let workflows = self.workspace.workflows.as_ref().unwrap();
 
         if let Some(task) = &self.task {
             let task = workflows.get_task(self.task.clone().unwrap().as_str()).unwrap();
@@ -267,11 +261,15 @@ async fn main() {
             std::process::exit(1);
         }));
 
-    let mut workspace = Workspace::new(PathBuf::from(&args.workspace_dir)).await;
+    let mut workspace = WorkspaceClient::new(PathBuf::from(&args.workspace_dir)).await;
     let revision = workspace.sync(&args.server).await.unwrap_or_else(|e| {
         error!("Failed to get workspace: {}", e);
         std::process::exit(1);
     });
+    if let Err(e) = workspace.read_workflows() {
+        error!("Failed to read workflows: {}", e);
+        std::process::exit(1);
+    };
 
     let mut runner = Runner::new(
         args.server,

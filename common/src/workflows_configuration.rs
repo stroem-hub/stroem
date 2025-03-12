@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
-use anyhow::Error;
+use anyhow::{bail, Error};
 use config::Config;
 use globwalker::GlobWalkerBuilder;
 use serde::{Deserialize, Serialize};
@@ -89,9 +89,15 @@ pub struct WorkflowsConfiguration {
 }
 
 impl WorkflowsConfiguration {
-    pub fn new(path: PathBuf) -> Option<Self> {
+    pub fn new(workspace_path: PathBuf) -> Option<Self> {
+        let workflows_path = workspace_path.join(".workflows");
+        if !workflows_path.exists() {
+            error!("Workspace configuration not found");
+            return None;
+        }
+
         // Build the glob walker, handling potential errors
-        let gw = match GlobWalkerBuilder::from_patterns(&path, &["*.yaml"])
+        let gw = match GlobWalkerBuilder::from_patterns(&workflows_path, &["*.yaml"])
             .max_depth(10)
             .follow_links(true)
             .sort_by(|a, b| a.path().cmp(b.path()))

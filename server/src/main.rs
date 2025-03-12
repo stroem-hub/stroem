@@ -21,7 +21,7 @@ mod server_config;
 
 use stroem_common::Job;
 use stroem_common::workflows_configuration::{WorkflowsConfiguration};
-use stroem_common::workspace::Workspace;
+use stroem_common::workspace_server::WorkspaceServer;
 use scheduler::Scheduler;
 use queue::Queue;
 use repository::JobRepository;
@@ -68,7 +68,7 @@ async fn main() -> Result<(), Error>{
     let workspace_dir = cfg.workspace.folder;
     create_dir_all(&workspace_dir)?;
 
-    let workspace = Arc::new(Workspace::new(workspace_dir).await);
+    let workspace = Arc::new(WorkspaceServer::new(workspace_dir).await);
     workspace.clone().watch().await;
 
 

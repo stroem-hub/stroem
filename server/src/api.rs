@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 use anyhow::{anyhow, Error};
 use serde_json::Value;
-use stroem_common::workspace::Workspace;
+use stroem_common::workspace_server::WorkspaceServer;
 use crate::repository::{JobRepository, LogRepository};
 use crate::error::AppError;
 use std::sync::{Arc, RwLock};
@@ -30,14 +30,14 @@ use std::sync::{Arc, RwLock};
 
 #[derive(Clone)]
 pub struct Api {
-    pub workspace: Arc<Workspace>,
+    pub workspace: Arc<WorkspaceServer>,
     pub job_repository: JobRepository,
     pub log_repository: LogRepository,
 }
 
 
 impl Api {
-    pub fn new(workspace: Arc<Workspace>, job_repository: JobRepository, log_repository: LogRepository) -> Self {
+    pub fn new(workspace: Arc<WorkspaceServer>, job_repository: JobRepository, log_repository: LogRepository) -> Self {
         Self { workspace, job_repository, log_repository }
     }
 }
