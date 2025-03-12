@@ -1,7 +1,7 @@
 use clap::Parser;
 use tracing::{info, error, debug};
 use tracing_subscriber;
-use stroem_common::workspace_configuration::{WorkspaceConfiguration, Action, FlowStep};
+use stroem_common::workflows_configuration::{WorkflowsConfiguration, Action, FlowStep};
 use stroem_common::workspace::Workspace;
 use reqwest::Client;
 use chrono::Utc;
@@ -134,7 +134,7 @@ impl Runner {
         Ok(())
     }
 
-    async fn execute_task(&self, flow: &HashMap<String, FlowStep>, config: &WorkspaceConfiguration) -> Result<bool> {
+    async fn execute_task(&self, flow: &HashMap<String, FlowStep>, config: &WorkflowsConfiguration) -> Result<bool> {
         let mut dag = DagWalker::new(flow)?; // Rename from DagExecutor
         let mut success = true;
 

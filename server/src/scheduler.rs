@@ -1,7 +1,7 @@
 // workflow-server/src/scheduler.rs
 use crate::Queue;
 use stroem_common::Job;
-use stroem_common::workspace_configuration::{WorkspaceConfiguration};
+use stroem_common::workflows_configuration::{WorkflowsConfiguration};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::watch;
 use tracing::{info, error, debug};
@@ -16,12 +16,12 @@ pub struct Scheduler {
     job_repository: JobRepository,
     task: Option<tokio::task::JoinHandle<()>>,
     cancel_tx: watch::Sender<bool>,
-    config_rx: watch::Receiver<Option<WorkspaceConfiguration>>,
+    config_rx: watch::Receiver<Option<WorkflowsConfiguration>>,
 }
 
 impl Scheduler {
     fn load_config(
-        config: Option<WorkspaceConfiguration>,
+        config: Option<WorkflowsConfiguration>,
         old_schedules: Option<&HashMap<String, (Schedule, Job, Option<DateTime<Utc>>, Option<DateTime<Utc>>)>>,
     ) -> HashMap<String, (Schedule, Job, Option<DateTime<Utc>>, Option<DateTime<Utc>>)> {
         let mut schedules = HashMap::new();
@@ -65,7 +65,7 @@ impl Scheduler {
         schedules
     }
 
-    pub fn new(job_repository: JobRepository, config_rx: watch::Receiver<Option<WorkspaceConfiguration>>) -> Self {
+    pub fn new(job_repository: JobRepository, config_rx: watch::Receiver<Option<WorkflowsConfiguration>>) -> Self {
         let (cancel_tx, _) = watch::channel(false);
         Self {
             job_repository,

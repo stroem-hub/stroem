@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use anyhow::{Result, anyhow};
-use crate::workspace_configuration::FlowStep;
+use crate::workflows_configuration::FlowStep;
 
 pub struct DagWalker {
     graph: HashMap<String, Vec<String>>, // Step -> Steps that depend on it (outgoing edges)

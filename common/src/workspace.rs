@@ -23,21 +23,21 @@ use notify::{RecommendedWatcher, RecursiveMode, Watcher, Config as NotifyConfig}
 use tokio::time::{sleep, Duration}; // For watcher task loop
 use std::sync::{Arc, RwLock};
 
-use crate::workspace_configuration::WorkspaceConfiguration;
+use crate::workflows_configuration::WorkflowsConfiguration;
 
 #[derive(Clone)]
 pub struct Workspace {
     pub path: PathBuf,
-    pub config: Option<WorkspaceConfiguration>,
+    pub config: Option<WorkflowsConfiguration>,
     pub revision: Arc<RwLock<Option<String>>>,
-    config_tx: watch::Sender<Option<WorkspaceConfiguration>>, // Add sender
-    config_rx: watch::Receiver<Option<WorkspaceConfiguration>>, // Add receiver
+    config_tx: watch::Sender<Option<WorkflowsConfiguration>>, // Add sender
+    config_rx: watch::Receiver<Option<WorkflowsConfiguration>>, // Add receiver
 }
 
 impl Workspace {
     pub async fn new(path: PathBuf) -> Self {
         fs::create_dir_all(&path).unwrap_or_default();
-        let config = WorkspaceConfiguration::new(path.clone());
+        let config = WorkflowsConfiguration::new(path.clone());
         let (config_tx, config_rx) = watch::channel(config.clone());
         let mut s = Self {
             path,
@@ -61,7 +61,7 @@ impl Workspace {
                     if let Ok(event) = res {
                         debug!("Filesystem event: {:?}", event);
                         let workflows_path = watcher_path.join(".workflows");
-                        let config = WorkspaceConfiguration::new(workflows_path);
+                        let config = WorkflowsConfiguration::new(workflows_path);
                         if let Some(cfg) = config {
                             if let Err(e) = config_tx.send(Some(cfg)) {
                                 error!("Failed to broadcast config update: {}", e);
@@ -101,7 +101,7 @@ impl Workspace {
         if !workflows_path.exists() {
             bail!("Workspace configuration not found");
         }
-        let mut config = WorkspaceConfiguration::new(workflows_path);
+        let mut config = WorkflowsConfiguration::new(workflows_path);
         info!("Loaded workspace configurations: {:?}", &config);
         self.config = config.clone();
 
@@ -114,7 +114,7 @@ impl Workspace {
         self.path.read_dir().map(|mut i| i.next().is_none()).unwrap_or(false)
     }
 
-    pub fn subscribe(&self) -> watch::Receiver<Option<WorkspaceConfiguration>> {
+    pub fn subscribe(&self) -> watch::Receiver<Option<WorkflowsConfiguration>> {
         self.config_rx.clone()
     }
 

@@ -13,12 +13,11 @@ tar = { workspace = true }
 flate2 = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
-config = "0.15.8"
-uuid = { version = "1.15.0", features = ["v4"] }
+config = { workspace = true }
+uuid = { workspace = true }
 clap = { workspace = true }
 globwalker = { workspace = true }
-anyhow = "1.0.96"
-tera = "1.20.0"
+anyhow = { workspace = true }
 cron = { workspace = true }
 chrono = { workspace = true }
 sqlx = { workspace = true }
@@ -28,6 +27,7 @@ deadpool-postgres = { workspace = true }
 fs2 = {workspace = true}
 futures = {workspace = true}
 tokio-stream = {workspace = true}
+git2 = {workspace = true}
 
 [build-dependencies]
 refinery = { workspace = true }

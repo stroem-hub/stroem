@@ -1,3 +1,4 @@
+use std::fs::create_dir_all;
 use std::ops::DerefMut;
 // workflow-server/src/main.rs
 use clap::Parser;
@@ -16,9 +17,10 @@ mod queue;
 mod api;
 mod repository;
 mod error;
+mod server_config;
 
 use stroem_common::Job;
-use stroem_common::workspace_configuration::{WorkspaceConfiguration};
+use stroem_common::workflows_configuration::{WorkflowsConfiguration};
 use stroem_common::workspace::Workspace;
 use scheduler::Scheduler;
 use queue::Queue;
@@ -28,10 +30,8 @@ use crate::repository::LogRepository;
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    #[arg(short, long, default_value = ".")]
-    workspace: String,
-    #[arg(short, long, required = false)]
-    config: Option<String>,
+    #[arg(short, long, required = true)]
+    config: String,
     #[arg(short, long)]
     verbose: bool,
 }
@@ -46,18 +46,13 @@ async fn main() -> Result<(), Error>{
         .with_max_level(log_level)
         .init();
 
-    let mut cfg_builder = Config::builder();
-    if let Some(config_filename) = args.config {
-        cfg_builder = cfg_builder.add_source(File::with_name(config_filename.as_str()));
-    }
-    cfg_builder = cfg_builder.add_source(Environment::with_prefix("WF").separator("_"));
-    let cfg = cfg_builder.build()?;
+    let cfg = server_config::ServerConfig::new(PathBuf::from(args.config))?;
 
     let mut db_config = deadpool_postgres::Config::new();
-    db_config.host = Some(cfg.get_string("db.host")?.to_string());
-    db_config.dbname = Some(cfg.get_string("db.database")?.to_string());
-    db_config.user = Some(cfg.get_string("db.username")?.to_string());
-    db_config.password = Some(cfg.get_string("db.password")?.to_string());
+    db_config.host = Some(cfg.db.host);
+    db_config.dbname = Some(cfg.db.database);
+    db_config.user = Some(cfg.db.username);
+    db_config.password = Some(cfg.db.password);
     db_config.manager = Some(deadpool_postgres::ManagerConfig {
         recycling_method: deadpool_postgres::RecyclingMethod::Fast,
     });
@@ -69,16 +64,15 @@ async fn main() -> Result<(), Error>{
         .run_async(db_client.deref_mut().deref_mut()) // Get to the tokio_postgresql object
         .await?;
 
-    let workspace_dir = PathBuf::from(&args.workspace);
-    if !workspace_dir.exists() || !workspace_dir.is_dir() {
-        bail!("Workspace path '{}' does not exist or is not a directory", args.workspace);
-        // return Ok(());
-    }
+    let workspace_dir = cfg.workspace.folder;
+    create_dir_all(&workspace_dir)?;
 
     let workspace = Workspace::new(workspace_dir).await;
     workspace.watch().await;
+
+
     let job_repo = JobRepository::new(db_pool);
-    let logs_repo = LogRepository::new(cfg.get_string("logs.folder").unwrap().parse()?);
+    let logs_repo = LogRepository::new(cfg.logs.folder);
 
     // Create Scheduler
     let mut scheduler = Scheduler::new(job_repo.clone(), workspace.subscribe());

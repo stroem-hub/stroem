@@ -81,14 +81,14 @@ pub struct Trigger {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct WorkspaceConfiguration {
+pub struct WorkflowsConfiguration {
     pub globals: Option<Globals>,
     pub actions: Option<HashMap<String, Action>>,
     pub tasks: Option<HashMap<String, Task>>,
     pub triggers: Option<HashMap<String, Trigger>>,
 }
 
-impl WorkspaceConfiguration {
+impl WorkflowsConfiguration {
     pub fn new(path: PathBuf) -> Option<Self> {
         // Build the glob walker, handling potential errors
         let gw = match GlobWalkerBuilder::from_patterns(&path, &["*.yaml"])

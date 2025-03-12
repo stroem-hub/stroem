@@ -6,9 +6,10 @@
 - [X] global error handler
 - [X] reload workspace webhook
 - [X] refactor scheduler
-- [ ] workspace watch changes
+- [X] workspace watch changes
 - [ ] workspace in git
 - [ ] config validator
 - [ ] Secrets
 - [ ] Resource types and Resources ?
 - [ ] helm-chart
+- [ ] Basic UI for viewing job results

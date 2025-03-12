@@ -7,3 +7,16 @@ db:
 
 logs:
   folder: /tmp/workflow-logs/
+
+
+workspace:
+  type: folder
+  folder: ....
+  poll_interval: 30
+
+# workspace:
+#   type: git
+#   folder: ....
+#   url:
+#   ssh_key: ....
+#   poll_interval: 30
