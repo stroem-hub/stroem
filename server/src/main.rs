@@ -2,11 +2,11 @@ use std::fs::create_dir_all;
 use std::ops::DerefMut;
 // workflow-server/src/main.rs
 use clap::Parser;
-use tracing::{info, error, Level};
+use tracing::{error, info, Level};
 use tracing_subscriber;
 use tokio::signal;
 use std::path::PathBuf;
-use config::{Config, File, Environment};
+use config::{Config, Environment, File};
 use anyhow::{bail, Error};
 use deadpool_postgres;
 use tokio_postgres::NoTls;
@@ -18,10 +18,13 @@ mod api;
 mod repository;
 mod error;
 mod server_config;
+pub mod workspace_server;
+mod workspace_git;
+mod workspace_folder;
 
 use stroem_common::Job;
-use stroem_common::workflows_configuration::{WorkflowsConfiguration};
-use stroem_common::workspace_server::WorkspaceServer;
+use stroem_common::workflows_configuration::WorkflowsConfiguration;
+use workspace_server::WorkspaceServer;
 use scheduler::Scheduler;
 use queue::Queue;
 use repository::JobRepository;
@@ -68,7 +71,9 @@ async fn main() -> Result<(), Error>{
     let workspace_dir = cfg.workspace.folder;
     create_dir_all(&workspace_dir)?;
 
-    let workspace = Arc::new(WorkspaceServer::new(workspace_dir).await);
+    let workspace = Arc::new(WorkspaceServer::new(workspace_dir, cfg.workspace.git).await);
+
+    workspace.read_workflows()?;
     workspace.clone().watch().await;
 
 

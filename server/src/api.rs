@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 use anyhow::{anyhow, Error};
 use serde_json::Value;
-use stroem_common::workspace_server::WorkspaceServer;
+use crate::workspace_server::WorkspaceServer;
 use crate::repository::{JobRepository, LogRepository};
 use crate::error::AppError;
 use std::sync::{Arc, RwLock};

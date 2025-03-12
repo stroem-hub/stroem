@@ -6,9 +6,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, Map};
 use std::collections::HashMap;
 use std::fs;
-use anyhow::{anyhow, bail, Error};
+use anyhow::{anyhow, bail, Error, Context};
 use tracing::{debug, error, info};
-use tera::Tera;
 use blake2::{Blake2b512, Blake2s256, Digest};
 use tar::{Builder, Archive};
 use std::fs::{File};
@@ -16,18 +15,28 @@ use std::io::{Read, Write};
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use flate2::read::GzDecoder;
-use reqwest::Client;
 use fs2::FileExt;
 use tokio::sync::watch;
 use notify::{RecommendedWatcher, RecursiveMode, Watcher, Config as NotifyConfig}; // Add notify imports
 use tokio::time::{sleep, Duration}; // For watcher task loop
 use std::sync::{Arc, RwLock};
+use git2::{Repository, RemoteCallbacks, Cred, FetchOptions, build::RepoBuilder, ResetType};
 
-use crate::workflows_configuration::WorkflowsConfiguration;
+use stroem_common::workflows_configuration::WorkflowsConfiguration;
+use crate::server_config::GitConfig;
+
+pub trait WorkspaceSource {
+    async fn sync(&self) -> Result<String, Error>;
+    async fn watch(&self) -> Result<(), Error>;
+    // async fn subscribe(&self) -> Result<watch::Receiver<bool>, Error>;
+    // fn get_revision(&self) -> Result<String, Error>;
+}
+
 
 #[derive(Clone)]
 pub struct WorkspaceServer {
     pub path: PathBuf,
+    pub git_config: Option<GitConfig>,
     pub workflows: Arc<RwLock<Option<WorkflowsConfiguration>>>,
     pub revision: Arc<RwLock<Option<String>>>,
     workflows_tx: watch::Sender<Option<WorkflowsConfiguration>>, // Add sender
@@ -35,13 +44,13 @@ pub struct WorkspaceServer {
 }
 
 impl WorkspaceServer {
-    pub async fn new(path: PathBuf) -> Self {
+    pub async fn new(path: PathBuf, git_config: Option<GitConfig>) -> Self {
         fs::create_dir_all(&path).unwrap_or_default();
-        let workflows = None;
-        let (workflows_tx, workflows_rx) = watch::channel(workflows.clone());
+        let (workflows_tx, workflows_rx) = watch::channel(None);
         Self {
             path,
-            workflows: Arc::new(RwLock::new(workflows)),
+            git_config,
+            workflows: Arc::new(RwLock::new(None)),
             revision: Arc::new(RwLock::new(None)),
             workflows_tx,
             workflows_rx,

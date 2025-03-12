@@ -30,7 +30,7 @@ pub struct WorkspaceConfig {
     pub git: Option<GitConfig>, // Optional, triggers Git behavior if present
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct GitConfig {
     pub url: String,
     pub branch: Option<String>, // Defaults to "main"
@@ -38,7 +38,7 @@ pub struct GitConfig {
     pub auth: Option<GitAuth>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct GitAuth {
     pub username: Option<String>,
     pub token: Option<String>,
