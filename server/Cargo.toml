@@ -20,14 +20,12 @@ globwalker = { workspace = true }
 anyhow = { workspace = true }
 cron = { workspace = true }
 chrono = { workspace = true }
-sqlx = { workspace = true }
 refinery = { workspace = true }
 tokio-postgres = { workspace = true }
 deadpool-postgres = { workspace = true }
 fs2 = {workspace = true}
 futures = {workspace = true}
 tokio-stream = {workspace = true}
-git2 = {workspace = true}
 
 [build-dependencies]
 refinery = { workspace = true }

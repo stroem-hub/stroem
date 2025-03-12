@@ -1,7 +1,6 @@
 use serde::{Deserialize};
 use std::path::PathBuf;
 use config::{Config, Environment, File};
-use tracing::error;
 use anyhow::{Context, Error, anyhow};
 
 #[derive(Debug, Deserialize)]
