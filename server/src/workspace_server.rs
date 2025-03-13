@@ -30,7 +30,7 @@ use crate::workspace_git::WorkspaceSourceGit;
 
 pub trait WorkspaceSource: Send + Sync {
     fn sync(&self) -> Result<String, Error>;
-    fn watch(&self, callback: Box<dyn Fn() + Send + Sync>) -> Result<(), Error>;
+    fn watch(self: Arc<Self>, callback: Box<dyn Fn() + Send + Sync>) -> Result<(), Error>;
     // async fn subscribe(&self) -> Result<watch::Receiver<bool>, Error>;
     // fn get_revision(&self) -> Result<String, Error>;
 }
@@ -69,9 +69,10 @@ impl WorkspaceServer {
 
     pub async fn watch(self: Arc<Self>) {
         let workspace = self.clone();
+        let source = self.source.clone();
         tokio::spawn(async move {
             let callback_workspace = workspace.clone();
-            if let Err(e) = workspace.source.watch(Box::new(move || {
+            if let Err(e) = source.watch(Box::new(move || {
                 if let Err(e) = callback_workspace.read_workflows() {
                     error!("Failed to reload workflows: {}", e);
                 }

@@ -69,7 +69,7 @@ impl WorkspaceSource for WorkspaceSourceFolder {
         self.get_revision()
     }
 
-    fn watch(&self, callback: Box<dyn Fn() + Send + Sync>) -> Result<(), Error> {
+    fn watch(self: Arc<Self>, callback: Box<dyn Fn() + Send + Sync>) -> Result<(), Error> {
         let watch_path = self.path.clone();
         tokio::spawn(async move {
             let mut watcher = match RecommendedWatcher::new(

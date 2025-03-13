@@ -72,7 +72,6 @@ async fn main() -> Result<(), Error>{
     create_dir_all(&workspace_dir)?;
 
     let workspace = Arc::new(WorkspaceServer::new(workspace_dir, cfg.workspace.git).await);
-
     workspace.read_workflows()?;
     workspace.clone().watch().await;
 
