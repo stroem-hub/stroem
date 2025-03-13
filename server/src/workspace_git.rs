@@ -136,7 +136,7 @@ impl WorkspaceSource for WorkspaceSourceGit {
 
                 let commit_hash = self.clone_repo().unwrap();
                 if last_commit.is_some() && last_commit != Some(commit_hash) {
-                    workspace_source.sync();
+                    let _ = workspace_source.sync();
                     callback();
                 }
                 last_commit = Some(commit_hash);

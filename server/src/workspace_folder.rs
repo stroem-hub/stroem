@@ -6,9 +6,11 @@ use anyhow::{anyhow, Error};
 use blake2::{Blake2b512, Digest};
 use globwalker::GlobWalkerBuilder;
 use notify::{RecommendedWatcher, RecursiveMode, Watcher, Config as NotifyConfig};
-use tokio::time::sleep;
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 use crate::workspace_server::WorkspaceSource;
+use tokio::sync::mpsc;
+use tokio::time;
+use tokio::time::{sleep, Instant};
 
 pub struct WorkspaceSourceFolder {
     pub path: PathBuf,
@@ -71,12 +73,17 @@ impl WorkspaceSource for WorkspaceSourceFolder {
 
     fn watch(self: Arc<Self>, callback: Box<dyn Fn() + Send + Sync>) -> Result<(), Error> {
         let watch_path = self.path.clone();
+        let workspace_source = self.clone();
+        let (event_tx, mut event_rx) = mpsc::channel::<()>(100);
+
         tokio::spawn(async move {
             let mut watcher = match RecommendedWatcher::new(
                 move |res: notify::Result<notify::Event>| {
                     if let Ok(event) = res {
                         debug!("Filesystem event: {:?}", event);
-                        callback();
+                        // let _ = workspace_source.sync();
+                        // callback();
+                        let _ = event_tx.try_send(());
                     }
                 },
                 NotifyConfig::default(),
@@ -92,11 +99,58 @@ impl WorkspaceSource for WorkspaceSourceFolder {
                 error!("Failed to watch directory {:?}: {}", watch_path, e);
                 return;
             }
+            let mut last_event_time = Instant::now();
+            let mut last_sent = Instant::now();
+            loop {
+                tokio::select! {
+                   _ = time::sleep(Duration::from_secs(5)) => {
+                       debug!("Checking");
+                       if last_event_time > last_sent {
+                           let elapsed = Instant::now().duration_since(last_event_time);
+                           if elapsed > Duration::from_secs(5) {
+                               let _ = workspace_source.sync();
+                               callback();
+                               last_sent = Instant::now();
+                           }
+                       }
+                   }
+                   Some(_) = event_rx.recv() => {
+                       debug!("Received event");
+                        last_event_time = Instant::now();
+                   }
+           }}
 
             loop {
                 sleep(Duration::from_secs(5)).await;
             }
         });
+
+        /*
+        tokio::spawn(async move {
+            let mut last_event_time = Instant::now();
+            let mut last_sent = Instant::now();
+            loop {
+               tokio::select! {
+                   _ = time::sleep(Duration::from_secs(5)) => {
+                       debug!("Checking");
+                       if last_event_time > last_sent {
+                           let elapsed = Instant::now().duration_since(last_event_time);
+                           if elapsed > Duration::from_secs(5) {
+                               let _ = workspace_source.sync();
+                               callback();
+                               last_sent = Instant::now();
+                           }
+                       }
+                   }
+                   Some(_) = event_rx.recv() => {
+                       debug!("Received event");
+                        last_event_time = Instant::now();
+                   }
+           }}
+        });
+
+         */
+
         Ok(())
     }
 }

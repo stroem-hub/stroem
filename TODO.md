@@ -7,10 +7,13 @@
 - [X] reload workspace webhook
 - [X] refactor scheduler
 - [X] workspace watch changes
+- [X] collect file system events for 5 seconds, do not reread everything on every event.
 - [ ] workspace in git
 - [ ] config validator
 - [ ] cli for validating config and running tasks
-- [ ] Secrets
+- [ ] logrepository to send files to S3/AzureBlob/GC/Minio
+- [ ] vals library alternative?
+- [ ] Secrets (sops?)
 - [ ] Resource types and Resources ?
 - [ ] helm-chart
 - [ ] Basic UI for viewing job results
