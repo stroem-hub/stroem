@@ -8,7 +8,7 @@
 - [X] refactor scheduler
 - [X] workspace watch changes
 - [X] collect file system events for 5 seconds, do not reread everything on every event.
-- [ ] workspace in git
+- [X] workspace in git
 - [ ] config validator
 - [ ] cli for validating config and running tasks
 - [ ] logrepository to send files to S3/AzureBlob/GC/Minio
@@ -17,3 +17,4 @@
 - [ ] Resource types and Resources ?
 - [ ] helm-chart
 - [ ] Basic UI for viewing job results
+- [ ] key-value storage
