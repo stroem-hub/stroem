@@ -17,17 +17,20 @@ use flate2::Compression;
 use flate2::read::GzDecoder;
 use fs2::FileExt;
 use tokio::sync::watch;
-use notify::{RecommendedWatcher, RecursiveMode, Watcher, Config as NotifyConfig}; // Add notify imports
+use notify::{RecommendedWatcher, RecursiveMode, Watcher, Config as NotifyConfig};
 use tokio::time::{sleep, Duration}; // For watcher task loop
 use std::sync::{Arc, RwLock};
 use git2::{Repository, RemoteCallbacks, Cred, FetchOptions, build::RepoBuilder, ResetType};
 
 use stroem_common::workflows_configuration::WorkflowsConfiguration;
 use crate::server_config::GitConfig;
+use crate::workspace_folder::WorkspaceSourceFolder;
+use crate::workspace_git::WorkspaceSourceGit;
 
-pub trait WorkspaceSource {
-    async fn sync(&self) -> Result<String, Error>;
-    async fn watch(&self) -> Result<(), Error>;
+
+pub trait WorkspaceSource: Send + Sync {
+    fn sync(&self) -> Result<String, Error>;
+    fn watch(&self, callback: Box<dyn Fn() + Send + Sync>) -> Result<(), Error>;
     // async fn subscribe(&self) -> Result<watch::Receiver<bool>, Error>;
     // fn get_revision(&self) -> Result<String, Error>;
 }
@@ -36,7 +39,8 @@ pub trait WorkspaceSource {
 #[derive(Clone)]
 pub struct WorkspaceServer {
     pub path: PathBuf,
-    pub git_config: Option<GitConfig>,
+    // pub git_config: Option<GitConfig>,
+    source: Arc<dyn WorkspaceSource + Send + Sync>,
     pub workflows: Arc<RwLock<Option<WorkflowsConfiguration>>>,
     pub revision: Arc<RwLock<Option<String>>>,
     workflows_tx: watch::Sender<Option<WorkflowsConfiguration>>, // Add sender
@@ -47,9 +51,15 @@ impl WorkspaceServer {
     pub async fn new(path: PathBuf, git_config: Option<GitConfig>) -> Self {
         fs::create_dir_all(&path).unwrap_or_default();
         let (workflows_tx, workflows_rx) = watch::channel(None);
+
+        let source: Arc<dyn WorkspaceSource + Send + Sync> = match git_config {
+            Some(git_config) => Arc::new(WorkspaceSourceGit::new(path.clone(), git_config)),
+            None => Arc::new(WorkspaceSourceFolder::new(path.clone())),
+        };
         Self {
             path,
-            git_config,
+            source,
+            // git_config,
             workflows: Arc::new(RwLock::new(None)),
             revision: Arc::new(RwLock::new(None)),
             workflows_tx,
@@ -59,33 +69,14 @@ impl WorkspaceServer {
 
     pub async fn watch(self: Arc<Self>) {
         let workspace = self.clone();
-        let watch_path = self.path.clone();
         tokio::spawn(async move {
-            let mut watcher = match RecommendedWatcher::new(
-                move |res: notify::Result<notify::Event>| {
-                    if let Ok(event) = res {
-                        debug!("Filesystem event: {:?}", event);
-                        if let Err(e) = workspace.read_workflows() {
-                            error!("Failed to reload workflows: {}", e);
-                        }
-                    }
-                },
-                NotifyConfig::default(),
-            ) {
-                Ok(w) => w,
-                Err(e) => {
-                    error!("Failed to create filesystem watcher: {}", e);
-                    return;
+            let callback_workspace = workspace.clone();
+            if let Err(e) = workspace.source.watch(Box::new(move || {
+                if let Err(e) = callback_workspace.read_workflows() {
+                    error!("Failed to reload workflows: {}", e);
                 }
-            };
-
-            if let Err(e) = watcher.watch(watch_path.as_path(), RecursiveMode::Recursive) {
-                error!("Failed to watch directory {:?}: {}", watch_path, e);
-                return;
-            }
-
-            loop {
-                sleep(Duration::from_secs(5)).await;
+            })) {
+                error!("Failed to start watching: {}", e);
             }
         });
     }

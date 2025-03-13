@@ -9,6 +9,7 @@
 - [X] workspace watch changes
 - [ ] workspace in git
 - [ ] config validator
+- [ ] cli for validating config and running tasks
 - [ ] Secrets
 - [ ] Resource types and Resources ?
 - [ ] helm-chart

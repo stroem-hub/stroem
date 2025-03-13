@@ -12,7 +12,7 @@ pub struct WorkspaceSourceGit {
 }
 
 impl WorkspaceSourceGit {
-    pub async fn new(path: PathBuf, git_config: GitConfig) -> Self {
+    pub fn new(path: PathBuf, git_config: GitConfig) -> Self {
         Self { path, git_config }
     }
 
@@ -108,7 +108,7 @@ impl WorkspaceSourceGit {
 }
 
 impl WorkspaceSource for WorkspaceSourceGit {
-    async fn sync(&self) -> Result<String, Error> {
+    fn sync(&self) -> Result<String, Error> {
         let repo = match Repository::open(&self.path) {
             Ok(repo) => {
                 self.update_repo(&repo)?;
@@ -131,7 +131,10 @@ impl WorkspaceSource for WorkspaceSourceGit {
         Ok(latest_commit_hash)
     }
 
-    async fn watch(&self) -> Result<(), Error>{
+    fn watch(&self, callback: Box<dyn Fn() + Send + Sync>) -> Result<(), Error> {
+        tokio::spawn(async move {
+
+        });
         Ok(())
     }
 
