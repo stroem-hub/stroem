@@ -16,6 +16,7 @@ use tokio::sync::mpsc::{self, Sender};
 use serde_json::Value;
 use regex::Regex;
 use std::io;
+use std::sync::Arc;
 use tracing_subscriber::{self, filter::LevelFilter, fmt, prelude::*};
 
 pub mod log_collector;
@@ -64,7 +65,7 @@ fn strip_ansi(input: &str) -> String {
     ANSI_REGEX.replace_all(input, "").to_string()
 }
 
-pub async fn run(cmd: &str, args: Option<Vec<String>>, cwd: Option<&PathBuf>, mut log_collector: LogCollector) -> Result<(bool, Option<Value>), Error> {
+pub async fn run(cmd: &str, args: Option<Vec<String>>, cwd: Option<&PathBuf>, log_collector: Arc<dyn LogCollector + Send + Sync>) -> Result<(bool, Option<Value>), Error> {
     let mut command = TokioCommand::new(cmd);
     if let Some(args) = args {
         command.args(args);

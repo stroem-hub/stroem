@@ -94,7 +94,7 @@ tasks:
 
 triggers:
   trigger01:
-    enabled: falsef
+    enabled: false
     type: "cron"
     cron: "*/20 * * * * *"
     task: task1

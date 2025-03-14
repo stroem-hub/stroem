@@ -25,10 +25,11 @@ pub struct Runner {
     workspace: WorkspaceClient,
     workspace_revision: String,
     client: Client,
+    log_collector: Arc<dyn LogCollector + Send + Sync>,
 }
 
 impl Runner {
-    pub fn new(server: String, job_id: String, worker_id: String, task: Option<String>, action: Option<String>, input: Option<Value>, workspace: WorkspaceClient, workspace_revision: String) -> Self {
+    pub fn new(server: String, job_id: String, worker_id: String, task: Option<String>, action: Option<String>, input: Option<Value>, workspace: WorkspaceClient, workspace_revision: String, log_collector: Arc<dyn LogCollector + Send + Sync>) -> Self {
         Runner {
             server,
             job_id,
@@ -39,6 +40,7 @@ impl Runner {
             workspace,
             workspace_revision,
             client: Client::new(),
+            log_collector,
         }
     }
 
@@ -164,6 +166,13 @@ impl Runner {
     async fn execute_action(&self, step_name: &str, action: &Action, step_input: Option<Value>) -> anyhow::Result<(bool, Option<Value>)> {
         // Send start with step-specific input
         let start_time = Utc::now();
+
+        let log_collector = self.log_collector.clone();
+        log_collector.set_step_name(Some(step_name.to_string())).await;
+
+        log_collector.mark_start(start_time, &step_input).await?;
+
+
         let start_payload = json!({
             "start_datetime": start_time.to_rfc3339(),
             "input": &step_input,
@@ -189,6 +198,8 @@ impl Runner {
         let cmd = action["cmd"].as_str().unwrap();
         debug!("Executing command: {}", cmd);
 
+
+        /*
         let mut log_collector = LogCollector::new(
             self.server.clone(),
             self.job_id.clone(),
@@ -196,6 +207,8 @@ impl Runner {
             Some(step_name.to_string()),
             Some(10),
         );
+
+         */
         let (exit_success, output) = run("sh", Some(vec!["-c".to_string(), cmd.to_string()]), Some(&self.workspace.path), log_collector).await?;
         let end_time = Utc::now();
 

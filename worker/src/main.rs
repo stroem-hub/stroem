@@ -13,6 +13,7 @@ use std::sync::Arc;
 use tokio::sync::Semaphore;
 use anyhow::{bail, Error};
 use serde_json::json;
+use stroem_common::log_collector::LogCollectorServer;
 
 mod runner_local;
 
@@ -98,13 +99,13 @@ async fn execute_job(client: &Client, job: &Job, server: &str, worker_id: &str) 
     let uuid = job.uuid.as_ref().unwrap();
     let start_time = Utc::now();
 
-    let log_collector = LogCollector::new(
+    let log_collector = Arc::new(LogCollectorServer::new(
         server.to_string(),
         job.uuid.as_ref().unwrap().to_string(),
         worker_id.to_string(),
         None,
         Some(10),
-    );
+    ));
 
     // TODO: Render input variables
 
@@ -125,11 +126,11 @@ async fn execute_job(client: &Client, job: &Job, server: &str, worker_id: &str) 
     let end_time = Utc::now();
 
     let result = JobResult {
-            exit_success: exit_success,
+            exit_success,
             start_datetime: start_time,
             end_datetime: end_time,
             input: job.input.clone(), // probably also not needed
-            output: output,
+            output,
             revision: None,
     };
 

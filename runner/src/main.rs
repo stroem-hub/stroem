@@ -13,6 +13,7 @@ use anyhow::{anyhow, Result};
 use stroem_common::parameter_renderer::ParameterRenderer;
 use stroem_common::dag_walker::DagWalker;
 use std::sync::{Arc, RwLock};
+use stroem_common::log_collector::LogCollectorServer;
 use stroem_common::workspace_client::WorkspaceClient;
 use stroem_common::runner::Runner;
 
@@ -70,16 +71,15 @@ async fn main() {
         std::process::exit(1);
     };
 
-    let mut runner = Runner::new(
-        args.server,
-        args.job_id,
-        args.worker_id,
-        args.task,
-        args.action,
-        input,
-        workspace,
-        revision,
-    );
+    let log_collector = Arc::new(LogCollectorServer::new(
+        args.server.clone(),
+        args.job_id.clone(),
+        args.worker_id.clone(),
+        None,
+        Some(10)
+    ));
+
+    let mut runner = Runner::new(args.server, args.job_id, args.worker_id, args.task, args.action, input, workspace, revision, log_collector);
     let success = runner.execute().await.unwrap_or_else(|e| {
         error!("Execution failed: {}", e);
         false
