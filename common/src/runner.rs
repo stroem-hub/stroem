@@ -16,20 +16,20 @@ use crate::workspace_client::WorkspaceClient;
 
 
 pub struct Runner {
-    server: String,
-    job_id: String,
-    worker_id: String,
+    server: Option<String>,
+    job_id: Option<String>,
+    worker_id: Option<String>,
     task: Option<String>,
     action: Option<String>,
     input: Option<Value>,
     workspace: WorkspaceClient,
-    workspace_revision: String,
+    workspace_revision: Option<String>,
     client: Client,
     log_collector: Arc<dyn LogCollector + Send + Sync>,
 }
 
 impl Runner {
-    pub fn new(server: String, job_id: String, worker_id: String, task: Option<String>, action: Option<String>, input: Option<Value>, workspace: WorkspaceClient, workspace_revision: String, log_collector: Arc<dyn LogCollector + Send + Sync>) -> Self {
+    pub fn new(server: Option<String>, job_id: Option<String>, worker_id: Option<String>, task: Option<String>, action: Option<String>, input: Option<Value>, workspace: WorkspaceClient, workspace_revision: Option<String>, log_collector: Arc<dyn LogCollector + Send + Sync>) -> Self {
         Runner {
             server,
             job_id,
@@ -51,7 +51,7 @@ impl Runner {
 
         match (self.task.clone(), self.action.clone()) {
             (Some(task), None) => {
-                info!("Running task: {} with job_id: {}, worker_id: {}", task, self.job_id, self.worker_id);
+                info!("Running task: {}", task);
                 if let Some(task_def) = workflows.get_task(&task) {
                     success = self.execute_task(&task_def.flow, workflows).await?;
                 } else {
@@ -60,7 +60,7 @@ impl Runner {
                 }
             }
             (None, Some(action_name)) => {
-                info!("Running action: {} with job_id: {}, worker_id: {}", action_name, self.job_id, self.worker_id);
+                info!("Running action: {}", action_name);
                 if let Some(action_def) = workflows.get_action(&action_name) {
                     let (action_success, _) = self.execute_action(&action_name, action_def, self.input.clone()).await?;
                     success = action_success;
@@ -172,7 +172,7 @@ impl Runner {
 
         log_collector.mark_start(start_time, &step_input).await?;
 
-
+        /*
         let start_payload = json!({
             "start_datetime": start_time.to_rfc3339(),
             "input": &step_input,
@@ -182,6 +182,7 @@ impl Runner {
             .json(&start_payload)
             .send()
             .await?;
+        */
 
         // Initialize ParameterRenderer
         let mut renderer = ParameterRenderer::new();
@@ -221,11 +222,13 @@ impl Runner {
             revision: None,
         };
 
+        self.log_collector.store_results(result).await?;
+        /*
         self.client.post(format!("{}/jobs/{}/steps/{}/results?worker_id={}", self.server, self.job_id, step_name, self.worker_id))
             .json(&result)
             .send()
             .await?;
-
+        */
         Ok((exit_success, output))
     }
 }

@@ -1,9 +1,13 @@
+use std::sync::Arc;
 use stroem_common::workspace_client::WorkspaceClient;
 use serde_json::Value;
 use tracing::error;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 use stroem_common::init_tracing;
+use stroem_common::log_collector::LogCollectorConsole;
+use stroem_common::runner::Runner;
+use std::fs;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -34,7 +38,9 @@ async fn main() {
     let args = Args::parse();
     // init_tracing(args.verbose);
 
-    let mut workspace = WorkspaceClient::new(PathBuf::from(&args.workspace)).await;
+    let workspace_path = fs::canonicalize(args.workspace).unwrap();
+
+    let mut workspace = WorkspaceClient::new(PathBuf::from(&workspace_path)).await;
 
     if let Err(e) = workspace.read_workflows() {
         eprintln!("Failed to read workflows: {}", e);
@@ -51,6 +57,25 @@ async fn main() {
                     error!("Failed to parse input: {}", e);
                     std::process::exit(1);
                 }));
+
+
+            let log_collector = Arc::new(LogCollectorConsole::new(None));
+
+            let mut runner = Runner::new(None, None, None,
+                                         task, action, input,
+                                         workspace, None,
+                                         log_collector);
+
+            let success = runner.execute().await.unwrap_or_else(|e| {
+                eprintln!("Execution failed: {}", e);
+                false
+            });
+
+            if !success {
+                std::process::exit(1);
+            }
+
+            println!("Successfully executed");
         }
     }
 

@@ -6,6 +6,7 @@ use reqwest::Client;
 use chrono::Utc;
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
+use std::fs;
 use std::ops::Deref;
 use stroem_common::{run, JobResult, log_collector::LogCollector, log_collector::LogEntry, init_tracing};
 use std::path::{Path, PathBuf};
@@ -53,6 +54,8 @@ async fn main() {
 
      */
 
+    let workspace_path = fs::canonicalize(args.workspace).unwrap();
+
     info!("Runner started for job_id: {}, worker_id: {}", args.job_id, args.worker_id);
 
     let input: Option<Value> = args.input.as_ref()
@@ -61,7 +64,7 @@ async fn main() {
             std::process::exit(1);
         }));
 
-    let mut workspace = WorkspaceClient::new(PathBuf::from(&args.workspace)).await;
+    let mut workspace = WorkspaceClient::new(PathBuf::from(&workspace_path)).await;
     let revision = workspace.sync(&args.server).await.unwrap_or_else(|e| {
         error!("Failed to get workspace: {}", e);
         std::process::exit(1);
@@ -79,7 +82,7 @@ async fn main() {
         Some(10)
     ));
 
-    let mut runner = Runner::new(args.server, args.job_id, args.worker_id, args.task, args.action, input, workspace, revision, log_collector);
+    let mut runner = Runner::new(Some(args.server), Some(args.job_id), Some(args.worker_id), args.task, args.action, input, workspace, Some(revision), log_collector);
     let success = runner.execute().await.unwrap_or_else(|e| {
         error!("Execution failed: {}", e);
         false

@@ -181,3 +181,51 @@ impl Drop for LogCollectorServer {
         // No automatic flush; handled explicitly
     }
 }
+
+pub struct LogCollectorConsole {
+    step_name: Arc<RwLock<Option<String>>>,
+}
+
+impl LogCollectorConsole {
+    pub fn new(step_name: Option<String>) -> Self {
+        Self {
+            step_name: Arc::new(RwLock::new(step_name)),
+        }
+    }
+}
+
+#[async_trait]
+impl LogCollector for LogCollectorConsole {
+    async fn log(&self, timestamp: DateTime<Utc>, is_stderr: bool, message: String) -> Result<(), Error> {
+        println!("{} {}", timestamp.format("%H:%M"), message);
+        Ok(())
+    }
+
+    async fn flush(&self) -> Result<(), Error> {
+        Ok(())
+    }
+
+    async fn set_step_name(&self, step_name: Option<String>) {
+        let mut step_name_guard = self.step_name.write().await;
+        *step_name_guard = step_name;
+    }
+
+    async fn mark_start(&self, start: DateTime<Utc>, input: &Option<Value>) -> Result<(), Error> {
+        let mut step_name_guard = self.step_name.read().await;
+        if let Some(step_name) = step_name_guard.as_ref() {
+            println!("====== Step: {} ======", step_name);
+        }
+        println!("---- Input ----");
+        println!("{}", serde_json::to_string_pretty(&input.as_ref().unwrap_or(&Value::Null)).unwrap());
+        println!("---------------");
+        Ok(())
+    }
+
+    async fn store_results(&self, result: JobResult) -> Result<(), Error> {
+        println!("---- Output ----");
+        println!("{}", serde_json::to_string_pretty(&result.output.as_ref().unwrap_or(&Value::Null)).unwrap());
+        println!("---------------");
+        println!("===================");
+        Ok(())
+    }
+}
