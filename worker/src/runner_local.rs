@@ -14,7 +14,12 @@ pub async fn start(job: &Job, server: &str, worker_id: &str, log_collector: Arc<
         Err(e) => {
             let msg = format!("Failed to get current executable path: {}", e);
             error!(msg);
-            log_collector.log(Utc::now(), true, msg).await?;
+            let entry = LogEntry {
+                timestamp: Utc::now(),
+                is_stderr: true,
+                message: msg,
+            };
+            log_collector.log(entry).await?;
             return Ok((false, None));
         }
     };
@@ -23,7 +28,12 @@ pub async fn start(job: &Job, server: &str, worker_id: &str, log_collector: Arc<
         None => {
             let msg = "Failed to get parent directory of worker binary".to_string();
             error!(msg);
-            log_collector.log(Utc::now(), true, msg).await?;
+            let entry = LogEntry {
+                timestamp: Utc::now(),
+                is_stderr: true,
+                message: msg,
+            };
+            log_collector.log(entry).await?;
             return Ok((false, None));
         }
     };
@@ -46,7 +56,12 @@ pub async fn start(job: &Job, server: &str, worker_id: &str, log_collector: Arc<
         runner_args.push(action.clone());
     } else {
         let msg = "Job must specify either task or action".to_string();
-        log_collector.log(Utc::now(), true, msg).await?;
+        let entry = LogEntry {
+            timestamp: Utc::now(),
+            is_stderr: true,
+            message: msg,
+        };
+        log_collector.log(entry).await?;
         return Ok((false, None));
     }
 
@@ -59,7 +74,12 @@ pub async fn start(job: &Job, server: &str, worker_id: &str, log_collector: Arc<
             Err(e) => {
                 let msg = format!("Failed to serialize input: {}", e);
                 error!(msg);
-                log_collector.log(Utc::now(), true, msg).await?;
+                let entry = LogEntry {
+                    timestamp: Utc::now(),
+                    is_stderr: true,
+                    message: msg,
+                };
+                log_collector.log(entry).await?;
                 return Ok((false, None));
             }
         }
@@ -67,5 +87,5 @@ pub async fn start(job: &Job, server: &str, worker_id: &str, log_collector: Arc<
 
     debug!("Executing: {:?} {:?}", runner_path, runner_args);
 
-    run(runner_path.to_str().unwrap(), Some(runner_args), None, log_collector).await
+    run(runner_path.to_str().unwrap(), Some(runner_args), None, None, log_collector).await
 }

@@ -65,7 +65,7 @@ fn strip_ansi(input: &str) -> String {
     ANSI_REGEX.replace_all(input, "").to_string()
 }
 
-pub async fn run(cmd: &str, args: Option<Vec<String>>, cwd: Option<&PathBuf>, log_collector: Arc<dyn LogCollector + Send + Sync>) -> Result<(bool, Option<Value>), Error> {
+pub async fn run(cmd: &str, args: Option<Vec<String>>, stdin_content: Option<String>, cwd: Option<&PathBuf>, log_collector: Arc<dyn LogCollector + Send + Sync>) -> Result<(bool, Option<Value>), Error> {
     let mut command = TokioCommand::new(cmd);
     if let Some(args) = args {
         command.args(args);
@@ -75,12 +75,24 @@ pub async fn run(cmd: &str, args: Option<Vec<String>>, cwd: Option<&PathBuf>, lo
     }
     command.stdout(Stdio::piped());
     command.stderr(Stdio::piped());
+    if stdin_content.is_some() {
+        command.stdin(Stdio::piped());
+    }
 
     let mut child = command.spawn()
         .map_err(|e| anyhow!("Failed to spawn command: {}", e))?;
 
     let stdout = child.stdout.take().unwrap();
     let stderr = child.stderr.take().unwrap();
+    if stdin_content.is_some() {
+        let mut stdin = child.stdin.take().unwrap();
+
+        stdin.write(stdin_content.unwrap().as_ref()).await?;
+        stdin.flush().await?;
+        stdin.shutdown().await?;
+        drop(stdin);
+    }
+
 
     // Channel for LogEntry from stdout/stderr to writer
     let (log_tx, mut log_rx) = mpsc::channel::<LogEntry>(100);
@@ -89,6 +101,7 @@ pub async fn run(cmd: &str, args: Option<Vec<String>>, cwd: Option<&PathBuf>, lo
 
     // Stdout task
     let log_tx_stdout = log_tx.clone();
+    let lc_stdout = log_collector.clone();
     tokio::spawn(async move {
         let mut stdout_reader = BufReader::new(stdout).lines();
         while let Some(line) = stdout_reader.next_line().await.unwrap_or(None) {
@@ -98,7 +111,8 @@ pub async fn run(cmd: &str, args: Option<Vec<String>>, cwd: Option<&PathBuf>, lo
                 is_stderr: false,
                 message: clean_line,
             };
-            log_tx_stdout.send(entry).await.unwrap_or_else(|e| error!("Failed to send stdout log: {}", e));
+            lc_stdout.log(entry).await;
+            // log_tx_stdout.send(entry).await.unwrap_or_else(|e| error!("Failed to send stdout log: {}", e));
             if line.starts_with("OUTPUT:") {
                 output_tx.send(line).await.unwrap_or_else(|e| error!("Failed to send output line: {}", e));
             }
@@ -107,6 +121,7 @@ pub async fn run(cmd: &str, args: Option<Vec<String>>, cwd: Option<&PathBuf>, lo
 
     // Stderr task
     let log_tx_stderr = log_tx.clone();
+    let lc_stderr = log_collector.clone();
     tokio::spawn(async move {
         let mut stderr_reader = BufReader::new(stderr).lines();
         while let Some(line) = stderr_reader.next_line().await.unwrap_or(None) {
@@ -116,11 +131,13 @@ pub async fn run(cmd: &str, args: Option<Vec<String>>, cwd: Option<&PathBuf>, lo
                 is_stderr: true,
                 message: clean_line,
             };
-            log_tx_stderr.send(entry).await.unwrap_or_else(|e| error!("Failed to send stderr log: {}", e));
+            lc_stderr.log(entry).await;
+            // log_tx_stderr.send(entry).await.unwrap_or_else(|e| error!("Failed to send stderr log: {}", e));
         }
     });
 
     // Single writer task to LogCollector
+    /*
     tokio::spawn(async move {
         while let Some(entry) = log_rx.recv().await {
             log_collector.log(entry.timestamp, entry.is_stderr, entry.message)
@@ -131,7 +148,10 @@ pub async fn run(cmd: &str, args: Option<Vec<String>>, cwd: Option<&PathBuf>, lo
         log_collector.flush().await.unwrap_or_else(|e| error!("Failed to flush logs: {}", e));
     });
 
+     */
+
     let status = child.wait().await?;
+    log_collector.flush().await?;
     let mut output_lines = Vec::new();
     while let Some(line) = output_rx.recv().await {
         output_lines.push(line.strip_prefix("OUTPUT:").unwrap().trim().to_string());
@@ -149,15 +169,6 @@ pub async fn run(cmd: &str, args: Option<Vec<String>>, cwd: Option<&PathBuf>, lo
     Ok((status.success(), output))
 }
 
-pub async fn send_result(client: &Client, server: &str, result: &JobResult) -> Result<(), Error> {
-    let url = format!("{}/jobs/results", server);
-    client.post(&url)
-        .json(result)
-        .send()
-        .await?;
-        //.map_err(|e| format!("Failed to send result: {}", e))?;
-    Ok(())
-}
 
 pub fn init_tracing(verbose: bool) {
     // Configure tracing with split output

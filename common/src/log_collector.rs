@@ -1,5 +1,6 @@
 use std::collections::VecDeque;
 use std::sync::Arc;
+use std::time::Duration;
 use anyhow::{bail, Error, anyhow, Context};
 use chrono::{DateTime, Utc};
 use reqwest::Client;
@@ -10,6 +11,7 @@ use tokio::task::JoinHandle;
 use tracing::{error, info, debug};
 use async_trait::async_trait;
 use serde_json::{json, Value};
+use tokio::time::sleep;
 use crate::JobResult;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -21,7 +23,7 @@ pub struct LogEntry {
 
 #[async_trait]
 pub trait LogCollector {
-    async fn log(&self, timestamp: DateTime<Utc>, is_stderr: bool, message: String) -> Result<(), Error>;
+    async fn log(&self, entry: LogEntry) -> Result<(), Error>;
     async fn flush(&self) -> Result<(), Error>;
     async fn set_step_name(&self, step_name: Option<String>);
 
@@ -29,6 +31,7 @@ pub trait LogCollector {
     async fn store_results(&self, result: JobResult) -> Result<(), Error> ;
 }
 
+#[derive(Clone)]
 pub struct LogCollectorServer {
     server: String,
     job_id: String,
@@ -37,12 +40,17 @@ pub struct LogCollectorServer {
     step_name: Arc<RwLock<Option<String>>>,
     buffer: Arc<RwLock<VecDeque<LogEntry>>>,
     buffer_size: usize,
+    sender: mpsc::Sender<LogEntry>,
+    handle: Arc<Option<JoinHandle<()>>>,
 }
 
 impl LogCollectorServer {
     pub fn new(server: String, job_id: String, worker_id: String, step_name: Option<String>, buffer_size: Option<usize>) -> Self {
         let buffer_size = buffer_size.unwrap_or(10);
-        Self {
+        let (sender, mut receiver) = mpsc::channel::<LogEntry>(100);
+
+
+        let mut s = Self {
             server,
             job_id,
             worker_id,
@@ -50,7 +58,41 @@ impl LogCollectorServer {
             step_name: Arc::new(RwLock::new(step_name)),
             buffer: Arc::new(RwLock::new(VecDeque::with_capacity(buffer_size))),
             buffer_size,
-        }
+            sender,
+            handle: Arc::new(None)
+        };
+
+        let lc = s.clone();
+
+        let handle = tokio::spawn(async move {
+            let flush_interval = Duration::from_secs(5); // X seconds, e.g., 5
+            loop {
+                tokio::select! {
+                    entry = receiver.recv() => {
+                        match entry {
+                            Some(entry) => {
+                                let mut buffer_guard = lc.buffer.write().await;
+                                buffer_guard.push_back(entry);
+                                if buffer_guard.len() >= lc.buffer_size {
+                                   lc.send_logs(&*buffer_guard).await;
+                                  buffer_guard.clear();
+                                }
+                            }
+                            None => break,
+                        }
+
+                    }
+                    _ = sleep(flush_interval) => {
+                        let  _ = lc.flush().await;
+                    }
+                }
+            }
+            lc.flush().await.ok();
+        });
+
+        s.handle = Arc::new(Some(handle));
+
+        s
     }
 
     async fn send_logs(&self, buffer: &VecDeque<LogEntry>) -> Result<(), Error> {
@@ -90,16 +132,20 @@ impl LogCollectorServer {
 
 }
 
+impl Drop for LogCollectorServer {
+    fn drop(&mut self) {
+        if let Some(handle) = self.handle.as_ref() {
+            handle.abort();
+        }
+    }
+}
+
 #[async_trait]
 impl LogCollector for LogCollectorServer {
-    async fn log(&self, timestamp: DateTime<Utc>, is_stderr: bool, message: String) -> Result<(), Error> {
-        let entry = LogEntry { timestamp, is_stderr, message };
-        let mut buffer_guard = self.buffer.write().await;
-        buffer_guard.push_back(entry);
-        if buffer_guard.len() >= self.buffer_size {
-            self.send_logs(&*buffer_guard).await?;
-            buffer_guard.clear();
-        }
+
+    async fn log(&self, entry: LogEntry) -> Result<(), Error> {
+        // let entry = LogEntry { timestamp, is_stderr, message };
+        self.sender.send(entry).await?;
         Ok(())
     }
 
@@ -176,11 +222,6 @@ impl LogCollector for LogCollectorServer {
     }
 }
 
-impl Drop for LogCollectorServer {
-    fn drop(&mut self) {
-        // No automatic flush; handled explicitly
-    }
-}
 
 pub struct LogCollectorConsole {
     step_name: Arc<RwLock<Option<String>>>,
@@ -196,8 +237,9 @@ impl LogCollectorConsole {
 
 #[async_trait]
 impl LogCollector for LogCollectorConsole {
-    async fn log(&self, timestamp: DateTime<Utc>, is_stderr: bool, message: String) -> Result<(), Error> {
-        println!("{} {}", timestamp.format("%H:%M"), message);
+
+    async fn log(&self, entry: LogEntry) -> Result<(), Error> {
+        println!("{} {}", entry.timestamp.format("%H:%M"), entry.message);
         Ok(())
     }
 

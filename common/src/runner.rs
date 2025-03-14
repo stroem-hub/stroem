@@ -210,7 +210,7 @@ impl Runner {
         );
 
          */
-        let (exit_success, output) = run("sh", Some(vec!["-c".to_string(), cmd.to_string()]), Some(&self.workspace.path), log_collector).await?;
+        let (exit_success, output) = run("sh", None, Some(cmd.to_string()), Some(&self.workspace.path), log_collector).await?;
         let end_time = Utc::now();
 
         let result = JobResult {
