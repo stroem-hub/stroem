@@ -9,6 +9,10 @@
 - [X] workspace watch changes
 - [X] collect file system events for 5 seconds, do not reread everything on every event.
 - [X] workspace in git
+- [ ] normalize action parameters, update runner
+- [ ] use handlebars template engine
+- [ ] add "vals" function to the template engine
+- [ ] "run" function, shell with stdin
 - [ ] config validator
 - [ ] cli for validating config and running tasks
 - [ ] logrepository to send files to S3/AzureBlob/GC/Minio
@@ -18,3 +22,4 @@
 - [ ] helm-chart
 - [ ] Basic UI for viewing job results
 - [ ] key-value storage
+- [ ] allow non existent keys

@@ -4,6 +4,8 @@ actions:
     cmd: echo "ERROR! at {{ input.step_name }}"
 
   allunite.ddd:
+    shell:
+      cmd:
     type: cmd
     path: run/last.sh
     args: "--var ${inputs.varname}"
@@ -92,7 +94,7 @@ tasks:
 
 triggers:
   trigger01:
-    enabled: false
+    enabled: falsef
     type: "cron"
     cron: "*/20 * * * * *"
     task: task1

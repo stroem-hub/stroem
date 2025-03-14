@@ -33,7 +33,7 @@ struct Args {
     #[arg(long, required = true)]
     worker_id: String,
     #[arg(long, default_value = "/tmp/workspace")]
-    workspace_dir: String,
+    workspace: String,
 }
 
 struct Runner {
@@ -259,7 +259,7 @@ async fn main() {
             std::process::exit(1);
         }));
 
-    let mut workspace = WorkspaceClient::new(PathBuf::from(&args.workspace_dir)).await;
+    let mut workspace = WorkspaceClient::new(PathBuf::from(&args.workspace)).await;
     let revision = workspace.sync(&args.server).await.unwrap_or_else(|e| {
         error!("Failed to get workspace: {}", e);
         std::process::exit(1);

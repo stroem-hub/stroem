@@ -89,11 +89,10 @@ pub struct WorkflowsConfiguration {
 }
 
 impl WorkflowsConfiguration {
-    pub fn new(workspace_path: PathBuf) -> Option<Self> {
+    pub fn new(workspace_path: PathBuf) -> Result<Self, Error> {
         let workflows_path = workspace_path.join(".workflows");
         if !workflows_path.exists() {
-            error!("Workspace configuration not found");
-            return None;
+            bail!("Workspace configuration not found");
         }
 
         // Build the glob walker, handling potential errors
@@ -109,8 +108,7 @@ impl WorkflowsConfiguration {
                 .map(|entry| config::File::from(entry.path()))
                 .collect::<Vec<_>>(),
             Err(e) => {
-                error!("Failed to build glob walker: {}", e);
-                return None;
+                bail!("Failed to build glob walker: {}", e);
             }
         };
 
@@ -118,8 +116,7 @@ impl WorkflowsConfiguration {
         let config = match Config::builder().add_source(gw).build() {
             Ok(config) => config,
             Err(e) => {
-                error!("Failed to build config: {}", e);
-                return None;
+                bail!("Failed to build config: {}", e);
             }
         };
 
@@ -127,10 +124,9 @@ impl WorkflowsConfiguration {
 
         // Deserialize to Self, converting Result to Option
         match config.try_deserialize::<Self>() {
-            Ok(cfg) => Some(cfg),
+            Ok(cfg) => Ok(cfg),
             Err(e) => {
-                error!("Failed to deserialize config: {}", e);
-                None
+                bail!("Failed to deserialize config: {}", e);
             }
         }
     }

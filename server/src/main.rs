@@ -7,7 +7,7 @@ use tracing_subscriber;
 use tokio::signal;
 use std::path::PathBuf;
 use config::{Config, Environment, File};
-use anyhow::{bail, Error};
+use anyhow::{bail, Context, Error};
 use deadpool_postgres;
 use tokio_postgres::NoTls;
 use refinery::embed_migrations;
@@ -63,7 +63,7 @@ async fn main() -> Result<(), Error>{
 
     let db_pool= db_config.create_pool(Some(deadpool_postgres::Runtime::Tokio1), NoTls)?;
 
-    let mut db_client = db_pool.get().await?;
+    let mut db_client = db_pool.get().await.context("Could not connect to DB server")?;
     migrations::runner()
         .run_async(db_client.deref_mut().deref_mut()) // Get to the tokio_postgresql object
         .await?;

@@ -20,7 +20,6 @@ use tokio::sync::watch;
 use notify::{RecommendedWatcher, RecursiveMode, Watcher, Config as NotifyConfig};
 use tokio::time::{sleep, Duration}; // For watcher task loop
 use std::sync::{Arc, RwLock};
-use git2::{Repository, RemoteCallbacks, Cred, FetchOptions, build::RepoBuilder, ResetType};
 
 use stroem_common::workflows_configuration::WorkflowsConfiguration;
 use crate::server_config::GitConfig;
@@ -83,11 +82,11 @@ impl WorkspaceServer {
     }
 
     pub fn read_workflows(&self) -> Result<(), Error> {
-        let new_workflows = WorkflowsConfiguration::new(PathBuf::from(self.path.clone()));
+        let new_workflows = WorkflowsConfiguration::new(PathBuf::from(self.path.clone()))?;
         info!("Loaded workspace configurations: {:?}", &new_workflows);
 
         if let Ok(mut workflows_guard) = self.workflows.write() {
-            *workflows_guard = new_workflows.clone();
+            *workflows_guard = Some(new_workflows.clone());
         } else {
             error!("Failed to acquire write lock on workflows");
             return Err(anyhow!("Failed to lock workflows for update"));
@@ -100,7 +99,7 @@ impl WorkspaceServer {
             return Err(anyhow!("Failed to lock revision for reset"));
         }
 
-        self.workflows_tx.send(new_workflows)?;
+        self.workflows_tx.send(Some(new_workflows))?;
         Ok(())
     }
 

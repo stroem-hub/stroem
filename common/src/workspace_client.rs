@@ -138,9 +138,9 @@ impl WorkspaceClient {
     }
 
     pub fn read_workflows(&mut self) -> Result<(), Error> {
-        let new_workflows = WorkflowsConfiguration::new(PathBuf::from(self.path.clone()));
+        let new_workflows = WorkflowsConfiguration::new(PathBuf::from(self.path.clone()))?;
         info!("Loaded workspace configurations: {:?}", &new_workflows);
-        self.workflows = new_workflows;
+        self.workflows = Some(new_workflows);
 
         Ok(())
     }

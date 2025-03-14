@@ -2444,6 +2444,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "stroem-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "clap",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "stroem-common",
+ "tera",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "stroem-common"
 version = "0.1.0"
 dependencies = [
