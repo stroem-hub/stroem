@@ -6,6 +6,7 @@ use globwalker::GlobWalkerBuilder;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing::{debug, error};
+use std::process::Command;
 
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -86,6 +87,7 @@ pub struct WorkflowsConfiguration {
     pub actions: Option<HashMap<String, Action>>,
     pub tasks: Option<HashMap<String, Task>>,
     pub triggers: Option<HashMap<String, Trigger>>,
+    pub secrets: Option<Value>,
 }
 
 impl WorkflowsConfiguration {
@@ -95,42 +97,46 @@ impl WorkflowsConfiguration {
             bail!("Workspace configuration not found");
         }
 
-        // Build the glob walker, handling potential errors
-        let gw = match GlobWalkerBuilder::from_patterns(&workflows_path, &["*.yaml"])
+        // Build the glob walker for both *.yaml and *.sops.yaml files
+        let gw = match GlobWalkerBuilder::from_patterns(&workflows_path, &["*.yaml", "*.sops.yaml"])
             .max_depth(10)
             .follow_links(true)
             .sort_by(|a, b| a.path().cmp(b.path()))
             .build()
         {
-            Ok(walker) => walker
-                .into_iter()
-                .filter_map(Result::ok)
-                .map(|entry| config::File::from(entry.path()))
-                .collect::<Vec<_>>(),
-            Err(e) => {
-                bail!("Failed to build glob walker: {}", e);
-            }
+            Ok(walker) => walker,
+            Err(e) => bail!("Failed to build glob walker: {}", e),
         };
 
-        // Build the config, handling errors
-        let config = match Config::builder().add_source(gw).build() {
+        let mut config_builder = Config::builder();
+
+        // Process each file from the glob walker asynchronously
+        for entry in gw.into_iter().filter_map(Result::ok) {
+            let path = entry.path();
+            let file_source = if path.extension().and_then(|s| s.to_str()) == Some("sops.yaml") {
+                // Decrypt SOPS file asynchronously
+                let decrypted_content = decrypt_sops_file(path)?;
+                config_builder = config_builder.add_source(config::File::from_str(&decrypted_content, config::FileFormat::Yaml));
+            } else {
+                // Regular YAML file
+                config_builder = config_builder.add_source(config::File::from(path));
+            };
+        }
+
+        // Build the config
+        let config = match config_builder.build() {
             Ok(config) => config,
-            Err(e) => {
-                bail!("Failed to build config: {}", e);
-            }
+            Err(e) => bail!("Failed to build config: {}", e),
         };
 
         debug!("Merged config: {:?}", config);
 
-        // Deserialize to Self, converting Result to Option
+        // Deserialize to Self
         match config.try_deserialize::<Self>() {
             Ok(cfg) => Ok(cfg),
-            Err(e) => {
-                bail!("Failed to deserialize config: {}", e);
-            }
+            Err(e) => bail!("Failed to deserialize config: {}", e),
         }
     }
-
 
     pub fn get_action(&self, name: &str) -> Option<&Action> {
         self.actions.as_ref()?.get(name)
@@ -139,4 +145,22 @@ impl WorkflowsConfiguration {
     pub fn get_task(&self, name: &str) -> Option<&Task> {
         self.tasks.as_ref()?.get(name)
     }
+}
+
+/// Decrypt a SOPS-encrypted YAML file using the `sops` command-line tool.
+fn decrypt_sops_file(path: &std::path::Path) -> Result<String, Error> {
+    let output = Command::new("sops")
+        .arg("-d") // Decrypt flag
+        .arg(path)
+        .output()
+        .map_err(|e| anyhow::anyhow!("Failed to execute sops: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        bail!("SOPS decryption failed: {}", stderr);
+    }
+
+    let decrypted_content = String::from_utf8(output.stdout)
+        .map_err(|e| anyhow::anyhow!("Failed to parse decrypted content: {}", e))?;
+    Ok(decrypted_content)
 }

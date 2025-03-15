@@ -1,3 +1,29 @@
+resource_types:
+  clickhouse:
+    hostname:
+      type: string
+    database:
+      type: string
+    port:
+      type: uint
+    username:
+      type: string
+    password:
+      type: string
+
+resource:
+  ch_staging:
+    type: clickhouse
+    values:
+      hostname: server.internal.inc
+      port: 8123
+      username: tasks
+      password: tasks
+
+secrets: {}
+
+
+
 actions:
   error_handler:
     type: shell

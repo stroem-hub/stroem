@@ -100,7 +100,6 @@ pub async fn run(cmd: &str, args: Option<Vec<String>>, stdin_content: Option<Str
     let (output_tx, mut output_rx) = mpsc::channel::<String>(100);
 
     // Stdout task
-    let log_tx_stdout = log_tx.clone();
     let lc_stdout = log_collector.clone();
     tokio::spawn(async move {
         let mut stdout_reader = BufReader::new(stdout).lines();
@@ -111,7 +110,7 @@ pub async fn run(cmd: &str, args: Option<Vec<String>>, stdin_content: Option<Str
                 is_stderr: false,
                 message: clean_line,
             };
-            lc_stdout.log(entry).await;
+            lc_stdout.log(entry).await.ok();
             // log_tx_stdout.send(entry).await.unwrap_or_else(|e| error!("Failed to send stdout log: {}", e));
             if line.starts_with("OUTPUT:") {
                 output_tx.send(line).await.unwrap_or_else(|e| error!("Failed to send output line: {}", e));
@@ -120,7 +119,6 @@ pub async fn run(cmd: &str, args: Option<Vec<String>>, stdin_content: Option<Str
     });
 
     // Stderr task
-    let log_tx_stderr = log_tx.clone();
     let lc_stderr = log_collector.clone();
     tokio::spawn(async move {
         let mut stderr_reader = BufReader::new(stderr).lines();
@@ -131,24 +129,10 @@ pub async fn run(cmd: &str, args: Option<Vec<String>>, stdin_content: Option<Str
                 is_stderr: true,
                 message: clean_line,
             };
-            lc_stderr.log(entry).await;
+            lc_stderr.log(entry).await.ok();
             // log_tx_stderr.send(entry).await.unwrap_or_else(|e| error!("Failed to send stderr log: {}", e));
         }
     });
-
-    // Single writer task to LogCollector
-    /*
-    tokio::spawn(async move {
-        while let Some(entry) = log_rx.recv().await {
-            log_collector.log(entry.timestamp, entry.is_stderr, entry.message)
-                .await
-                .unwrap_or_else(|e| error!("Failed to log entry: {}", e));
-        }
-        // Flush remaining logs when channel closes
-        log_collector.flush().await.unwrap_or_else(|e| error!("Failed to flush logs: {}", e));
-    });
-
-     */
 
     let status = child.wait().await?;
     log_collector.flush().await?;

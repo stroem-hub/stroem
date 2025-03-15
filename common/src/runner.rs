@@ -123,6 +123,8 @@ impl Runner {
         let mut success = true;
 
         let mut renderer = ParameterRenderer::new();
+        renderer.add_to_context(json!({"secrets": config.secrets}))?;
+
         if let Some(input_value) = &self.input {
             debug!("Task input: {}", input_value);
             renderer.add_to_context(json!({"input": input_value.clone()}))?;

@@ -1,3 +1,4 @@
+use std::process::Command;
 use serde_json::{Value, Map};
 use upon::Engine;
 use anyhow::{Result, anyhow};
@@ -25,6 +26,12 @@ impl ParameterRenderer {
     /// Creates a new ParameterRenderer with an empty context.
     pub fn new() -> Self {
         let mut engine = Engine::new();
+        engine.add_filter("vals", |vals_ref: &str| {
+            run_vals(vals_ref).unwrap_or_else(|e| {
+                eprintln!("vals filter error: {}", e);
+                "".to_string() // Return empty string on error, consistent with upon's default
+            })
+        });
         // No need to configure strict mode; upon defaults to "" for missing values
         ParameterRenderer {
             context: Value::Object(Map::new()),
@@ -53,7 +60,6 @@ impl ParameterRenderer {
     }
 
     /// Renders a Value, processing any string values as templates using the context.
-    /// Renders a Value, processing any string values as templates using the context.
     pub fn render(&self, input: Value) -> Result<Value> {
         match input {
             Value::String(template) => {
@@ -81,6 +87,24 @@ impl ParameterRenderer {
             v => Ok(v),
         }
     }
+}
+
+/// Synchronously run the `vals eval` command to resolve a reference.
+fn run_vals(vals_ref: &str) -> Result<String> {
+    let output = Command::new("vals")
+        .arg("eval")
+        .arg(vals_ref)
+        .output()
+        .map_err(|e| anyhow!("Failed to execute vals: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(anyhow!("vals eval failed: {}", stderr));
+    }
+
+    let result = String::from_utf8(output.stdout)
+        .map_err(|e| anyhow!("Failed to parse vals output: {}", e))?;
+    Ok(result.trim().to_string()) // Trim to remove trailing newlines
 }
 
 #[cfg(test)]

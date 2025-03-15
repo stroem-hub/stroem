@@ -11,13 +11,12 @@
 - [X] workspace in git
 - [ ] normalize action parameters, update runner
 - [ ] use handlebars template engine
-- [ ] add "vals" function to the template engine
-- [ ] "run" function, shell with stdin
+- [X] add "vals" function to the template engine
+- [X] "run" function, shell with stdin
 - [ ] config validator
-- [ ] cli for validating config and running tasks
+- [X] cli for validating config and running tasks
 - [ ] logrepository to send files to S3/AzureBlob/GC/Minio
-- [ ] vals library alternative?
-- [ ] Secrets (sops?)
+- [X] Secrets (sops)
 - [ ] Resource types and Resources ?
 - [ ] helm-chart
 - [ ] Basic UI for viewing job results
