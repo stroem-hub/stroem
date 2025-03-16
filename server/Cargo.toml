@@ -29,6 +29,8 @@ tokio-stream = {workspace = true}
 notify = {workspace = true}
 blake2 = { workspace = true }
 git2 = {workspace = true}
+rust-embed = { workspace = true }
+mime_guess = { workspace = true }
 
 [build-dependencies]
 refinery = { workspace = true }

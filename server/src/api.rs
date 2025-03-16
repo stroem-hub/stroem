@@ -2,10 +2,11 @@ use std::collections::HashMap;
 // workflow-server/src/api.rs
 use axum::{
     extract::{Path, Query, State},
-    http::StatusCode,
+    http::{StatusCode, Uri},
     response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
+    body::Body
 };
 use std::path::PathBuf;
 use tokio::net::TcpListener;
@@ -17,7 +18,7 @@ use flate2::write::GzEncoder;
 use flate2::Compression;
 use globwalker::GlobWalkerBuilder;
 use std::fs::File;
-use std::io::{Write, Cursor};
+use std::io::{Write, Cursor, Read};
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 use anyhow::{anyhow, Error};
@@ -26,6 +27,13 @@ use crate::workspace_server::WorkspaceServer;
 use crate::repository::{JobRepository, LogRepository};
 use crate::error::AppError;
 use std::sync::{Arc, RwLock};
+use rust_embed::RustEmbed;
+use mime_guess::from_path;
+
+#[derive(RustEmbed)]
+#[folder = "static/"]
+#[prefix = ""]
+struct StaticAssets;
 
 
 #[derive(Clone)]
@@ -54,6 +62,8 @@ pub async fn run(api: Api, addr: &str) {
         .route("/jobs/{:job_id}/steps/{:step_name}/results", post(update_step_result))
         .route("/files/workspace.tar.gz", get(serve_workspace_tarball))
         .route("/reload", post(reload_workspace))
+        .route("/{*path}", get(serve_static))
+        .route("/", get(serve_static))
         .with_state(api);
 
     let listener = TcpListener::bind(addr).await.unwrap();
@@ -61,6 +71,36 @@ pub async fn run(api: Api, addr: &str) {
     axum::serve(listener, app.into_make_service())
         .await
         .unwrap();
+}
+
+async fn serve_static(uri: Uri) -> impl IntoResponse {
+    let path = uri.path();
+    let path = path.trim_start_matches('/'); // Remove leading slash
+    debug!("Serving static file at {}", path);
+    match StaticAssets::get(path) {
+        Some(file) => {
+            let mime = from_path(path).first_or_octet_stream();
+            Response::builder()
+                .status(StatusCode::OK)
+                .header("Content-Type", mime.as_ref())
+                .body(Body::from(file.data))
+                .unwrap()
+        }
+        None => {
+            // Fallback to index.html for SPA routing
+            match StaticAssets::get("index.html") {
+                Some(file) => Response::builder()
+                    .status(StatusCode::OK)
+                    .header("Content-Type", "text/html")
+                    .body(file.data.into())
+                    .unwrap(),
+                None => Response::builder()
+                    .status(StatusCode::NOT_FOUND)
+                    .body("404 Not Found".into())
+                    .unwrap(),
+            }
+        }
+    }
 }
 
 #[axum::debug_handler]
