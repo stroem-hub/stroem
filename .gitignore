@@ -3,3 +3,4 @@ files/workspace/logs
 files/workspace/results
 .idea
 data
+.DS_Store
