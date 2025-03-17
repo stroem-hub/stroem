@@ -8,6 +8,7 @@ use stroem_common::init_tracing;
 use stroem_common::log_collector::LogCollectorConsole;
 use stroem_common::runner::Runner;
 use std::fs;
+use anyhow::bail;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -50,6 +51,17 @@ async fn main() {
 
     match args.command {
         Commands::Validate {} => {
+            if let Some(workflows) = workspace.workflows {
+                if let Err(e) = workflows.validate() {
+                    eprintln!("Failed to validate workflows: {}", e);
+                    std::process::exit(1);
+                }
+            }
+            else {
+                eprintln!("Cuuld not load workflows");
+                std::process::exit(1);
+            }
+            println!("Workspace configuration is valid");
         }
         Commands::Run { task, action, input } => {
             let input: Option<Value> = input.as_ref()

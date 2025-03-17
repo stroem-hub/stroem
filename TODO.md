@@ -9,16 +9,20 @@
 - [X] workspace watch changes
 - [X] collect file system events for 5 seconds, do not reread everything on every event.
 - [X] workspace in git
+- [ ] Dockerfile for server
+- [ ] Dockerfile for worker and runner (with all utilities)
 - [ ] normalize action parameters, update runner
 - [ ] use handlebars template engine
 - [X] add "vals" function to the template engine
 - [X] "run" function, shell with stdin
 - [ ] config validator
 - [X] cli for validating config and running tasks
-- [ ] logrepository to send files to S3/AzureBlob/GC/Minio
+- [ ] logrepository to send files to S3/AzureBlob/GC/Minio - object_store
 - [X] Secrets (sops)
 - [ ] Resource types and Resources ?
 - [ ] helm-chart
 - [ ] Basic UI for viewing job results
 - [ ] key-value storage
 - [ ] allow non existent keys
+- [ ] Confirmation flow (terraform plan + apply).
+      Maybe, with using outputs of another flow

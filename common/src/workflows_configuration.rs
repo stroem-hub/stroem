@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
-use anyhow::{bail, Error};
+use anyhow::{anyhow, bail, Error};
 use config::Config;
 use globwalker::GlobWalkerBuilder;
 use serde::{Deserialize, Serialize};
@@ -136,6 +136,40 @@ impl WorkflowsConfiguration {
             Ok(cfg) => Ok(cfg),
             Err(e) => bail!("Failed to deserialize config: {}", e),
         }
+    }
+
+    pub fn validate(&self) -> Result<(), Error> {
+        // Validate triggers if present
+        if let Some(triggers) = &self.triggers {
+            for (trigger_name, trigger) in triggers {
+                let task = self.get_task(&trigger.task)
+                    .ok_or_else(|| anyhow!("Trigger '{}' references non-existent task '{}'", trigger_name, trigger.task))?;
+            }
+        }
+
+        // Validate tasks and their steps if present
+        if let Some(tasks) = &self.tasks {
+            for (task_name, task) in tasks {
+                for (step_name, step) in &task.flow {
+                    self.get_action(&step.action)
+                        .ok_or_else(|| anyhow!("Step '{}' in task '{}' references non-existent action '{}'", step_name, task_name, step.action))?;
+                    if let Some(on_error) = &step.on_error {
+                        self.get_action(on_error)
+                            .ok_or_else(|| anyhow!("Step '{}' in task '{}' has on_error '{}' referencing non-existent action", step_name, task_name, on_error))?;
+                    }
+                }
+            }
+        }
+
+        // Validate global error handler if present
+        if let Some(globals) = &self.globals {
+            if let Some(error_handler) = &globals.error_handler {
+                self.get_action(error_handler)
+                    .ok_or_else(|| anyhow!("Global error handler '{}' references non-existent action", error_handler))?;
+            }
+        }
+
+        Ok(())
     }
 
     pub fn get_action(&self, name: &str) -> Option<&Action> {
