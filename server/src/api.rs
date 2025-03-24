@@ -22,13 +22,14 @@ use std::io::{Write, Cursor, Read};
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 use anyhow::{anyhow, Error};
-use serde_json::Value;
+use serde_json::{Value, json};
 use crate::workspace_server::WorkspaceServer;
 use crate::repository::{JobRepository, LogRepository};
 use crate::error::AppError;
 use std::sync::{Arc, RwLock};
 use rust_embed::RustEmbed;
 use mime_guess::from_path;
+use stroem_common::workflows_configuration::Task;
 
 #[derive(RustEmbed)]
 #[folder = "static/"]
@@ -52,6 +53,7 @@ impl Api {
 
 pub async fn run(api: Api, addr: &str) {
     let app = Router::new()
+        .route("/api/tasks", get(get_tasks))
         .route("/jobs", post(enqueue_job))
         .route("/jobs/next", get(get_next_job))
         .route("/jobs/{:job_id}/start", post(update_job_start))
@@ -102,6 +104,27 @@ async fn serve_static(uri: Uri) -> impl IntoResponse {
         }
     }
 }
+
+#[axum::debug_handler]
+async fn get_tasks(
+    State(api): State<Api>,
+) -> Result<Json<Value>, AppError> {
+    let workflows_guard = api.workspace.workflows.read().map_err(|_| anyhow!("Could not read workspace"))?;
+    let workflows = workflows_guard.as_ref().unwrap();
+    let tasks = workflows.tasks.as_ref();
+
+    let tasks_json = match &workflows.tasks {
+        Some(tasks) => {
+            let mut task_array: Vec<Value> = tasks.iter().map(|(name, task)| serde_json::to_value(task).unwrap()).collect();
+            // task_array.sort_by(|a, b| a.get("name").unwrap().as_str().cmp(&b.get("name").unwrap().as_str()));
+            serde_json::to_value(task_array)?
+        }
+        None => Value::Array(vec![]), // Empty array if no tasks
+    };
+
+    Ok(Json(tasks_json))
+}
+
 
 #[axum::debug_handler]
 async fn reload_workspace(

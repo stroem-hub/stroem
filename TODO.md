@@ -15,7 +15,7 @@
 - [ ] use handlebars template engine
 - [X] add "vals" function to the template engine
 - [X] "run" function, shell with stdin
-- [ ] config validator
+- [X] config validator
 - [X] cli for validating config and running tasks
 - [ ] logrepository to send files to S3/AzureBlob/GC/Minio - object_store
 - [X] Secrets (sops)
@@ -26,3 +26,4 @@
 - [ ] allow non existent keys
 - [ ] Confirmation flow (terraform plan + apply).
       Maybe, with using outputs of another flow
+- [ ] 

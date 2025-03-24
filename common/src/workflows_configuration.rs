@@ -17,6 +17,9 @@ pub struct Globals {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Action {
+    #[serde(skip_deserializing, default = "default_id")]
+    pub id: String,
+    pub name: Option<String>,
     pub description: Option<String>,
     #[serde(rename = "type")]
     pub action_type: String,
@@ -29,6 +32,8 @@ pub struct Action {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct InputField {
+    #[serde(skip_deserializing, default = "default_id")]
+    pub id: String,
     #[serde(rename = "type")]
     pub field_type: String,
     pub required: Option<bool>,
@@ -50,10 +55,15 @@ pub struct OutputProperty {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Task {
+    #[serde(skip_deserializing, default = "default_id")]
+    pub id: String,
+    pub name: Option<String>,
     pub description: Option<String>,
     pub input: Option<HashMap<String, InputField>>,
     pub flow: HashMap<String, FlowStep>,
 }
+
+fn default_id() -> String { "".to_string() }
 
 impl Task {
     pub fn get_step(&self, name: &str) -> Option<&FlowStep> {
@@ -63,6 +73,9 @@ impl Task {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FlowStep {
+    #[serde(skip_deserializing, default = "default_id")]
+    pub id: String,
+    pub name: Option<String>,
     pub action: String,
     pub input: Option<HashMap<String, String>>,
     pub depends_on: Option<Vec<String>>,
@@ -73,6 +86,8 @@ pub struct FlowStep {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Trigger {
+    #[serde(skip_deserializing, default = "default_id")]
+    pub id: String,
     #[serde(rename = "type")]
     pub trigger_type: String,
     pub cron: Option<String>,
@@ -132,10 +147,43 @@ impl WorkflowsConfiguration {
         debug!("Merged config: {:?}", config);
 
         // Deserialize to Self
-        match config.try_deserialize::<Self>() {
-            Ok(cfg) => Ok(cfg),
+        let mut cfg = match config.try_deserialize::<Self>() {
+            Ok(cfg) => cfg,
             Err(e) => bail!("Failed to deserialize config: {}", e),
+        };
+
+        if let Some(actions) = &mut cfg.actions {
+            for (id, action) in actions {
+                action.id = id.clone();
+                if let Some(inputs) = &mut action.input {
+                    for (input_id, input) in inputs {
+                        input.id = input_id.clone();
+                    }
+                }
+            }
         }
+
+        if let Some(tasks) = &mut cfg.tasks {
+            for (id, task) in tasks {
+                task.id = id.clone();
+                for (step_id, step) in &mut task.flow {
+                    step.id = step_id.clone();
+                }
+                if let Some(inputs) = &mut task.input {
+                    for (input_id, input) in inputs {
+                        input.id = input_id.clone();
+                    }
+                }
+            }
+        }
+
+        if let Some(triggers) = &mut cfg.triggers {
+            for (id, trigger) in triggers {
+                trigger.id = id.clone();
+            }
+        }
+
+        Ok(cfg)
     }
 
     pub fn validate(&self) -> Result<(), Error> {

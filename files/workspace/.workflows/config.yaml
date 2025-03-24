@@ -38,10 +38,18 @@ actions:
 
     input:
       varname:
+        name: Readable name
         type: "string"
         default: ""
         required: true
         order: 0
+
+      # varname1:
+      #   name: Readable name
+      #   required: true
+      #   order: 0
+      #   string:
+      #     default: ""
 
       varname2:
         type: "int"
