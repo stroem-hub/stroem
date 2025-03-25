@@ -66,6 +66,15 @@ impl JobRepository {
         Ok(None)
     }
 
+    pub async fn get_jobs(&self) -> Result<(), Error> {
+        let client = self.pool.get().await?;
+        let row = client.query_opt(
+            "SELECT *,
+            ", &[],
+        ).await?;
+        Ok(())
+    }
+
     pub async fn update_start_time(&self, job_id: &str, worker_id: &str, start_time: DateTime<Utc>, input: Option<Value>) -> Result<(), Error> {
         let client = self.pool.get().await?;
         let rows_affected = client.execute(

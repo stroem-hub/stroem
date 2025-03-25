@@ -25,7 +25,7 @@ use anyhow::{anyhow, Error};
 use serde_json::{Value, json};
 use crate::workspace_server::WorkspaceServer;
 use crate::repository::{JobRepository, LogRepository};
-use crate::error::AppError;
+use crate::error::{ApiError, AppError};
 use std::sync::{Arc, RwLock};
 use rust_embed::RustEmbed;
 use mime_guess::from_path;
@@ -54,6 +54,7 @@ impl Api {
 pub async fn run(api: Api, addr: &str) {
     let app = Router::new()
         .route("/api/tasks", get(get_tasks))
+        .route("/api/tasks/{:task_id}", get(get_task))
         .route("/jobs", post(enqueue_job))
         .route("/jobs/next", get(get_next_job))
         .route("/jobs/{:job_id}/start", post(update_job_start))
@@ -108,21 +109,53 @@ async fn serve_static(uri: Uri) -> impl IntoResponse {
 #[axum::debug_handler]
 async fn get_tasks(
     State(api): State<Api>,
-) -> Result<Json<Value>, AppError> {
+) -> Result<Json<Value>, ApiError> {
     let workflows_guard = api.workspace.workflows.read().map_err(|_| anyhow!("Could not read workspace"))?;
     let workflows = workflows_guard.as_ref().unwrap();
     let tasks = workflows.tasks.as_ref();
 
+    let mut total = 0;
+
     let tasks_json = match &workflows.tasks {
         Some(tasks) => {
             let mut task_array: Vec<Value> = tasks.iter().map(|(name, task)| serde_json::to_value(task).unwrap()).collect();
+            total = task_array.len();
             // task_array.sort_by(|a, b| a.get("name").unwrap().as_str().cmp(&b.get("name").unwrap().as_str()));
             serde_json::to_value(task_array)?
         }
         None => Value::Array(vec![]), // Empty array if no tasks
     };
 
-    Ok(Json(tasks_json))
+    Ok(json!({
+        "success": true,
+        "data": tasks_json,
+        "meta": {
+            "total": total
+        }
+    }).into())
+}
+
+#[axum::debug_handler]
+async fn get_task(
+    State(api): State<Api>,
+    Path(task_id): Path<String>,
+) -> Result<Json<Value>, ApiError> {
+    let workflows_guard = api.workspace.workflows.read().map_err(|_| anyhow!("Could not read workspace"))?;
+    let workflows = workflows_guard.as_ref().unwrap();
+    let task = serde_json::to_value(workflows.get_task(task_id.as_str()))?;
+    Ok(json!({
+        "success": true,
+        "data": task,
+    }).into())
+}
+
+#[axum::debug_handler]
+async fn get_jobs(
+    State(api): State<Api>,
+    Query(params): Query<HashMap<String, String>>,
+) -> Result<Json<Value>, AppError> {
+    // api.job_repository.get_jobs(params.get("task_id"), params.get("offset").unwrap_or(0), params.get("limit").unwrap_or(20))
+    Ok(Json(Value::Array(vec![])))
 }
 
 
