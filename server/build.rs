@@ -3,6 +3,8 @@ use std::path::Path;
 use std::fs;
 
 fn main() {
+    println!("cargo:rerun-if-changed=migrations");
+
     // Tell Cargo to rerun this script if the UI source changes
     println!("cargo:rerun-if-changed=../ui/src");
     println!("cargo:rerun-if-changed=../ui/svelte.config.js");
@@ -27,4 +29,5 @@ fn main() {
         panic!("SvelteKit UI build failed");
     }
     // println!("cargo:rerun-if-changed=static");
+
 }

@@ -31,6 +31,8 @@ blake2 = { workspace = true }
 git2 = {workspace = true}
 rust-embed = { workspace = true }
 mime_guess = { workspace = true }
+sqlx = {workspace = true}
+sqlx-paginated = { workspace = true }
 
 [build-dependencies]
 refinery = { workspace = true }

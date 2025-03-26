@@ -11,6 +11,9 @@ use anyhow::{bail, Context, Error};
 use deadpool_postgres;
 use tokio_postgres::NoTls;
 use refinery::embed_migrations;
+use sqlx::postgres::PgPoolOptions;
+use sqlx::migrate::Migrator;
+
 
 mod scheduler;
 mod queue;
@@ -40,7 +43,8 @@ struct Args {
     verbose: bool,
 }
 
-embed_migrations!("migrations");
+// embed_migrations!("migrations");
+static MIGRATOR: Migrator = sqlx::migrate!();
 
 #[tokio::main]
 async fn main() -> Result<(), Error>{
@@ -52,21 +56,20 @@ async fn main() -> Result<(), Error>{
 
     let cfg = server_config::ServerConfig::new(PathBuf::from(args.config))?;
 
-    let mut db_config = deadpool_postgres::Config::new();
-    db_config.host = Some(cfg.db.host);
-    db_config.dbname = Some(cfg.db.database);
-    db_config.user = Some(cfg.db.username);
-    db_config.password = Some(cfg.db.password);
-    db_config.manager = Some(deadpool_postgres::ManagerConfig {
-        recycling_method: deadpool_postgres::RecyclingMethod::Fast,
-    });
-
-    let db_pool= db_config.create_pool(Some(deadpool_postgres::Runtime::Tokio1), NoTls)?;
-
-    let mut db_client = db_pool.get().await.context("Could not connect to DB server")?;
-    migrations::runner()
-        .run_async(db_client.deref_mut().deref_mut()) // Get to the tokio_postgresql object
+    let db_pool = PgPoolOptions::new()
+        .max_connections(5) // Adjust as needed, default max connections
+        .connect(&format!(
+            "postgres://{}:{}@{}/{}",
+            cfg.db.username, cfg.db.password, cfg.db.host, cfg.db.database
+        ))
         .await?;
+
+    MIGRATOR.run(&db_pool).await?;
+
+    // let mut db_client = db_pool.get().await.context("Could not connect to DB server")?;
+    // migrations::runner()
+    //     .run_async(db_client.deref_mut().deref_mut()) // Get to the tokio_postgresql object
+    //     .await?;
 
     let workspace_dir = cfg.workspace.folder;
     create_dir_all(&workspace_dir)?;
