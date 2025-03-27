@@ -12,7 +12,8 @@ use std::path::PathBuf;
 use tokio::net::TcpListener;
 use tracing::{info, error, debug};
 use crate::Queue;
-use stroem_common::{Job, log_collector::LogEntry, JobResult};
+use stroem_common::{JobRequest, log_collector::LogEntry, JobResult};
+use futures::StreamExt;
 use tar::Builder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
@@ -55,6 +56,10 @@ pub async fn run(api: Api, addr: &str) {
     let app = Router::new()
         .route("/api/tasks", get(get_tasks))
         .route("/api/tasks/{:task_id}", get(get_task))
+        .route("/api/jobs", get(get_jobs))
+        .route("/api/jobs/{:job_id}", get(get_job))
+        .route("/api/jobs/{:job_id}/logs", get(get_job_logs))
+        .route("/api/jobs/{:job_id}/steps/{:step_name}/logs", get(get_job_step_logs))
         .route("/jobs", post(enqueue_job))
         .route("/jobs/next", get(get_next_job))
         .route("/jobs/{:job_id}/start", post(update_job_start))
@@ -154,8 +159,61 @@ async fn get_jobs(
     State(api): State<Api>,
     Query(params): Query<HashMap<String, String>>,
 ) -> Result<Json<Value>, AppError> {
-    // api.job_repository.get_jobs(params.get("task_id"), params.get("offset").unwrap_or(0), params.get("limit").unwrap_or(20))
-    Ok(Json(Value::Array(vec![])))
+    let jobs = api.job_repository.get_jobs().await?;
+    Ok(json!({
+        "success": true,
+        "data": serde_json::to_value(jobs)?,
+        "meta": {
+        }
+    }).into())
+}
+
+#[axum::debug_handler]
+async fn get_job(
+    State(api): State<Api>,
+    Path(job_id): Path<String>,
+) -> Result<Json<Value>, ApiError> {
+    let task = api.job_repository.get_job(job_id.as_str()).await?;
+    Ok(json!({
+        "success": true,
+        "data": task,
+    }).into())
+}
+
+#[axum::debug_handler]
+async fn get_job_logs(
+    State(api): State<Api>,
+    Path(job_id): Path<String>,
+) -> Result<Json<Value>, ApiError> {
+    let log_stream = api.log_repository.get_logs(job_id.as_str(), None).await?;
+    let logs: Vec<LogEntry> = log_stream
+        .collect::<Vec<Result<LogEntry, Error>>>()
+        .await
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(json!({
+        "success": true,
+        "data": logs,
+    }).into())
+}
+
+#[axum::debug_handler]
+async fn get_job_step_logs(
+    State(api): State<Api>,
+    Path((job_id, step_name)): Path<(String, String)>,
+) -> Result<Json<Value>, ApiError> {
+    let log_stream = api.log_repository.get_logs(job_id.as_str(), Some(step_name.as_str())).await?;
+    let logs: Vec<LogEntry> = log_stream
+        .collect::<Vec<Result<LogEntry, Error>>>()
+        .await
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(json!({
+        "success": true,
+        "data": logs,
+    }).into())
 }
 
 
@@ -171,7 +229,7 @@ async fn reload_workspace(
 #[axum::debug_handler]
 async fn enqueue_job(
     State(api): State<Api>,
-    Json(job): Json<Job>,
+    Json(job): Json<JobRequest>,
 ) -> Result<String, AppError> {
     Ok(api.job_repository.enqueue_job(&job, "user", None).await?)
 }
@@ -180,7 +238,7 @@ async fn enqueue_job(
 async fn get_next_job(
     State(api): State<Api>,
     Query(params): Query<HashMap<String, String>>,
-) -> Result<Json<Option<Job>>, AppError> {
+) -> Result<Json<Option<JobRequest>>, AppError> {
     let worker_id = params.get("worker_id").unwrap();
     let job = api.job_repository.get_next_job(worker_id).await?;
     Ok(Json(job))

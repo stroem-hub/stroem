@@ -30,7 +30,7 @@ use log_collector::{LogCollector, LogEntry};
 
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Job {
+pub struct JobRequest {
     pub task: Option<String>,
     pub action: Option<String>,
     pub input: Option<serde_json::Value>,

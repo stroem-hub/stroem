@@ -25,7 +25,7 @@ pub mod workspace_server;
 mod workspace_git;
 mod workspace_folder;
 
-use stroem_common::Job;
+use stroem_common::JobRequest;
 use stroem_common::workflows_configuration::WorkflowsConfiguration;
 use workspace_server::WorkspaceServer;
 use scheduler::Scheduler;

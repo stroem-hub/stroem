@@ -1,19 +1,19 @@
 CREATE TABLE IF NOT EXISTS job (
-   job_id TEXT PRIMARY KEY,
-   task_name TEXT,
-   action_name TEXT,
-   input JSONB,
-   revision TEXT,
-   worker_id TEXT,
-   queued TIMESTAMP WITH TIME ZONE NOT NULL,
-   picked TIMESTAMP WITH TIME ZONE,
-   start_datetime TIMESTAMP WITH TIME ZONE,
-   end_datetime TIMESTAMP WITH TIME ZONE,
-   output JSONB,
-   success BOOLEAN,
-   status TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued', 'running', 'completed', 'failed')),
-   source_type TEXT NOT NULL CHECK (source_type IN ('trigger', 'user', 'webhook')),
-   source_id TEXT
+  job_id TEXT PRIMARY KEY,
+  task_name TEXT,
+  action_name TEXT,
+  input JSONB,
+  revision TEXT,
+  worker_id TEXT,
+  queued TIMESTAMP WITH TIME ZONE NOT NULL,
+  picked TIMESTAMP WITH TIME ZONE,
+  start_datetime TIMESTAMP WITH TIME ZONE,
+  end_datetime TIMESTAMP WITH TIME ZONE,
+  output JSONB,
+  success BOOLEAN,
+  status TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued', 'running', 'completed', 'failed')),
+  source_type TEXT NOT NULL CHECK (source_type IN ('trigger', 'user', 'webhook')),
+  source_id TEXT
 );
 
 CREATE TABLE IF NOT EXISTS job_step (

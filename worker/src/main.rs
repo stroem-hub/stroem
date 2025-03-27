@@ -4,7 +4,7 @@ use tracing::{info, error, debug};
 use tracing_subscriber;
 use tokio::time::{self, Duration};
 use reqwest::Client;
-use stroem_common::{Job, JobResult, log_collector::LogCollector};
+use stroem_common::{JobRequest, JobResult, log_collector::LogCollector};
 use std::env;
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
@@ -78,7 +78,7 @@ async fn main() {
     }
 }
 
-async fn poll_job(client: &Client, server: &str, worker_id: &str) -> Result<Option<Job>, Error> {
+async fn poll_job(client: &Client, server: &str, worker_id: &str) -> Result<Option<JobRequest>, Error> {
     let url = format!("{}/jobs/next?worker_id={}", server, worker_id);
     let response = client.get(&url)
         .send()
@@ -86,7 +86,7 @@ async fn poll_job(client: &Client, server: &str, worker_id: &str) -> Result<Opti
         // .map_err(|e| format!("Failed to poll job: {}", e))?;
 
     if response.status().is_success() {
-        let job = response.json::<Option<Job>>()
+        let job = response.json::<Option<JobRequest>>()
             .await?;
             //.map_err(|e| format!("Failed to parse job: {}", e))?;
         Ok(job)
@@ -95,7 +95,7 @@ async fn poll_job(client: &Client, server: &str, worker_id: &str) -> Result<Opti
     }
 }
 
-async fn execute_job(client: &Client, job: &Job, server: &str, worker_id: &str) -> Result<(), Error> {
+async fn execute_job(client: &Client, job: &JobRequest, server: &str, worker_id: &str) -> Result<(), Error> {
     let uuid = job.uuid.as_ref().unwrap();
     let start_time = Utc::now();
 

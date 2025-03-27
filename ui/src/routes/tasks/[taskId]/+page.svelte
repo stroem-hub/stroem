@@ -2,6 +2,8 @@
 	import { Card } from 'flowbite-svelte';
 	import { Input, Label, Helper } from 'flowbite-svelte';
 	import { Tabs, TabItem } from 'flowbite-svelte';
+	import { Table, TableBody, TableBodyCell, TableBodyRow, TableHead, TableHeadCell, Tooltip } from 'flowbite-svelte';
+	import { CloseCircleSolid, CheckCircleSolid, QuestionCircleSolid } from 'flowbite-svelte-icons';
 	import { goto } from '$app/navigation';
 	import type { PageProps } from './$types';
 
@@ -31,7 +33,7 @@
 
 	let { data }: PageProps = $props();
 
-	let task = data.data as Task;
+	let task = data.task.data as Task;
 
 	function getSortedInputs(input?: Record<string, InputField>): InputField[] {
 		if (!input) {
@@ -54,13 +56,17 @@
 		goto('/tasks');
 	}
 
+	function openJob(job_id: string) {
+		goto(`/jobs/${job_id}`);
+	}
+
 </script>
 
 <div class="p-6">
-	{#if !data.success}
+	{#if !data.task.success}
 		<Card class="max-w-none mb-6 bg-red-50 border-red-200">
 			<h3 class="text-lg font-semibold text-red-900">Error</h3>
-			<p class="text-red-700">{data.error}</p>
+			<p class="text-red-700">{data.task.error}</p>
 			<button
 				class="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
 				onclick={goBack}
@@ -68,7 +74,7 @@
 				Back to Tasks
 			</button>
 		</Card>
-	{:else if data.data}
+	{:else if data.task.data}
 
 		<h1>TASK: {task.name || task.id}</h1>
 
@@ -77,7 +83,60 @@
 				<div slot="title" class="flex items-center gap-2">
 					Activity
 				</div>
-				success, timestamp, duration, started_by, output
+				{#await data.jobs}
+					Loading...
+				{:then jobs}
+
+					{#if !jobs.success }
+						<Card class="max-w-none mb-6 bg-red-50 border-red-200">
+							<h3 class="text-lg font-semibold text-red-900">Error</h3>
+							<p class="text-red-700">{jobs.error}</p>
+						</Card>
+					{:else if jobs.data}
+
+						<Table hoverable={true}>
+							<TableHead>
+								<TableHeadCell class="p-4!"></TableHeadCell>
+								<TableHeadCell>Started</TableHeadCell>
+								<TableHeadCell>Output</TableHeadCell>
+								<TableHeadCell>Triggered by</TableHeadCell>
+							</TableHead>
+							<TableBody tableBodyClass="divide-y cursor-pointer">
+								{#each jobs.data as job}
+									<TableBodyRow onclick={ () =>{ openJob(job.job_id)} }>
+										<TableBodyCell class="p-4!">
+											{#if job.success === null}
+												<QuestionCircleSolid class="text-yellow-400 dark:text-yellow-400 shrink-0 h-5 w-5" />
+											{:else if job.success}
+												<CheckCircleSolid class="text-green-400 dark:text-green-400 shrink-0 h-5 w-5" />
+											{:else}
+												<CloseCircleSolid class="text-red-500 dark:text-red-500 shrink-0 h-5 w-5" />
+											{/if}
+											<Tooltip placement='left'>{job.status}</Tooltip>
+										</TableBodyCell>
+										<TableBodyCell>{job.start_datetime}
+										</TableBodyCell>
+										<TableBodyCell>{job.output || "(No output)"}
+										</TableBodyCell>
+										<TableBodyCell>{job.source_type}:{job.source_id || "unknown"}
+										</TableBodyCell>
+									</TableBodyRow>
+								{/each}
+
+							</TableBody>
+						</Table>
+
+					{:else}
+						<Card class="max-w-none mb-6">
+							<p class="text-gray-600">No jobs yet</p>
+						</Card>
+					{/if}
+
+				{:catch error}
+					<p>error loading comments: {error.message}</p>
+				{/await}
+
+
 
 			</TabItem>
 			<TabItem>

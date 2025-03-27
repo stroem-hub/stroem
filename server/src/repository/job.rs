@@ -11,8 +11,39 @@ use std::collections::HashMap;
 use fs2::FileExt;
 use tokio_stream::{self, StreamExt, wrappers::LinesStream};
 use futures::Stream;
+use serde::{Deserialize, Serialize};
+use stroem_common::{JobRequest, JobResult, log_collector::LogEntry};
 
-use stroem_common::{Job, JobResult, log_collector::LogEntry};
+#[derive(sqlx::FromRow, Debug, Serialize, Deserialize)]
+pub struct JobStep {
+    pub success: bool,
+    pub name: String,
+    pub input: Option<Value>,
+    pub output: Option<Value>,
+    pub start_datetime: DateTime<Utc>,
+    pub end_datetime: DateTime<Utc>,
+}
+
+#[derive(sqlx::FromRow, Debug, Serialize, Deserialize)]
+pub struct Job {
+    pub worker_id: String,
+    pub job_id: String,
+    pub success: Option<bool>,
+    pub start_datetime: DateTime<Utc>,
+    pub end_datetime: DateTime<Utc>,
+    #[sqlx(rename = "task_name")]
+    pub task: Option<String>,
+    #[sqlx(rename = "action_name")]
+    pub action: Option<String>,
+    pub input: Option<Value>,
+    pub output: Option<Value>,
+    pub source_type: Option<String>,
+    pub source_id: Option<String>,
+    pub status: Option<String>,
+    pub revision: Option<String>,
+    #[sqlx(skip)]
+    pub steps: Vec<JobStep>,
+}
 
 #[derive(Clone)]
 pub struct JobRepository {
@@ -24,7 +55,7 @@ impl JobRepository {
         Self { pool }
     }
 
-    pub async fn enqueue_job(&self, job: &Job, source_type: &str, source_id: Option<&str>) -> Result<String, Error> {
+    pub async fn enqueue_job(&self, job: &JobRequest, source_type: &str, source_id: Option<&str>) -> Result<String, Error> {
         let uuid = job.uuid.clone().unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
         sqlx::query(
             "INSERT INTO job (job_id, task_name, action_name, input, queued, status, source_type, source_id)
@@ -44,7 +75,7 @@ impl JobRepository {
         Ok(uuid)
     }
 
-    pub async fn get_next_job(&self, worker_id: &str) -> Result<Option<Job>, Error> {
+    pub async fn get_next_job(&self, worker_id: &str) -> Result<Option<JobRequest>, Error> {
         let row = sqlx::query(
             "UPDATE job
              SET worker_id = $1, picked = NOW(), status = 'running'
@@ -63,7 +94,7 @@ impl JobRepository {
 
         if let Some(row) = row {
             let job_id: String = row.try_get("job_id")?;
-            let job = Job {
+            let job = JobRequest {
                 uuid: Some(job_id.clone()),
                 task: row.try_get("task_name")?,
                 action: row.try_get("action_name")?,
@@ -76,20 +107,49 @@ impl JobRepository {
         Ok(None)
     }
 
-    pub async fn get_jobs(&self) -> Result<(), Error> {
-        let row = sqlx::query(
+    pub async fn get_jobs(&self) -> Result<Vec<Job>, Error> {
+        let list = sqlx::query_as(
             "SELECT
-                job_id, task_name, action_name, input, output,
-                status, source_type, source_id, start_datetime, end_datetime - start_datetime as duration
+                job_id, success, task_name, action_name, input, output, worker_id,
+                status, source_type, source_id, start_datetime, end_datetime, revision
              FROM job
              ORDER BY start_datetime DESC
              LIMIT 20"
         )
-            .fetch_optional(&self.pool)
+            .fetch_all(&self.pool)
+            .await?;
+        Ok(list)
+    }
+
+    pub async fn get_job(&self, job_id: &str) -> Result<Job, Error> {
+        let mut job: Job = sqlx::query_as(
+            "SELECT
+                job_id, success, task_name, action_name, input, output, worker_id,
+                status, source_type, source_id, start_datetime, end_datetime, revision
+             FROM job
+             WHERE job_id = $1
+            "
+        )
+            .bind(job_id)
+            .fetch_one(&self.pool)
             .await?;
 
-        // Note: This just fetches one row for now - adjust if you need a list
-        Ok(())
+        // Fetch the associated job steps
+        let steps: Vec<JobStep> = sqlx::query_as(
+            "SELECT
+                success, step_name AS name, input, output,
+                start_datetime, end_datetime
+             FROM job_step
+             WHERE job_id = $1
+             ORDER BY start_datetime ASC" // Optional: order steps by start time
+        )
+            .bind(job_id)
+            .fetch_all(&self.pool) // Fetch all steps for this job
+            .await?;
+
+        job.steps = steps;
+
+        Ok(job)
     }
 
     pub async fn update_start_time(&self, job_id: &str, worker_id: &str, start_time: DateTime<Utc>, input: Option<Value>) -> Result<(), Error> {

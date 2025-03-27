@@ -1,6 +1,6 @@
 // workflow-server/src/scheduler.rs
 use crate::Queue;
-use stroem_common::Job;
+use stroem_common::JobRequest;
 use stroem_common::workflows_configuration::{WorkflowsConfiguration};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::watch;
@@ -22,8 +22,8 @@ pub struct Scheduler {
 impl Scheduler {
     fn load_config(
         config: Option<WorkflowsConfiguration>,
-        old_schedules: Option<&HashMap<String, (Schedule, Job, Option<DateTime<Utc>>, Option<DateTime<Utc>>)>>,
-    ) -> HashMap<String, (Schedule, Job, Option<DateTime<Utc>>, Option<DateTime<Utc>>)> {
+        old_schedules: Option<&HashMap<String, (Schedule, JobRequest, Option<DateTime<Utc>>, Option<DateTime<Utc>>)>>,
+    ) -> HashMap<String, (Schedule, JobRequest, Option<DateTime<Utc>>, Option<DateTime<Utc>>)> {
         let mut schedules = HashMap::new();
         let Some(config) = config else { return schedules };
 
@@ -36,7 +36,7 @@ impl Scheduler {
                     if let Some(cron_expr) = &trigger.cron {
                         match Schedule::from_str(cron_expr) {
                             Ok(schedule) => {
-                                let job = Job {
+                                let job = JobRequest {
                                     task: Some(trigger.task.clone()),
                                     action: None,
                                     input: trigger.input.clone()
@@ -99,7 +99,7 @@ impl Scheduler {
 
                     if let Some(next_time) = *next_run {
                         if now >= next_time {
-                            let job = Job {
+                            let job = JobRequest {
                                 task: job.task.clone(),
                                 action: None,
                                 input: job.input.clone(),
