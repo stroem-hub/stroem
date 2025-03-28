@@ -3111,6 +3111,7 @@ dependencies = [
  "futures-util",
  "git2",
  "globwalker",
+ "log",
  "mime_guess",
  "notify",
  "refinery",

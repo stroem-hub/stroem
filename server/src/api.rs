@@ -40,6 +40,7 @@ use futures_util::stream::Stream;
 use std::convert::Infallible;
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt;
+use std::{pin::Pin, task::{Context, Poll}};
 
 #[derive(RustEmbed)]
 #[folder = "static/"]
@@ -50,6 +51,36 @@ struct StaticAssets;
 struct JobEvent {
     pub event_name: String,
     pub data: Value,
+}
+
+struct JobChannel<S> {
+    inner: Pin<Box<S>>,
+    job_id: String,
+    channels: Arc<Mutex<HashMap<String, Sender<JobEvent>>>>,
+}
+
+impl<S> Stream for JobChannel<S>
+where
+    S: Stream<Item = Result<Event, Infallible>> + 'static,
+{
+    type Item = Result<Event, Infallible>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        self.inner.as_mut().poll_next(cx)
+    }
+}
+
+impl<S> Drop for JobChannel<S> {
+    fn drop(&mut self) {
+        let mut channels = self.channels.lock().unwrap();
+        if let Some(tx) = channels.get(&self.job_id) {
+            if tx.receiver_count() <= 1 {
+                // current one is about to drop, so it's the last
+                channels.remove(&self.job_id);
+                debug!("Removed channel for job_id: {}", self.job_id);
+            }
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -77,10 +108,10 @@ pub async fn run(api: Api, addr: &str) {
         .route("/api/tasks", get(get_tasks))
         .route("/api/tasks/{:task_id}", get(get_task))
         .route("/api/jobs", get(get_jobs))
-        .route("/api/jobs/sse", get(get_job_sse))
         .route("/api/jobs/{:job_id}", get(get_job))
         .route("/api/jobs/{:job_id}/logs", get(get_job_logs))
         .route("/api/jobs/{:job_id}/steps/{:step_name}/logs", get(get_job_step_logs))
+        .route("/api/jobs/{:job_id}/sse", get(get_job_sse))
         .route("/api/run", post(put_job))
         .route("/jobs", post(enqueue_job))
         .route("/jobs/next", get(get_next_job))
@@ -257,6 +288,9 @@ async fn get_job_sse(
     Path(job_id): Path<String>,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
 
+    debug!("Received SSE connection for job {}", job_id);
+
+
     let mut rx = {
         let mut channels = api.job_channels.lock().unwrap();
         if let Some(tx) = channels.get(&job_id) {
@@ -283,7 +317,15 @@ async fn get_job_sse(
         }
     });
 
-    Sse::new(stream).keep_alive(axum::response::sse::KeepAlive::default())
+    let pinned = Box::pin(stream);
+
+    let wrapped_stream = JobChannel {
+        inner: pinned,
+        job_id: job_id.clone(),
+        channels: Arc::clone(&api.job_channels),
+    };
+
+    Sse::new(wrapped_stream).keep_alive(axum::response::sse::KeepAlive::default())
 }
 
 
