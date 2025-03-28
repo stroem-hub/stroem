@@ -1,9 +1,14 @@
 use std::collections::HashMap;
 // workflow-server/src/api.rs
 use axum::{
-    extract::{Path, Query, State},
+    extract::{
+        ws::{WebSocket, WebSocketUpgrade},
+        Path, Query, State
+    },
+
     http::{StatusCode, Uri},
     response::{IntoResponse, Response},
+    response::sse::{Event, Sse},
     routing::{get, post},
     Json, Router,
     body::Body
@@ -13,7 +18,6 @@ use tokio::net::TcpListener;
 use tracing::{info, error, debug};
 use crate::Queue;
 use stroem_common::{JobRequest, log_collector::LogEntry, JobResult};
-use futures::StreamExt;
 use tar::Builder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
@@ -27,28 +31,44 @@ use serde_json::{Value, json};
 use crate::workspace_server::WorkspaceServer;
 use crate::repository::{JobRepository, LogRepository};
 use crate::error::{ApiError, AppError};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, RwLock, Mutex};
 use rust_embed::RustEmbed;
 use mime_guess::from_path;
 use stroem_common::workflows_configuration::Task;
+use tokio::sync::broadcast::{self, Sender};
+use futures_util::stream::Stream;
+use std::convert::Infallible;
+use tokio_stream::wrappers::BroadcastStream;
+use tokio_stream::StreamExt;
 
 #[derive(RustEmbed)]
 #[folder = "static/"]
 #[prefix = ""]
 struct StaticAssets;
 
+#[derive(Clone)]
+struct JobEvent {
+    pub event_name: String,
+    pub data: Value,
+}
 
 #[derive(Clone)]
 pub struct Api {
     pub workspace: Arc<WorkspaceServer>,
     pub job_repository: JobRepository,
     pub log_repository: LogRepository,
+    pub job_channels: Arc<Mutex<HashMap<String, Sender<JobEvent>>>>,
 }
 
 
 impl Api {
     pub fn new(workspace: Arc<WorkspaceServer>, job_repository: JobRepository, log_repository: LogRepository) -> Self {
-        Self { workspace, job_repository, log_repository }
+        Self {
+            workspace,
+            job_repository,
+            log_repository,
+            job_channels: Arc::new(Mutex::new(HashMap::new())),
+        }
     }
 }
 
@@ -57,9 +77,11 @@ pub async fn run(api: Api, addr: &str) {
         .route("/api/tasks", get(get_tasks))
         .route("/api/tasks/{:task_id}", get(get_task))
         .route("/api/jobs", get(get_jobs))
+        .route("/api/jobs/sse", get(get_job_sse))
         .route("/api/jobs/{:job_id}", get(get_job))
         .route("/api/jobs/{:job_id}/logs", get(get_job_logs))
         .route("/api/jobs/{:job_id}/steps/{:step_name}/logs", get(get_job_step_logs))
+        .route("/api/run", post(put_job))
         .route("/jobs", post(enqueue_job))
         .route("/jobs/next", get(get_next_job))
         .route("/jobs/{:job_id}/start", post(update_job_start))
@@ -214,6 +236,54 @@ async fn get_job_step_logs(
         "success": true,
         "data": logs,
     }).into())
+}
+
+
+#[axum::debug_handler]
+async fn put_job(
+    State(api): State<Api>,
+    Json(job): Json<JobRequest>,
+) -> Result<Json<Value>, ApiError> {
+    let job_id = api.job_repository.enqueue_job(&job, "user", None).await?;
+    Ok(json!({
+        "success": true,
+        "data": &job_id,
+    }).into())
+}
+
+#[axum::debug_handler]
+async fn get_job_sse(
+    State(api): State<Api>,
+    Path(job_id): Path<String>,
+) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+
+    let mut rx = {
+        let mut channels = api.job_channels.lock().unwrap();
+        if let Some(tx) = channels.get(&job_id) {
+            tx.subscribe()
+        } else {
+            let (tx, rx) = broadcast::channel(100);
+            channels.insert(job_id.clone(), tx);
+            rx
+        }
+    };
+
+    let stream = BroadcastStream::new(rx).then(|result| async move {
+        match result {
+            Ok(msg) => {
+                // Perform async operations here if needed (e.g., async serialization in the future)
+                let data = serde_json::to_string(&msg.data).unwrap(); // Currently sync, but could be async
+                Ok(Event::default().event(msg.event_name).data(data))
+            }
+            Err(e) => {
+                error!("BroadcastStream error: {:?}", e); // Log for debugging
+                // Instead of dropping, you could return an error event or retry logic here
+                Ok(Event::default().data(format!("Error: {:?}", e))) // Example: Send error as an event
+            }
+        }
+    });
+
+    Sse::new(stream).keep_alive(axum::response::sse::KeepAlive::default())
 }
 
 

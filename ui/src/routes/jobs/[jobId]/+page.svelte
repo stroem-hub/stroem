@@ -15,11 +15,11 @@
 
 	// Define the Job type based on your Rust struct
 	interface Job {
-		worker_id: string;
+		worker_id?: string;
 		job_id: string;
-		success: boolean;
-		start_datetime: string; // Assuming ISO string from DateTime<Utc>
-		end_datetime: string;   // Assuming ISO string from DateTime<Utc>
+		success?: boolean;
+		start_datetime?: string; // Assuming ISO string from DateTime<Utc>
+		end_datetime?: string;   // Assuming ISO string from DateTime<Utc>
 		task?: string;
 		action?: string;
 		input?: any;           // JSON Value, could be object, string, etc.
@@ -101,8 +101,8 @@
 
 			<!-- Job Status Badge -->
 			<div>
-				<Badge color={job.data.success ? 'green' : 'red'} large>
-					{job.data.success ? 'Success' : 'Failed'}
+				<Badge color={job.data.success == null ? 'yellow' : job.data.success ? 'green' : 'red'} large>
+					{job.data.status}
 				</Badge>
 			</div>
 
@@ -112,7 +112,7 @@
 				<dl class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 					<div>
 						<dt class="text-sm font-medium text-gray-500">Worker ID</dt>
-						<dd class="mt-1 text-gray-900">{job.data.worker_id}</dd>
+						<dd class="mt-1 text-gray-900">{job.data.worker_id || 'N/A'}</dd>
 					</div>
 					<div>
 						<dt class="text-sm font-medium text-gray-500">Status</dt>
@@ -128,11 +128,11 @@
 					</div>
 					<div>
 						<dt class="text-sm font-medium text-gray-500">Start Time</dt>
-						<dd class="mt-1 text-gray-900">{formatDate(job.data.start_datetime)}</dd>
+						<dd class="mt-1 text-gray-900">{job.data.start_datetime ? formatDate(job.data.start_datetime) : 'N/A'}</dd>
 					</div>
 					<div>
 						<dt class="text-sm font-medium text-gray-500">End Time</dt>
-						<dd class="mt-1 text-gray-900">{formatDate(job.data.end_datetime)}</dd>
+						<dd class="mt-1 text-gray-900">{job.data.end_datetime ? formatDate(job.data.end_datetime) : 'N/A'}</dd>
 					</div>
 					<div>
 						<dt class="text-sm font-medium text-gray-500">Source Type</dt>

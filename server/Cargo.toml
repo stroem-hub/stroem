@@ -33,6 +33,7 @@ rust-embed = { workspace = true }
 mime_guess = { workspace = true }
 sqlx = {workspace = true}
 sqlx-paginated = { workspace = true }
+futures-util = { workspace = true }
 
 [build-dependencies]
 refinery = { workspace = true }

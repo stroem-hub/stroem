@@ -26,11 +26,11 @@ pub struct JobStep {
 
 #[derive(sqlx::FromRow, Debug, Serialize, Deserialize)]
 pub struct Job {
-    pub worker_id: String,
+    pub worker_id: Option<String>,
     pub job_id: String,
     pub success: Option<bool>,
-    pub start_datetime: DateTime<Utc>,
-    pub end_datetime: DateTime<Utc>,
+    pub start_datetime: Option<DateTime<Utc>>,
+    pub end_datetime: Option<DateTime<Utc>>,
     #[sqlx(rename = "task_name")]
     pub task: Option<String>,
     #[sqlx(rename = "action_name")]

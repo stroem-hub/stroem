@@ -1,9 +1,10 @@
 <script lang="ts">
-	import { Card } from 'flowbite-svelte';
+	import { Card, Button } from 'flowbite-svelte';
 	import { Input, Label, Helper } from 'flowbite-svelte';
 	import { Tabs, TabItem } from 'flowbite-svelte';
 	import { Table, TableBody, TableBodyCell, TableBodyRow, TableHead, TableHeadCell, Tooltip } from 'flowbite-svelte';
-	import { CloseCircleSolid, CheckCircleSolid, QuestionCircleSolid } from 'flowbite-svelte-icons';
+	import { CloseCircleSolid, CheckCircleSolid, QuestionCircleSolid, InfoCircleSolid } from 'flowbite-svelte-icons';
+	import { Alert } from 'flowbite-svelte';
 	import { goto } from '$app/navigation';
 	import type { PageProps } from './$types';
 
@@ -48,8 +49,36 @@
 		return entries;
 	}
 
+	let runResponse = {success: true, data: null, error: null};
+
 	async function runTask(event: SubmitEvent & { currentTarget: EventTarget & HTMLFormElement}) {
 		event.preventDefault();
+
+		const formData = new FormData(event.currentTarget);
+		var inputObj = Object.fromEntries(Array.from(formData.keys()).map(key => [key, formData.getAll(key).length > 1 ? formData.getAll(key) : formData.get(key)]))
+		// var formJson = JSON.stringify(formObj)
+		// console.log(formJson)
+
+		var payload = {
+			"task": task.id,
+			"input": inputObj,
+		}
+		try {
+			const res = await fetch('/api/run', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(payload)
+			});
+
+			runResponse = await res.json();
+		} catch (err) {
+			runResponse = { success: false, data: null, meta: null, error: 'Failed to run task' };
+			console.error(err);
+		}
+
+		if (runResponse.success) {
+			goto(`/jobs/${runResponse.data}`)
+		}
 	}
 
 	function goBack() {
@@ -61,6 +90,14 @@
 	}
 
 </script>
+
+{#if !runResponse.success}
+	<Alert border color="red">
+		<InfoCircleSolid slot="icon" class="w-5 h-5" />
+		<span class="font-medium">Could not run the task.</span>
+		{runResponse.error}
+	</Alert>
+{/if}
 
 <div class="p-6">
 	{#if !data.task.success}
@@ -153,6 +190,7 @@
 				{#if field.type === "string"}
 					<Input
 						id={field.id}
+						name={field.id}
 						type="text"
 						value={field.default}
 						required={field.required}
@@ -163,6 +201,7 @@
 			</div>
 
 		{/each}
+			<Button type="submit" color="blue" class="w-full">Run</Button>
 		</form>
 
 			</TabItem>

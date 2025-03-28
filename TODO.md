@@ -21,9 +21,18 @@
 - [X] Secrets (sops)
 - [ ] Resource types and Resources ?
 - [ ] helm-chart
-- [ ] Basic UI for viewing job results
+- [ ] Basic UI for viewing jobs
+- [X] Basic UI for viewing job results
+- [ ] Basic UI for viewing tasks
+- [ ] Basic UI for viewing task details
+- [ ] Basic UI for starting the task
+- [ ] Auth using internal email/pass
+- [ ] OIDC2 auth
+- [ ] LDAP auth
 - [ ] key-value storage
-- [ ] allow non existent keys
+- [ ] allow non existent keys for templating
 - [ ] Confirmation flow (terraform plan + apply).
       Maybe, with using outputs of another flow
-- [ ] 
+- [ ] use https://github.com/hexagon/croner-rust for cron
+- [ ] webhooks triggers with passing headers and body as input templates
+- [ ] Basic ACL
