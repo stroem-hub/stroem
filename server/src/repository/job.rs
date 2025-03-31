@@ -152,7 +152,7 @@ impl JobRepository {
         Ok(job)
     }
 
-    pub async fn update_start_time(&self, job_id: &str, worker_id: &str, start_time: DateTime<Utc>, input: Option<Value>) -> Result<(), Error> {
+    pub async fn update_start_time(&self, job_id: &str, worker_id: &str, start_time: DateTime<Utc>, input: &Option<Value>) -> Result<(), Error> {
         let rows_affected = sqlx::query(
             "UPDATE job
              SET start_datetime = $1, input = $2
@@ -176,7 +176,7 @@ impl JobRepository {
         Ok(())
     }
 
-    pub async fn update_step_start_time(&self, job_id: &str, step_name: &str, worker_id: &str, start_time: DateTime<Utc>, input: Option<Value>) -> Result<(), Error> {
+    pub async fn update_step_start_time(&self, job_id: &str, step_name: &str, worker_id: &str, start_time: DateTime<Utc>, input: &Option<Value>) -> Result<(), Error> {
         let rows_affected = sqlx::query(
             "INSERT INTO job_step (job_id, step_name, start_datetime, input)
              VALUES ($1, $2, $3, $4)
@@ -211,7 +211,7 @@ impl JobRepository {
             .bind(&result.start_datetime)
             .bind(&result.end_datetime)
             .bind(&result.output)
-            .bind(&result.exit_success)
+            .bind(&result.success)
             .bind(job_id)
             .bind(step_name)
             .execute(&self.pool)
@@ -237,8 +237,8 @@ impl JobRepository {
             .bind(&result.start_datetime)
             .bind(&result.end_datetime)
             .bind(&result.output)
-            .bind(&result.exit_success)
-            .bind(if result.exit_success { "completed" } else { "failed" })
+            .bind(&result.success)
+            .bind(if result.success { "completed" } else { "failed" })
             .bind(job_id)
             .execute(&self.pool)
             .await?

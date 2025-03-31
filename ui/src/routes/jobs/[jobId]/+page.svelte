@@ -39,7 +39,7 @@
 
 	let { data }: PageProps = $props();
 
-	let job: { success: boolean; data?: Job; error?: string } = data.job;
+	let job: { success: boolean; data?: Job; error?: string } = $state(data.job);
 
 	// Reactive store for logs (keyed by step name)
 	let logs: { [key: string]: LogEntry[] } = $state({});
@@ -76,6 +76,49 @@
 		}
 	}
 
+	let eventSource: EventSource | null = null;
+	function connectSse(jobId : string) {
+		eventSource = new EventSource(`/api/jobs/${jobId}/sse`);
+
+		eventSource.addEventListener('step_logs', (event) => {
+			const update = JSON.parse(event.data);
+			if (update.logs) logs[update.step_name] = [...(logs[update.step_name] || []), ...update.logs];
+		});
+		eventSource.addEventListener('logs', (event) => {
+			const update = JSON.parse(event.data);
+			if (update.logs) logs["-"] = [...(logs["-"] || []), ...update.logs];
+		});
+		eventSource.addEventListener('result', (event) => {
+			const update = JSON.parse(event.data);
+			job.data.success = update.result.success;
+			job.data.end_datetime = update.result.end_datetime;
+			job.data.output = update.result.output;
+		});
+		eventSource.addEventListener('step_result', (event) => {
+			const update = JSON.parse(event.data);
+			for (const step of job.data.steps) {
+				if (step.name == update.step_name) {
+					step.output = update.result.output;
+					step.success = update.result.success;
+					break;
+				}
+			}
+
+		});
+		eventSource.addEventListener('step_start', (event) => {
+			const update = JSON.parse(event.data);
+			let step = {
+				"name": update.step_name,
+				"input": update.input,
+			}
+			job.data.steps.push(step);
+		});
+		eventSource.addEventListener('start', (event) => {
+			const update = JSON.parse(event.data);
+			// Update step state
+		});
+	}
+
 	onMount(async () => {
 		if (job.data) {
 			// Fetch job-level logs
@@ -84,6 +127,11 @@
 			for (const step of job.data.steps) {
 				await fetchLogs(job.data.job_id, step.name);
 			}
+
+			if (job.data.success == null) { // job is still running
+				connectSse(job.data.job_id);
+			}
+
 		}
 	});
 </script>

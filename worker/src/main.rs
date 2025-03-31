@@ -126,7 +126,7 @@ async fn execute_job(client: &Client, job: &JobRequest, server: &str, worker_id:
     let end_time = Utc::now();
 
     let result = JobResult {
-            exit_success,
+        success: exit_success,
             start_datetime: start_time,
             end_datetime: end_time,
             input: job.input.clone(), // probably also not needed

@@ -328,6 +328,18 @@ async fn get_job_sse(
     Sse::new(wrapped_stream).keep_alive(axum::response::sse::KeepAlive::default())
 }
 
+async fn send_sse_event(api: &Api, job_id: &str, name: &str, data: Value) -> Result<(), Error> {
+    let channels = api.job_channels.lock().map_err(|_| anyhow!("Could not lock job channels"))?;
+    if let Some(mut tx) = channels.get(job_id) {
+        let event = JobEvent {
+            event_name: name.to_string(),
+            data
+        };
+        let _ = tx.send(event);
+    }
+    Ok(())
+}
+
 
 #[axum::debug_handler]
 async fn reload_workspace(
@@ -370,8 +382,14 @@ async fn update_job_start(
 
     let input = payload.get("input").cloned();
     api.job_repository
-        .update_start_time(&job_id, worker_id, start_datetime, input)
+        .update_start_time(&job_id, worker_id, start_datetime, &input)
         .await?;
+
+    send_sse_event(&api, &job_id, "start", json!({
+        "start_datetime": &start_datetime,
+        "input": &input,
+    })).await?;
+
     Ok(())
 }
 
@@ -391,6 +409,10 @@ async fn update_job_result(
     api.job_repository
         .update_job_result(&job_id, &payload)
         .await?;
+
+    send_sse_event(&api, &job_id, "result", json!({
+        "result": &payload
+    })).await?;
     Ok(())
 }
 
@@ -408,8 +430,14 @@ async fn update_step_start(
     let input = payload.get("input").cloned();
 
     api.job_repository
-        .update_step_start_time(&job_id, &step_name, &worker_id, start_datetime, input)
+        .update_step_start_time(&job_id, &step_name, &worker_id, start_datetime, &input)
         .await?;
+
+    send_sse_event(&api, &job_id, "step_start", json!({
+        "step_name": &step_name,
+        "start_datetime": &start_datetime,
+        "input": &input,
+    })).await?;
     Ok(())
 }
 
@@ -425,6 +453,12 @@ async fn update_step_result(
     api.job_repository
         .update_step_result(&job_id, &step_name, &payload)
         .await?;
+
+    send_sse_event(&api, &job_id, "step_result", json!({
+        "step_name": &step_name,
+        "result": &payload
+    })).await?;
+
     Ok(())
 }
 
@@ -434,7 +468,12 @@ async fn save_job_logs(
     Path(job_id): Path<String>,
     Json(logs): Json<Vec<LogEntry>>,
 ) -> Result<(), AppError> {
-    api.log_repository.save_logs(&job_id, None, logs).await?;
+    api.log_repository.save_logs(&job_id, None, &logs).await?;
+
+    send_sse_event(&api, &job_id, "logs", json!({
+        "logs": &logs
+    })).await?;
+
     Ok(())
 }
 
@@ -444,7 +483,13 @@ async fn save_step_logs(
     Path((job_id, step_name)): Path<(String, String)>,
     Json(logs): Json<Vec<LogEntry>>,
 ) -> Result<(), AppError> {
-    api.log_repository.save_logs(&job_id, Some(&step_name), logs).await?;
+    api.log_repository.save_logs(&job_id, Some(&step_name), &logs).await?;
+
+    send_sse_event(&api, &job_id, "step_logs", json!({
+        "step_name": &step_name,
+        "logs": &logs
+    })).await?;
+
     Ok(())
 }
 

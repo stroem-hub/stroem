@@ -24,7 +24,7 @@ impl LogRepository {
         Self { logs_dir }
     }
 
-    pub async fn save_logs(&self, job_id: &str, step_name: Option<&str>, logs: Vec<LogEntry>) -> Result<(), anyhow::Error> {
+    pub async fn save_logs(&self, job_id: &str, step_name: Option<&str>, logs: &Vec<LogEntry>) -> Result<(), anyhow::Error> {
         let file_path = self.get_log_file_path(job_id, step_name);
         std::fs::create_dir_all(file_path.parent().unwrap())?;
 
@@ -48,7 +48,7 @@ impl LogRepository {
         let mut file = File::from_std(std_file);
         let mut writer = tokio::io::BufWriter::new(&mut file);
 
-        for log in &logs {
+        for log in logs {
             let line = serde_json::to_string(&log)? + "\n";
             writer.write_all(line.as_bytes()).await?;
         }

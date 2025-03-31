@@ -216,7 +216,7 @@ impl Runner {
         let end_time = Utc::now();
 
         let result = JobResult {
-            exit_success,
+            success: exit_success,
             start_datetime: start_time,
             end_datetime: end_time,
             input: step_input.clone(), // Probably not needed, but kept for now

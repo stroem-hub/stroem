@@ -41,7 +41,7 @@ pub struct JobRequest {
 pub struct JobResult {
     // pub worker_id: String, // --
     // pub job_id: String, // --
-    pub exit_success: bool,
+    pub success: bool,
     // pub logs: Vec<LogEntry>, // --
     pub start_datetime: DateTime<Utc>,
     pub end_datetime: DateTime<Utc>,
