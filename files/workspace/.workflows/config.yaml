@@ -27,22 +27,23 @@ secrets: {}
 actions:
   error_handler:
     type: shell
-    cmd: echo "ERROR! at {{ input.step_name }}"
+    shell:
+      cmd: echo "ERROR! at {{ input.step_name }}"
 
   allunite.ddd:
+    type: shell
     shell:
       cmd:
-    type: cmd
     path: run/last.sh
     args: "--var ${inputs.varname}"
 
     input:
       varname:
         name: Readable name
-        type: "string"
-        default: ""
         required: true
         order: 0
+        type: string
+        default: ""
 
       # varname1:
       #   name: Readable name
@@ -52,7 +53,7 @@ actions:
       #     default: ""
 
       varname2:
-        type: "int"
+        type: int
         default: 0
 
     output:
@@ -63,7 +64,7 @@ actions:
           type: boolean
 
   allunite.action1:
-    type: cmd
+    type: shell
     cmd: "echo \"A1 Input: {{ input.vvv }}\" && echo 'OUTPUT:{\"result\": \"action1 output\"}'"
 
     input:
@@ -76,7 +77,7 @@ actions:
           type: string
 
   allunite.action2:
-    type: cmd
+    type: shell
     cmd: "echo \"A2 Input: {{ input.vvv }}\" && echo 'OUTPUT:{\"result\": \"action2 output\"}'"
 
     input:
@@ -89,7 +90,7 @@ actions:
           type: string
 
   core.mail:
-    type: cmd
+    type: shell
     content: |
       #!/bin/sh
       
@@ -109,8 +110,16 @@ tasks:
   task1:
     input:
       field1:
+        name: "Field 1"
+        description: "Here goes the description"
+        required: true
         type: string
-        default: 111
+        default: "111"
+      field2:
+        name: "Field 2"
+        description: "Here goes the description"
+        required: false
+        type: string
 
     flow:
       step1:

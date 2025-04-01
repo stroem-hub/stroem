@@ -11,7 +11,7 @@
 - [X] workspace in git
 - [ ] Dockerfile for server
 - [ ] Dockerfile for worker and runner (with all utilities)
-- [ ] normalize action parameters, update runner
+- [X] normalize action parameters, update runner
 - [ ] use handlebars template engine
 - [X] add "vals" function to the template engine
 - [X] "run" function, shell with stdin
@@ -25,7 +25,7 @@
 - [X] Basic UI for viewing job results
 - [ ] Basic UI for viewing tasks
 - [ ] Basic UI for viewing task details
-- [ ] Basic UI for starting the task
+- [X] Basic UI for starting the task
 - [ ] Auth using internal email/pass
 - [ ] OIDC2 auth
 - [ ] LDAP auth
@@ -36,3 +36,5 @@
 - [ ] use https://github.com/hexagon/croner-rust for cron
 - [ ] webhooks triggers with passing headers and body as input templates
 - [ ] Basic ACL
+- [ ] Cancel jobs
+- [ ] Pause jobs after current step (approval?)

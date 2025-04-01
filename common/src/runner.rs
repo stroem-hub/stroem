@@ -193,10 +193,13 @@ impl Runner {
             renderer.add_to_context(json!({"input": input_value}))?;
         }
 
+
         let action_value = serde_json::to_value(action)?;
+        debug!("Action: {:?}", action_value);
         let action = renderer.render(action_value)?;
 
         debug!("Step input: {:?}", step_input);
+
 
         let cmd = action["cmd"].as_str().unwrap();
         debug!("Executing command: {}", cmd);

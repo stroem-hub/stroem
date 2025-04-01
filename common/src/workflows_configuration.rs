@@ -21,25 +21,47 @@ pub struct Action {
     pub id: String,
     pub name: Option<String>,
     pub description: Option<String>,
-    #[serde(rename = "type")]
-    pub action_type: String,
-    pub cmd: Option<String>,
-    pub content: Option<String>,
-    pub args: Option<String>,
     pub input: Option<HashMap<String, InputField>>,
     pub output: Option<OutputSpec>,
+    #[serde(flatten)]
+    pub action_type: ActionType,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "type", rename_all = "lowercase")]
+pub enum ActionType {
+    Shell {
+        cmd: Option<String>,
+    },
+    RemoteShell {}, // TODO
+    Docker {}, // TODO
+    Pod {}, // TODO
+    Python {
+        script: Option<String>,
+    }, // TODO
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct InputField {
     #[serde(skip_deserializing, default = "default_id")]
     pub id: String,
-    #[serde(rename = "type")]
-    pub field_type: String,
     pub required: Option<bool>,
-    pub default: Option<Value>,
     pub description: Option<String>,
     pub order: Option<i32>,
+
+    #[serde(flatten)]
+    pub field_type: InputFieldType,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "type", rename_all = "lowercase")]
+pub enum InputFieldType {
+    String {
+        default: Option<String>,
+    },
+    Int {
+        default: Option<i32>,
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
