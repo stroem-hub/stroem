@@ -38,3 +38,4 @@
 - [ ] Basic ACL
 - [ ] Cancel jobs
 - [ ] Pause jobs after current step (approval?)
+- [ ] Worker tags

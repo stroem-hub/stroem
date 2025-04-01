@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing::{debug, error};
 use std::process::Command;
+use strum_macros::{AsRefStr};
 
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -27,7 +28,8 @@ pub struct Action {
     pub action_type: ActionType,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, AsRefStr)]
+#[strum(serialize_all = "snake_case")]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum ActionType {
     Shell {

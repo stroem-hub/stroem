@@ -1,3 +1,4 @@
+use std::any::Any;
 use tracing::{info, error, debug};
 use tracing_subscriber;
 use crate::workflows_configuration::{WorkflowsConfiguration, Action, FlowStep};
@@ -12,6 +13,8 @@ use anyhow::{anyhow, Result};
 use crate::parameter_renderer::ParameterRenderer;
 use crate::dag_walker::DagWalker;
 use std::sync::{Arc, RwLock};
+use crate::action::ActionExecutor;
+use crate::action::shell::ShellAction;
 use crate::workspace_client::WorkspaceClient;
 
 
@@ -26,10 +29,13 @@ pub struct Runner {
     workspace_revision: Option<String>,
     client: Client,
     log_collector: Arc<dyn LogCollector + Send + Sync>,
+    action_executors: HashMap<String, Box<dyn ActionExecutor>>,
 }
 
 impl Runner {
     pub fn new(server: Option<String>, job_id: Option<String>, worker_id: Option<String>, task: Option<String>, action: Option<String>, input: Option<Value>, workspace: WorkspaceClient, workspace_revision: Option<String>, log_collector: Arc<dyn LogCollector + Send + Sync>) -> Self {
+        let mut action_executors: HashMap<String, Box<dyn ActionExecutor>> = HashMap::new();
+        action_executors.insert("shell".to_string(), Box::new(ShellAction));
         Runner {
             server,
             job_id,
@@ -41,6 +47,7 @@ impl Runner {
             workspace_revision,
             client: Client::new(),
             log_collector,
+            action_executors,
         }
     }
 
@@ -174,18 +181,6 @@ impl Runner {
 
         log_collector.mark_start(start_time, &step_input).await?;
 
-        /*
-        let start_payload = json!({
-            "start_datetime": start_time.to_rfc3339(),
-            "input": &step_input,
-        });
-
-        self.client.post(format!("{}/jobs/{}/steps/{}/start?worker_id={}", &self.server, &self.job_id, step_name, &self.worker_id))
-            .json(&start_payload)
-            .send()
-            .await?;
-        */
-
         // Initialize ParameterRenderer
         let mut renderer = ParameterRenderer::new();
         if let Some(input_value) = &step_input {
@@ -193,6 +188,8 @@ impl Runner {
             renderer.add_to_context(json!({"input": input_value}))?;
         }
 
+        let executor = self.action_executors.get(action.action_type.as_ref())
+            .ok_or_else(|| anyhow!("Unsupported action type: {}", action.action_type.as_ref()))?;
 
         let action_value = serde_json::to_value(action)?;
         debug!("Action: {:?}", action_value);
@@ -204,18 +201,7 @@ impl Runner {
         let cmd = action["cmd"].as_str().unwrap();
         debug!("Executing command: {}", cmd);
 
-
-        /*
-        let mut log_collector = LogCollector::new(
-            self.server.clone(),
-            self.job_id.clone(),
-            self.worker_id.clone(),
-            Some(step_name.to_string()),
-            Some(10),
-        );
-
-         */
-        let (exit_success, output) = run("sh", None, Some(cmd.to_string()), Some(&self.workspace.path), log_collector).await?;
+        let (exit_success, output) = executor.execute(&action, &step_input, &self.workspace.path, log_collector).await?;
         let end_time = Utc::now();
 
         let result = JobResult {
@@ -228,12 +214,6 @@ impl Runner {
         };
 
         self.log_collector.store_results(result).await?;
-        /*
-        self.client.post(format!("{}/jobs/{}/steps/{}/results?worker_id={}", self.server, self.job_id, step_name, self.worker_id))
-            .json(&result)
-            .send()
-            .await?;
-        */
         Ok((exit_success, output))
     }
 }

@@ -25,6 +25,7 @@ pub mod dag_walker;
 pub mod workflows_configuration;
 pub mod workspace_client;
 pub mod runner;
+mod action;
 
 use log_collector::{LogCollector, LogEntry};
 
