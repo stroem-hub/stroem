@@ -1,7 +1,7 @@
 triggers:
   trigger02:
     enabled: false
-    type: "cron"
+    type: "scheduler"
     cron: "0 10 15 * * *"
     task: task1
     input:

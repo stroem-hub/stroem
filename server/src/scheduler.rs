@@ -1,7 +1,7 @@
 // workflow-server/src/scheduler.rs
 use crate::Queue;
 use stroem_common::JobRequest;
-use stroem_common::workflows_configuration::{WorkflowsConfiguration};
+use stroem_common::workflows_configuration::{TriggerType, WorkflowsConfiguration};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::watch;
 use tracing::{info, error, debug};
@@ -32,9 +32,10 @@ impl Scheduler {
                 if !trigger.enabled.unwrap_or(true) {
                     continue;
                 }
-                if trigger.trigger_type == "cron" {
-                    if let Some(cron_expr) = &trigger.cron {
-                        match Schedule::from_str(cron_expr) {
+
+                match &trigger.trigger_type {
+                    TriggerType::Scheduler { cron } => {
+                        match Schedule::from_str(&cron) {
                             Ok(schedule) => {
                                 let job = JobRequest {
                                     task: Some(trigger.task.clone()),
@@ -53,11 +54,12 @@ impl Scheduler {
                                 let last_run = old_schedules
                                     .and_then(|old| old.get(trigger_name))
                                     .and_then(|(_, _, last, _)| *last);
-                                info!("Added trigger '{}' to scheduler: {}", trigger_name, cron_expr);
+                                info!("Added trigger '{}' to scheduler: {}", trigger_name, &cron);
                                 schedules.insert(trigger_name.clone(), (schedule, job, last_run, None));
                             }
                             Err(e) => error!("Invalid cron expression for trigger '{}': {}", trigger_name, e),
                         }
+
                     }
                 }
             }

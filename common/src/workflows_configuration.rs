@@ -55,7 +55,8 @@ pub struct InputField {
     pub field_type: InputFieldType,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, AsRefStr)]
+#[strum(serialize_all = "lowercase")]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum InputFieldType {
     String {
@@ -112,12 +113,21 @@ pub struct FlowStep {
 pub struct Trigger {
     #[serde(skip_deserializing, default = "default_id")]
     pub id: String,
-    #[serde(rename = "type")]
-    pub trigger_type: String,
-    pub cron: Option<String>,
     pub task: String,
     pub input: Option<HashMap<String, String>>,
     pub enabled: Option<bool>,
+
+    #[serde(flatten)]
+    pub trigger_type: TriggerType,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, AsRefStr)]
+#[strum(serialize_all = "snake_case")]
+#[serde(tag = "type", rename_all = "lowercase")]
+pub enum TriggerType {
+    Scheduler {
+        cron: String,
+    },
 }
 
 #[derive(Debug, Deserialize, Clone)]

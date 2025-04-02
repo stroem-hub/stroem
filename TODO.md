@@ -39,3 +39,4 @@
 - [ ] Cancel jobs
 - [ ] Pause jobs after current step (approval?)
 - [ ] Worker tags
+- [ ] Multi workspace support

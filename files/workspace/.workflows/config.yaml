@@ -138,7 +138,7 @@ tasks:
 triggers:
   trigger01:
     enabled: false
-    type: "cron"
+    type: "scheduler"
     cron: "*/20 * * * * *"
     task: task1
     input:
