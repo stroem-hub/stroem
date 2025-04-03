@@ -1,0 +1,6 @@
+target
+data
+ui/build
+ui/node_modules
+ui/.svelte-kit
+server/static

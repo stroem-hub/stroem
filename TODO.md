@@ -9,7 +9,7 @@
 - [X] workspace watch changes
 - [X] collect file system events for 5 seconds, do not reread everything on every event.
 - [X] workspace in git
-- [ ] Dockerfile for server
+- [X] Dockerfile for server
 - [ ] Dockerfile for worker and runner (with all utilities)
 - [X] normalize action parameters, update runner
 - [ ] use handlebars template engine
@@ -40,3 +40,4 @@
 - [ ] Pause jobs after current step (approval?)
 - [ ] Worker tags
 - [ ] Multi workspace support
+- [ ] gix instead of git2

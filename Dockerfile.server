@@ -1,0 +1,61 @@
+# syntax=docker/dockerfile:1.4
+FROM node:20-alpine AS frontend-builder
+
+WORKDIR /build
+COPY ./ui/package.json ./ui/package-lock.json ./
+RUN npm ci
+COPY ./ui .
+RUN npm run build
+
+FROM rust:1.85-slim-bookworm AS server-builder
+WORKDIR /build
+RUN apt-get update && apt-get install -y git libssl-dev pkg-config
+COPY . .
+COPY --from=frontend-builder /build/build ./server/static/
+RUN --mount=type=cache,target=/build/target/ \
+    --mount=type=cache,target=/usr/local/cargo/git/db \
+    --mount=type=cache,target=/usr/local/cargo/registry/ \
+    cargo build --package stroem-server --bin stroem-server --release \
+    && mkdir -p /build/dist \
+    && cp /build/target/release/stroem-server /build/dist/
+
+FROM debian:bookworm-slim
+ARG SOPS_VERSION="3.10.1"
+ARG VALS_VERSION="0.40.1"
+
+WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tzdata ca-certificates libssl-dev git curl sudo \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install SOPS
+RUN set -eux \
+    && arch="$(dpkg --print-architecture)"; arch="${arch##*-}" \
+    && SOPS_FILENAME=sops-v${SOPS_VERSION}.linux.${arch} \
+    && curl --retry 5 --retry-connrefused -LO "https://github.com/mozilla/sops/releases/download/v${SOPS_VERSION}/${SOPS_FILENAME}" \
+    && chmod +x "${SOPS_FILENAME}" \
+    && sudo mv "${SOPS_FILENAME}" /usr/local/bin/sops \
+    && sops --version | grep -E "^sops ${SOPS_VERSION}"
+
+# Install vals
+RUN set -eux \
+    && arch="$(dpkg --print-architecture)"; arch="${arch##*-}" \
+    && VALS_FILENAME="vals_${VALS_VERSION}_linux_${arch}.tar.gz" \
+    && curl --retry 5 --retry-connrefused -LO "https://github.com/helmfile/vals/releases/download/v${VALS_VERSION}/${VALS_FILENAME}" \
+    && sudo tar xvf "${VALS_FILENAME}" -C /usr/local/bin vals \
+    && rm "${VALS_FILENAME}" \
+    && vals version | grep -E "^Version: ${VALS_VERSION}"
+
+RUN groupadd -g 1000 -r stroem && useradd -r -g stroem -u 1000 -d /app stroem
+RUN mkdir -p /var/lib/stroem/{logs,workspace} && chown -R stroem:stroem /var/lib/stroem
+
+COPY --from=server-builder /build/dist/stroem-server ./
+COPY ./files/server-config.yaml /etc/stroem.yaml
+
+EXPOSE 8080
+VOLUME /var/lib/stroem/logs /var/lib/stroem/workspace
+USER stroem:stroem
+ENTRYPOINT ["/app/stroem-server"]
+CMD ["--config", "/etc/stroem.yaml"]

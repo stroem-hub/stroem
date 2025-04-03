@@ -13,3 +13,25 @@ services:
       - POSTGRES_USER=workflow
       - POSTGRES_PASSWORD=workflow
 
+  stroem-server:
+    image: stroem-hub/stroem-server:dev
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    volumes:
+      - $PWD/files/workspace:/var/lib/stroem/workspace
+      - $PWD/files/logs:/var/lib/stroem/logs
+    environment:
+      STROEM_DB_HOST: db
+      STROEM_DB_DATABASE: workflow
+      STROEM_DB_USERNAME: workflow
+      STROEM_DB_PASSWORD: workflow
+    ports:
+      - "8080:8080"
+    links:
+      - postgres:db
+    command:
+      - "--config"
+      - "/etc/stroem.yaml"
+      - "-v"
+

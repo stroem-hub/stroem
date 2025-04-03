@@ -1,7 +1,10 @@
 target
+files/server-config.*.yaml
 files/workspace/logs
 files/workspace/results
+files/logs
 .idea
 data
 .DS_Store
 server/static
+ui/build

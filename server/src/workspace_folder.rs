@@ -83,7 +83,12 @@ impl WorkspaceSource for WorkspaceSourceFolder {
                         debug!("Filesystem event: {:?}", event);
                         // let _ = workspace_source.sync();
                         // callback();
-                        let _ = event_tx.try_send(());
+                        if event.kind.is_access() {
+                            debug!("Ignoring access event");
+                        }
+                        else {
+                            let _ = event_tx.try_send(());
+                        }
                     }
                 },
                 NotifyConfig::default(),

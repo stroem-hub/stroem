@@ -6,11 +6,11 @@ db:
   password: workflow
 
 logs:
-  folder: /tmp/workflow-logs/
+  folder: /var/lib/stroem/logs
 
 
 workspace:
-  folder: /Users/ala/workspace/personal/workflow-engine/files/workspace
+  folder: /var/lib/stroem/workspace
 
 # workspace:
 #   type: git

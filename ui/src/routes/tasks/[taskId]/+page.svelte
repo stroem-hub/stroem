@@ -49,7 +49,7 @@
 		return entries;
 	}
 
-	let runResponse = {success: true, data: null, error: null};
+	let runResponse = $state({success: true, data: null, error: null});
 
 	async function runTask(event: SubmitEvent & { currentTarget: EventTarget & HTMLFormElement}) {
 		event.preventDefault();
