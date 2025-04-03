@@ -204,6 +204,8 @@ impl Runner {
         let (exit_success, output) = executor.execute(&action, &step_input, &self.workspace.path, log_collector).await?;
         let end_time = Utc::now();
 
+        self.log_collector.flush().await?;
+
         let result = JobResult {
             success: exit_success,
             start_datetime: start_time,

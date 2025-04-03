@@ -10,7 +10,7 @@
 - [X] collect file system events for 5 seconds, do not reread everything on every event.
 - [X] workspace in git
 - [X] Dockerfile for server
-- [ ] Dockerfile for worker and runner (with all utilities)
+- [X] Dockerfile for worker and runner (with all utilities)
 - [X] normalize action parameters, update runner
 - [ ] use handlebars template engine
 - [X] add "vals" function to the template engine

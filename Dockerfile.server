@@ -15,7 +15,7 @@ COPY --from=frontend-builder /build/build ./server/static/
 RUN --mount=type=cache,target=/build/target/ \
     --mount=type=cache,target=/usr/local/cargo/git/db \
     --mount=type=cache,target=/usr/local/cargo/registry/ \
-    cargo build --package stroem-server --bin stroem-server --release \
+    cargo build --bin stroem-server --release \
     && mkdir -p /build/dist \
     && cp /build/target/release/stroem-server /build/dist/
 

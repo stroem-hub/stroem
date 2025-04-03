@@ -35,3 +35,14 @@ services:
       - "/etc/stroem.yaml"
       - "-v"
 
+  stroem-worker:
+    image: stroem-hub/stroem-worker:dev
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    links:
+      - stroem-server:server
+    command:
+      - "--verbose"
+      - "--server"
+      - "http://server:8080"
