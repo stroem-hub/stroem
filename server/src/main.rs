@@ -31,7 +31,7 @@ use workspace_server::WorkspaceServer;
 use scheduler::Scheduler;
 use queue::Queue;
 use repository::JobRepository;
-use crate::repository::LogRepository;
+use crate::repository::LogRepositoryFactory;
 use std::sync::{Arc, RwLock};
 
 #[derive(Parser, Debug)]
@@ -80,7 +80,7 @@ async fn main() -> Result<(), Error>{
 
 
     let job_repo = JobRepository::new(db_pool);
-    let logs_repo = LogRepository::new(cfg.logs.folder);
+    let logs_repo = LogRepositoryFactory::new(&cfg.log_storage)?;
 
     // Create Scheduler
     let mut scheduler = Scheduler::new(job_repo.clone(), workspace.subscribe());

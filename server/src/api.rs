@@ -87,13 +87,13 @@ impl<S> Drop for JobChannel<S> {
 pub struct Api {
     pub workspace: Arc<WorkspaceServer>,
     pub job_repository: JobRepository,
-    pub log_repository: LogRepository,
+    pub log_repository: Arc<dyn LogRepository + Send + Sync>,
     pub job_channels: Arc<Mutex<HashMap<String, Sender<JobEvent>>>>,
 }
 
 
 impl Api {
-    pub fn new(workspace: Arc<WorkspaceServer>, job_repository: JobRepository, log_repository: LogRepository) -> Self {
+    pub fn new(workspace: Arc<WorkspaceServer>, job_repository: JobRepository, log_repository: Arc<dyn LogRepository + Send + Sync>) -> Self {
         Self {
             workspace,
             job_repository,

@@ -7,25 +7,66 @@ use anyhow::{Error, anyhow, bail};
 use tokio::fs::{File, OpenOptions};
 use tokio::io::{AsyncWriteExt, BufReader, AsyncBufReadExt};
 use std::collections::HashMap;
+use std::sync::Arc;
+use async_trait::async_trait;
 use fs2::FileExt;
 use tokio_stream::{self, StreamExt, wrappers::LinesStream};
 use futures::Stream;
 
 use stroem_common::{JobRequest, JobResult, log_collector::LogEntry};
-
+use crate::server_config::{LogStorageConfig, LogStorageType};
 
 #[derive(Clone)]
-pub struct LogRepository {
+pub struct LogRepositoryLocal {
     logs_dir: PathBuf,
 }
 
-impl LogRepository {
+impl LogRepositoryLocal {
     pub fn new(logs_dir: PathBuf) -> Self {
         Self { logs_dir }
     }
 
-    pub async fn save_logs(&self, job_id: &str, step_name: Option<&str>, logs: &Vec<LogEntry>) -> Result<(), anyhow::Error> {
-        let file_path = self.get_log_file_path(job_id, step_name);
+    fn get_log_file_path(&self, job_id: &str, step_name: Option<&str>) -> PathBuf {
+        match step_name {
+            Some(step) => self.logs_dir.join(format!("{}_{}.jsonl", job_id, step)),
+            None => self.logs_dir.join(format!("{}.jsonl", job_id)),
+        }
+    }
+}
+
+impl LogRepository for LogRepositoryLocal {
+    fn get_cache_folder(&self) -> PathBuf {
+        self.logs_dir.clone()
+    }
+}
+
+pub struct LogRepositoryFactory {}
+impl LogRepositoryFactory {
+    pub fn new(config: &LogStorageConfig) -> Result<Arc<dyn LogRepository>, Error> {
+        match &config.log_storage_type {
+            LogStorageType::Local { folder} => {
+                Ok(Arc::new(LogRepositoryLocal::new(PathBuf::from(folder))))
+            }
+            _ => {
+                bail!("Not implemented yet");
+            }
+        }
+    }
+}
+
+#[async_trait]
+pub trait LogRepository: Send + Sync {
+    fn get_cache_folder(&self) -> PathBuf;
+
+    fn get_log_cache_file_path(&self, job_id: &str, step_name: Option<&str>) -> PathBuf {
+        match step_name {
+            Some(step) => self.get_cache_folder().join(format!("{}_{}.jsonl", job_id, step)),
+            None => self.get_cache_folder().join(format!("{}.jsonl", job_id)),
+        }
+    }
+
+    async fn save_logs(&self, job_id: &str, step_name: Option<&str>, logs: &[LogEntry]) -> Result<(), anyhow::Error> {
+        let file_path = self.get_log_cache_file_path(job_id, step_name);
         std::fs::create_dir_all(file_path.parent().unwrap())?;
 
         // Open file with append mode
@@ -59,8 +100,8 @@ impl LogRepository {
         Ok(())
     }
 
-    pub async fn get_logs(&self, job_id: &str, step_name: Option<&str>) -> Result<Box<dyn Stream<Item = Result<LogEntry, anyhow::Error>> + Send + Unpin>, anyhow::Error> {
-        let file_path = self.get_log_file_path(job_id, step_name);
+    async fn get_logs(&self, job_id: &str, step_name: Option<&str>) -> Result<Box<dyn Stream<Item = Result<LogEntry, anyhow::Error>> + Send + Unpin>, anyhow::Error> {
+        let file_path = self.get_log_cache_file_path(job_id, step_name);
 
         if !file_path.exists() {
             debug!("No logs found for job_id: {}, step_name: {:?}", job_id, step_name);
@@ -79,10 +120,4 @@ impl LogRepository {
         Ok(Box::new(stream))
     }
 
-    fn get_log_file_path(&self, job_id: &str, step_name: Option<&str>) -> PathBuf {
-        match step_name {
-            Some(step) => self.logs_dir.join(format!("{}_{}.jsonl", job_id, step)),
-            None => self.logs_dir.join(format!("{}.jsonl", job_id)),
-        }
-    }
 }

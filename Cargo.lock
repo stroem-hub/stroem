@@ -3076,6 +3076,7 @@ name = "stroem-server"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "axum",
  "blake2",
  "chrono",
@@ -3089,7 +3090,6 @@ dependencies = [
  "futures-util",
  "git2",
  "globwalker",
- "log",
  "mime_guess",
  "notify",
  "refinery",
@@ -3099,6 +3099,8 @@ dependencies = [
  "sqlx",
  "sqlx-paginated",
  "stroem-common",
+ "strum",
+ "strum_macros",
  "tar",
  "tokio",
  "tokio-postgres",

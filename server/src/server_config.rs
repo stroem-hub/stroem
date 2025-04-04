@@ -1,12 +1,14 @@
-use serde::{Deserialize};
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use config::{Config, Environment, File};
 use anyhow::{Context, Error, anyhow};
+use stroem_common::workflows_configuration::ActionType;
+use strum_macros::{AsRefStr};
 
 #[derive(Debug, Deserialize)]
 pub struct ServerConfig {
     pub db: DbConfig,
-    pub logs: LogsConfig,
+    pub log_storage: LogStorageConfig,
     pub workspace: WorkspaceConfig,
 }
 
@@ -20,8 +22,25 @@ pub struct DbConfig {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct LogsConfig {
-    pub folder: PathBuf,
+pub struct LogStorageConfig {
+    pub cache_folder: PathBuf,
+    #[serde(flatten)]
+    pub log_storage_type: LogStorageType,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, AsRefStr)]
+#[strum(serialize_all = "snake_case")]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum LogStorageType {
+    Local {folder: PathBuf},
+    S3 {
+        aws_access_key_id: Option<String>,
+        aws_secret_access_key: Option<String>,
+        aws_region: Option<String>,
+        bucket: String,
+        prefix: Option<String>,
+        endpoint: Option<String>,
+    },
 }
 
 #[derive(Debug, Deserialize)]

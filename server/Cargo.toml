@@ -34,7 +34,9 @@ mime_guess = { workspace = true }
 sqlx = {workspace = true}
 sqlx-paginated = { workspace = true }
 futures-util = { workspace = true }
-log = "0.4.26"
+strum = { workspace = true}
+strum_macros = { workspace = true }
+async-trait = { workspace = true}
 
 [build-dependencies]
 refinery = { workspace = true }
