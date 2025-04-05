@@ -6,7 +6,6 @@ use anyhow::Error;
 use async_trait::async_trait;
 use serde_json::Value;
 use crate::log_collector::LogCollector;
-use crate::workflows_configuration::Action;
 
 #[async_trait]
 pub trait ActionExecutor {

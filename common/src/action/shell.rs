@@ -6,7 +6,6 @@ use serde_json::Value;
 use crate::action::ActionExecutor;
 use crate::log_collector::LogCollector;
 use crate::run;
-use crate::workflows_configuration::Action;
 
 #[derive(Clone)]
 pub struct ShellAction;
@@ -15,7 +14,7 @@ impl ActionExecutor for ShellAction {
     async fn execute(
         &self,
         action: &Value,
-        input: &Option<Value>,
+        _input: &Option<Value>,
         workspace_path: &PathBuf,
         log_collector: Arc<dyn LogCollector + Send + Sync>,
     ) -> Result<(bool, Option<Value>), Error> {

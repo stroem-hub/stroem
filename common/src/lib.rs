@@ -1,18 +1,14 @@
-use std::path::{Path, PathBuf};
+use std::path::{PathBuf};
 // common/src/lib.rs
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 use tokio::io::{AsyncWriteExt, BufReader};
 use tokio::io::AsyncBufReadExt;
-use tokio::process::Command;
 use std::process::Stdio;
-use tokio::select;
-use tracing::{error, info};
-use reqwest::Client;
-use anyhow::{anyhow, bail, Error};
-use std::collections::VecDeque;
+use tracing::{error};
+use anyhow::{anyhow, Error};
 use tokio::process::Command as TokioCommand;
-use tokio::sync::mpsc::{self, Sender};
+use tokio::sync::mpsc::{self};
 use serde_json::Value;
 use regex::Regex;
 use std::io;
@@ -96,7 +92,7 @@ pub async fn run(cmd: &str, args: Option<Vec<String>>, stdin_content: Option<Str
 
 
     // Channel for LogEntry from stdout/stderr to writer
-    let (log_tx, mut log_rx) = mpsc::channel::<LogEntry>(100);
+    // let (log_tx, mut log_rx) = mpsc::channel::<LogEntry>(100);
     // Channel for OUTPUT: lines
     let (output_tx, mut output_rx) = mpsc::channel::<String>(100);
 

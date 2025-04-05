@@ -1,18 +1,15 @@
-use std::any::Any;
+use crate::LogCollector;
 use tracing::{info, error, debug};
-use tracing_subscriber;
 use crate::workflows_configuration::{WorkflowsConfiguration, Action, FlowStep};
 use reqwest::Client;
 use chrono::Utc;
 use serde_json::{json, Value};
-use std::collections::{HashMap, HashSet};
-use std::ops::Deref;
-use crate::{run, JobResult, log_collector::LogCollector, log_collector::LogEntry, init_tracing};
-use std::path::{Path, PathBuf};
-use anyhow::{anyhow, Result};
+use std::collections::{HashMap};
+use crate::{JobResult};
+use anyhow::{anyhow};
 use crate::parameter_renderer::ParameterRenderer;
 use crate::dag_walker::DagWalker;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc};
 use crate::action::ActionExecutor;
 use crate::action::shell::ShellAction;
 use crate::workspace_client::WorkspaceClient;
@@ -102,7 +99,7 @@ impl Runner {
         let workflows = self.workspace.workflows.as_ref().unwrap();
 
         if let Some(task) = &self.task {
-            let task = workflows.get_task(self.task.clone().unwrap().as_str()).unwrap();
+            let task = workflows.get_task(task).unwrap();
             let step = task.flow.get(step_name.unwrap()).unwrap();
 
             if let Some(on_error_name) = &step.on_error {

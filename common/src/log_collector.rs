@@ -1,12 +1,11 @@
 use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
-use anyhow::{bail, Error, anyhow, Context};
+use anyhow::{Error, anyhow};
 use chrono::{DateTime, Utc};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, RwLock};
-use tokio::sync::mpsc::Sender;
 use tokio::task::JoinHandle;
 use tracing::{error, info, debug};
 use async_trait::async_trait;
@@ -74,7 +73,7 @@ impl LogCollectorServer {
                                 let mut buffer_guard = lc.buffer.write().await;
                                 buffer_guard.push_back(entry);
                                 if buffer_guard.len() >= lc.buffer_size {
-                                   lc.send_logs(&*buffer_guard).await;
+                                   let _ = lc.send_logs(&*buffer_guard).await;
                                   buffer_guard.clear();
                                 }
                             }
@@ -252,8 +251,8 @@ impl LogCollector for LogCollectorConsole {
         *step_name_guard = step_name;
     }
 
-    async fn mark_start(&self, start: DateTime<Utc>, input: &Option<Value>) -> Result<(), Error> {
-        let mut step_name_guard = self.step_name.read().await;
+    async fn mark_start(&self, _start: DateTime<Utc>, input: &Option<Value>) -> Result<(), Error> {
+        let step_name_guard = self.step_name.read().await;
         if let Some(step_name) = step_name_guard.as_ref() {
             println!("====== Step: {} ======", step_name);
         }

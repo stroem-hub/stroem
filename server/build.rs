@@ -1,6 +1,4 @@
-use std::process::Command;
-use std::path::Path;
-use std::fs;
+
 
 fn main() {
     println!("cargo:rerun-if-changed=migrations");

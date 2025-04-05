@@ -1,6 +1,5 @@
-use deadpool_postgres::Pool;
-use std::path::{Path, PathBuf};
-use tracing::{info, error, debug};
+use std::path::{PathBuf};
+use tracing::{info, debug};
 use chrono::{DateTime, Duration, Utc};
 use serde_json::Value;
 use anyhow::{Error, anyhow, bail, Context};

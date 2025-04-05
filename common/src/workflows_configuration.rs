@@ -5,7 +5,7 @@ use config::Config;
 use globwalker::GlobWalkerBuilder;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tracing::{debug, error};
+use tracing::{debug};
 use std::process::Command;
 use strum_macros::{AsRefStr};
 
@@ -162,7 +162,7 @@ impl WorkflowsConfiguration {
         // Process each file from the glob walker asynchronously
         for entry in gw.into_iter().filter_map(Result::ok) {
             let path = entry.path();
-            let file_source = if path.extension().and_then(|s| s.to_str()) == Some("sops.yaml") {
+            let _ = if path.extension().and_then(|s| s.to_str()) == Some("sops.yaml") {
                 // Decrypt SOPS file asynchronously
                 let decrypted_content = decrypt_sops_file(path)?;
                 config_builder = config_builder.add_source(config::File::from_str(&decrypted_content, config::FileFormat::Yaml));
@@ -224,7 +224,7 @@ impl WorkflowsConfiguration {
         // Validate triggers if present
         if let Some(triggers) = &self.triggers {
             for (trigger_name, trigger) in triggers {
-                let task = self.get_task(&trigger.task)
+                let _ = self.get_task(&trigger.task)
                     .ok_or_else(|| anyhow!("Trigger '{}' references non-existent task '{}'", trigger_name, trigger.task))?;
             }
         }

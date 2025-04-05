@@ -2,7 +2,6 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use config::{Config, Environment, File};
 use anyhow::{Context, Error, anyhow};
-use stroem_common::workflows_configuration::ActionType;
 use strum_macros::{AsRefStr};
 
 #[derive(Debug, Deserialize)]

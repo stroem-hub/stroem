@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::{Context, Error};
 use git2::{Cred, FetchOptions, RemoteCallbacks, Repository, ResetType, Oid};
 use tokio::time::{sleep, Duration};
-use tracing::{debug, error};
+use tracing::{debug};
 use crate::server_config::GitConfig;
 use crate::workspace_server::WorkspaceSource;
 
@@ -115,7 +115,7 @@ impl WorkspaceSource for WorkspaceSourceGit {
     fn sync(&self) -> Result<String, Error> {
         let latest_commit = match self.update_repo() {
             Ok(commit_hash) => commit_hash,
-            Err(e) => self.clone_repo()?,
+            Err(_) => self.clone_repo()?,
         };
 
         let latest_commit_hash = latest_commit.to_string();

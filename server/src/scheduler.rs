@@ -1,8 +1,6 @@
 // workflow-server/src/scheduler.rs
-use crate::Queue;
 use stroem_common::JobRequest;
 use stroem_common::workflows_configuration::{TriggerType, WorkflowsConfiguration};
-use tokio::sync::mpsc::Sender;
 use tokio::sync::watch;
 use tracing::{info, error, debug};
 use cron::Schedule;

@@ -4,11 +4,9 @@ use serde_json::Value;
 use tracing::error;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
-use stroem_common::init_tracing;
 use stroem_common::log_collector::LogCollectorConsole;
 use stroem_common::runner::Runner;
 use std::fs;
-use anyhow::bail;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
