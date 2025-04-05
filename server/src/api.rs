@@ -410,6 +410,10 @@ async fn update_job_result(
         .update_job_result(&job_id, &payload)
         .await?;
 
+    api.log_repository
+        .job_done(&job_id)
+        .await?;
+
     send_sse_event(&api, &job_id, "result", json!({
         "result": &payload
     })).await?;
