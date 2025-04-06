@@ -1,4 +1,5 @@
 # Strøm ⚡
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 **Strøm** is a high-performance orchestration and automation platform designed to act as the backbone of your infrastructure. It powers scheduled tasks, CI/CD workflows, ETL pipelines, and system operations through a unified and programmable execution model.
 
