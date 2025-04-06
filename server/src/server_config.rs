@@ -8,7 +8,7 @@ use strum_macros::{AsRefStr};
 pub struct ServerConfig {
     pub db: DbConfig,
     pub log_storage: LogStorageConfig,
-    pub workspace: WorkspaceConfig,
+    pub workspace: WorkspaceSourceConfig,
 }
 
 #[derive(Debug, Deserialize)]
@@ -43,20 +43,26 @@ pub enum LogStorageType {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct WorkspaceConfig {
-    pub folder: PathBuf, // Required for all cases
-    pub git: Option<GitConfig>, // Optional, triggers Git behavior if present
+pub struct WorkspaceSourceConfig {
+    pub folder: PathBuf,
+    #[serde(flatten)]
+    pub workspace_source_type: WorkspaceSourceType,
 }
 
-#[derive(Debug, Deserialize, Clone)]
-pub struct GitConfig {
-    pub url: String,
-    pub branch: Option<String>, // Defaults to "main"
-    pub poll_interval: Option<u64>, // Seconds, defaults to 60
-    pub auth: Option<GitAuth>,
+#[derive(Debug, Serialize, Deserialize, Clone, AsRefStr)]
+#[strum(serialize_all = "snake_case")]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum WorkspaceSourceType {
+    Folder {},
+    Git {
+        url: String,
+        branch: Option<String>, // Defaults to "main"
+        poll_interval: Option<u64>, // Seconds, defaults to 60
+        auth: Option<GitAuth>,
+    },
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GitAuth {
     pub username: Option<String>,
     pub token: Option<String>,

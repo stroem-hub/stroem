@@ -12,6 +12,7 @@ log_storage:
 
 
 workspace:
+  type: folder
   folder: /var/lib/stroem/workspace
 
 # workspace:

@@ -22,8 +22,7 @@ mod repository;
 mod error;
 mod server_config;
 pub mod workspace_server;
-mod workspace_git;
-mod workspace_folder;
+mod workspace_source;
 
 use stroem_common::JobRequest;
 use stroem_common::workflows_configuration::WorkflowsConfiguration;
@@ -71,10 +70,10 @@ async fn main() -> Result<(), Error>{
     //     .run_async(db_client.deref_mut().deref_mut()) // Get to the tokio_postgresql object
     //     .await?;
 
-    let workspace_dir = cfg.workspace.folder;
-    create_dir_all(&workspace_dir)?;
+    let workspace_dir = &cfg.workspace.folder;
+    create_dir_all(workspace_dir)?;
 
-    let workspace = Arc::new(WorkspaceServer::new(workspace_dir, cfg.workspace.git).await);
+    let workspace = Arc::new(WorkspaceServer::new(cfg.workspace).await);
     workspace.read_workflows()?;
     workspace.clone().watch().await;
 

@@ -7,7 +7,7 @@ use blake2::{Blake2b512, Digest};
 use globwalker::GlobWalkerBuilder;
 use notify::{RecommendedWatcher, RecursiveMode, Watcher, Config as NotifyConfig};
 use tracing::{debug, error, info};
-use crate::workspace_server::WorkspaceSource;
+use crate::workspace_source::WorkspaceSource;
 use tokio::sync::mpsc;
 use tokio::time;
 use tokio::time::{sleep, Instant};

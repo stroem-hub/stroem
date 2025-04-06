@@ -22,17 +22,9 @@ use tokio::time::{sleep, Duration}; // For watcher task loop
 use std::sync::{Arc, RwLock};
 
 use stroem_common::workflows_configuration::WorkflowsConfiguration;
-use crate::server_config::GitConfig;
-use crate::workspace_folder::WorkspaceSourceFolder;
-use crate::workspace_git::WorkspaceSourceGit;
+use crate::server_config::WorkspaceSourceConfig;
+use crate::workspace_source::{WorkspaceSource, WorkspaceSourceFactory};
 
-
-pub trait WorkspaceSource: Send + Sync {
-    fn sync(&self) -> Result<String, Error>;
-    fn watch(self: Arc<Self>, callback: Box<dyn Fn() + Send + Sync>) -> Result<(), Error>;
-    // async fn subscribe(&self) -> Result<watch::Receiver<bool>, Error>;
-    // fn get_revision(&self) -> Result<String, Error>;
-}
 
 
 #[derive(Clone)]
@@ -47,16 +39,19 @@ pub struct WorkspaceServer {
 }
 
 impl WorkspaceServer {
-    pub async fn new(path: PathBuf, git_config: Option<GitConfig>) -> Self {
-        fs::create_dir_all(&path).unwrap_or_default();
+    pub async fn new(config: WorkspaceSourceConfig) -> Self {
+        fs::create_dir_all(&config.folder).unwrap_or_default();
         let (workflows_tx, workflows_rx) = watch::channel(None);
 
+        let source = WorkspaceSourceFactory::new(&config).await.unwrap();
+        /*
         let source: Arc<dyn WorkspaceSource + Send + Sync> = match git_config {
             Some(git_config) => Arc::new(WorkspaceSourceGit::new(path.clone(), git_config)),
             None => Arc::new(WorkspaceSourceFolder::new(path.clone())),
         };
+        */
         Self {
-            path,
+            path: config.folder,
             source,
             // git_config,
             workflows: Arc::new(RwLock::new(None)),

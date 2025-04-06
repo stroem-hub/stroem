@@ -4,17 +4,20 @@ use anyhow::{Context, Error};
 use git2::{Cred, FetchOptions, RemoteCallbacks, Repository, ResetType, Oid};
 use tokio::time::{sleep, Duration};
 use tracing::{debug};
-use crate::server_config::GitConfig;
-use crate::workspace_server::WorkspaceSource;
+use crate::server_config::GitAuth;
+use crate::workspace_source::WorkspaceSource;
 
 pub struct WorkspaceSourceGit {
     pub path: PathBuf,
-    pub git_config: GitConfig,
+    pub url: String,
+    pub branch: Option<String>, // Defaults to "main"
+    pub poll_interval: Option<u64>, // Seconds, defaults to 60
+    pub auth: Option<GitAuth>,
 }
 
 impl WorkspaceSourceGit {
-    pub fn new(path: PathBuf, git_config: GitConfig) -> Self {
-        Self { path, git_config }
+    pub fn new(path: PathBuf, url: String, branch: Option<String>, poll_interval: Option<u64>, auth: Option<GitAuth>) -> Self {
+        Self { path, url, branch, poll_interval, auth }
     }
 
     fn update_repo(&self) -> Result<Oid, Error> {
@@ -23,7 +26,7 @@ impl WorkspaceSourceGit {
         self.configure_git_callbacks(&mut fetch_options).context("Failed to configure git config")?;
 
         let binding = "main".to_string();
-        let branch = self.git_config.branch.as_ref().unwrap_or(&binding);
+        let branch = self.branch.as_ref().unwrap_or(&binding);
 
         let mut remote = repo.find_remote("origin")?;
         remote.fetch(&[branch], Some(&mut fetch_options), None)
@@ -52,7 +55,7 @@ impl WorkspaceSourceGit {
 
     fn clone_repo(&self) -> Result<Oid, Error> {
         let binding = "main".to_string();
-        let branch = self.git_config.branch.as_ref().unwrap_or(&binding);
+        let branch = self.branch.as_ref().unwrap_or(&binding);
 
         let mut fetch_options = FetchOptions::new();
         self.configure_git_callbacks(&mut fetch_options).context("Failed to configure git config")?;
@@ -60,7 +63,7 @@ impl WorkspaceSourceGit {
         let mut builder = git2::build::RepoBuilder::new();
         builder.branch(branch);
         builder.fetch_options(fetch_options);
-        let repo = builder.clone(self.git_config.url.as_str(), self.path.as_path())
+        let repo = builder.clone(self.url.as_str(), self.path.as_path())
             .context("Failed to clone repository")?;
 
         // Checkout the branch
@@ -86,7 +89,7 @@ impl WorkspaceSourceGit {
     }
 
     fn configure_git_callbacks(&self, fetch_options: &mut FetchOptions) -> Result<(), Error> {
-        if let Some(auth) = &self.git_config.auth {
+        if let Some(auth) = &self.auth {
             let mut callbacks = RemoteCallbacks::new();
 
             if let Some(ssh_key) = auth.ssh_key.clone() {
@@ -127,9 +130,8 @@ impl WorkspaceSource for WorkspaceSourceGit {
     fn watch(self: Arc<Self>, callback: Box<dyn Fn() + Send + Sync>) -> Result<(), Error> {
         let workspace_source = self.clone();
         let git_path = self.path.clone();
-        let git_config = self.git_config.clone();
         tokio::spawn(async move {
-            let interval = Duration::from_secs(git_config.poll_interval.unwrap_or(60));
+            let interval = Duration::from_secs(self.poll_interval.unwrap_or(60));
             let mut last_commit: Option<Oid> = None;
             loop {
                 let repo = Repository::open(&git_path).unwrap();
