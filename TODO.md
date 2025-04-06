@@ -41,3 +41,4 @@
 - [ ] Worker tags
 - [ ] Multi workspace support
 - [ ] gix instead of git2
+- [ ] replace fs2 with fs4

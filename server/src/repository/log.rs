@@ -19,6 +19,7 @@ use tokio_tar::Builder;
 use tokio_util::compat::TokioAsyncReadCompatExt;
 use stroem_common::{JobRequest, JobResult, log_collector::LogEntry};
 use crate::server_config::{LogStorageConfig, LogStorageType};
+use std::fs::File as StdFile;
 
 mod local;
 use local::LogRepositoryLocal;
@@ -113,18 +114,27 @@ pub trait LogRepository: Send + Sync {
             debug!("Log file not found in cache for job_id: {}, step_name: {:?}", job_id, step_name);
 
             let archive_name = self.get_cache_folder().join(format!("{}.tgz", job_id));
-            debug!("Attempting to retrieve archive: {}", archive_name.display());
-            self.retrieve_archive_from_storage(job_id, &archive_name).await?;
 
-            let file = File::open(&archive_name).await?;
-            let buf_reader = BufReader::new(file);
-            let gzip_decoder = GzipDecoder::new(buf_reader);
-            let mut archive = Archive::new(gzip_decoder.compat());
-            archive.unpack(self.get_cache_folder()).await?;
-            fs::remove_file(archive_name).await?;
+            let lock_file_path = self.get_cache_folder().join(format!("{}.lock", job_id));
+            let std_lock_file = StdFile::create(&lock_file_path)
+                .with_context(|| format!("Failed to create lock file: {}", lock_file_path.display()))?;
 
+            std_lock_file.lock_exclusive()
+                .with_context(|| format!("Failed to lock for archive unpack: {}", lock_file_path.display()))?;
 
-            return Ok(Box::new(tokio_stream::empty()));
+            // Within lock: re-check file existence (race-safe)
+            if !file_path.exists() {
+                debug!("Attempting to retrieve archive: {}", archive_name.display());
+                self.retrieve_archive_from_storage(job_id, &archive_name).await?;
+
+                let file = File::open(&archive_name).await?;
+                let buf_reader = BufReader::new(file);
+                let gzip_decoder = GzipDecoder::new(buf_reader);
+                let mut archive = Archive::new(gzip_decoder.compat());
+                archive.unpack(self.get_cache_folder()).await?;
+                fs::remove_file(archive_name).await?;
+            }
+            // Lock is released when std_lock_file is dropped
         }
 
         let file = File::open(&file_path).await?;
