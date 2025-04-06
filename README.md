@@ -1,32 +1,28 @@
-# Workflow Engine
+# Strøm ⚡
 
-A distributed task execution system built in Rust, designed to manage and execute workflows defined in YAML files. The system consists of three main components: a server, a worker, and a runner, with a shared common library.
+**Strøm** is a high-performance orchestration and automation platform designed to act as the backbone of your infrastructure. It powers scheduled tasks, CI/CD workflows, ETL pipelines, and system operations through a unified and programmable execution model.
 
-## Overview
+> ⚠️ **Early Development Notice**
+>
+> Strøm is currently under **active development**. The public API, configuration formats, CLI behavior, and architecture are **unstable and subject to change**. Use with caution.
 
-The Workflow Engine enables users to define tasks and actions in a `.workflows` directory within a workspace, trigger them via cron schedules or API calls, and execute them concurrently across multiple runners. It supports workspace synchronization, result logging, and revision tracking, with plans for future Git integration.
+---
 
-### Components
+## 🔧 Project Goals
 
-- **workflow-server**: Manages job queues, serves workspace tarballs, and receives job results.
-    - Listens on `0.0.0.0:8080` by default.
-    - Watches the workspace for changes and caches tarballs with revisions.
-- **workflow-worker**: Polls jobs from the server and spawns runners (up to `--max-runners`, default 5).
-- **workflow-runner**: Executes individual jobs, syncing the workspace from the server if needed.
-- **common**: Shared library with structs (e.g., `Job`, `JobResult`, `Workspace`) and utilities.
+- Orchestrate infrastructure and data workflows
+- Automate routine and critical operational tasks
+- Provide modular components: server, worker, CLI
+- Enable extensibility through plugins and adapters
 
-## Features
+---
 
-- **Workflow Definition**: YAML-based configuration for triggers, tasks, and actions.
-- **Concurrent Execution**: Multiple runners execute jobs in parallel, controlled by `--max-runners`.
-- **Workspace Sync**: Runners download and unpack tarballs from the server, locked per process to avoid conflicts.
-- **Revision Tracking**: Uses BLAKE2b hashing of workspace contents for versioning.
-- **Logging**: Job results and logs are currently logged to console; persistent storage TBD.
+## 🚧 Status
 
-## Usage
+The core system is being prototyped. Functionality may be incomplete or non-functional in some areas.
 
-1. **Build**:
-   ```bash
-   cd workflow-engine
-   cargo build --all
-   cp target/debug/workflow-server target/debug/workflow-worker /path/to/workspace/
+**Expect breaking changes** as design decisions evolve. Contributions, discussions, and feedback are welcome during this phase.
+
+---
+
+
