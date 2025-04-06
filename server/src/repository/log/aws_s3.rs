@@ -1,6 +1,8 @@
 use async_trait::async_trait;
 use std::path::{PathBuf};
 use anyhow::{Error, Context};
+use aws_config::BehaviorVersion;
+use aws_config::meta::region::RegionProviderChain;
 use crate::repository::LogRepository;
 use tokio::fs::{File};
 use aws_sdk_s3::Client;
@@ -26,28 +28,35 @@ impl LogRepositoryAWSS3 {
         prefix: Option<String>,
         endpoint: Option<String>,
     ) -> Result<Self, Error> {
-        // Configure AWS credentials
-        let credentials = Credentials::new(
-            aws_access_key_id.unwrap_or_default(),
-            aws_secret_access_key.unwrap_or_default(),
-            None, // session token
-            None, // expires after
-            "log_repository",
-        );
 
         // Configure region or endpoint
-        let region = aws_region.map(Region::new).unwrap_or(Region::new("us-east-1"));
-        let mut config_builder = aws_sdk_s3::Config::builder()
-            .region(region)
-            .credentials_provider(credentials);
+        let region_provider = RegionProviderChain::first_try(aws_region.map(Region::new))
+            .or_default_provider();
 
-        // If custom endpoint is provided (e.g., for S3-compatible services like MinIO)
-        if let Some(endpoint_url) = endpoint {
-            config_builder = config_builder.endpoint_url(endpoint_url);
+        let mut config_loader = aws_config::defaults(BehaviorVersion::latest()).region(region_provider);
+
+        // If credentials were explicitly passed, override provider
+        if aws_access_key_id.is_some() && aws_secret_access_key.is_some() {
+            let credentials = Credentials::new(
+                aws_access_key_id.unwrap(),
+                aws_secret_access_key.unwrap(),
+                None,
+                None,
+                "log_repository",
+            );
+            config_loader = config_loader.credentials_provider(credentials);
         }
 
-        let config = config_builder.build();
-        let client = Client::from_conf(config);
+        let shared_config = config_loader.load().await;
+
+        let mut config = aws_sdk_s3::config::Builder::from(&shared_config);
+
+        if let Some(endpoint_url) = endpoint {
+            config = config.endpoint_url(endpoint_url);
+        }
+
+        let client = Client::from_conf(config.build());
+
 
         Ok(Self {
             cache_dir,
