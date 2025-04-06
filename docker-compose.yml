@@ -21,6 +21,7 @@ services:
     volumes:
       - $PWD/files/workspace:/var/lib/stroem/workspace
       - $PWD/files/logs:/var/lib/stroem/logs
+      - $PWD/files/logs-cache:/var/lib/stroem/logs-cache
     environment:
       STROEM_DB_HOST: db
       STROEM_DB_DATABASE: workflow

@@ -41,6 +41,8 @@ async-compression = { workspace = true }
 async-tar = { workspace = true }
 tokio-util = { workspace = true}
 tokio-tar = {workspace = true}
+aws-sdk-s3 = {workspace = true}
+aws-config = {workspace = true}
 
 [build-dependencies]
 refinery = { workspace = true }

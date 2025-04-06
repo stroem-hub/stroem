@@ -51,3 +51,5 @@ async-compression = { version = "0.4.22", features = ["tokio", "gzip"] }
 async-tar = "0.5.0"
 tokio-util = { version = "0.7.14", features = ["compat"]  }
 tokio-tar = "0.3.1"
+aws-sdk-s3 = "1.82.0"
+aws-config = "1.6.1"

@@ -5,10 +5,10 @@ db:
   username: workflow
   password: workflow
 
-logs_storage:
+log_storage:
   type: local
   folder: /var/lib/stroem/logs
-  cache_folder: /tmp/stroem-logs
+  cache_folder: /var/lib/stroem/logs-cache
 
 
 workspace:
