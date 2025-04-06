@@ -5,11 +5,11 @@ COPY . .
 RUN --mount=type=cache,target=/build/target/ \
     --mount=type=cache,target=/usr/local/cargo/git/db \
     --mount=type=cache,target=/usr/local/cargo/registry/ \
-    cargo build --bin stroem-worker --bin stroem-runner --bin stroem-cli --release \
+    cargo build --bin stroem-worker --bin stroem-runner --bin stroem --release \
     && mkdir -p /build/dist \
     && cp /build/target/release/stroem-worker /build/dist/ \
     && cp /build/target/release/stroem-runner /build/dist/ \
-    && cp /build/target/release/stroem-cli /build/dist/
+    && cp /build/target/release/stroem /build/dist/
 
 
 FROM debian:bookworm-slim AS tools
