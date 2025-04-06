@@ -30,7 +30,7 @@ impl LogRepository for LogRepositoryLocal {
 
     async fn upload_archive_to_storage(&self, job_id: &str, archive_name: &PathBuf) -> Result<(), Error> {
         let filename = archive_name.file_name().unwrap();
-        fs::rename(archive_name, self.storage_dir.join(filename)).await?;
+        fs::copy(archive_name, self.storage_dir.join(filename)).await?;
         Ok(())
     }
 

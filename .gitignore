@@ -1,7 +1,7 @@
 target
 files/server-config.*.yaml
 files/workspace/logs
-files/workspace/logs-cache
+files/logs-cache
 files/workspace/results
 files/logs
 .idea

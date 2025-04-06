@@ -229,6 +229,7 @@ pub trait LogRepository: Send + Sync {
     async fn job_done(&self, job_id: &str) -> Result<(), anyhow::Error> {
         let archive_name = self.archive_logs_tgz(job_id).await?;
         self.upload_archive_to_storage(job_id, &archive_name).await?;
+        fs::remove_file(&archive_name).await?;
         self.clean_cache().await?;
 
         Ok(())
