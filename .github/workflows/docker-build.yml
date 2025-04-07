@@ -41,7 +41,7 @@ jobs:
             {
               "build-target": "/build/target",
               "usr-local-cargo-git-db": "/usr/local/cargo/git/db",
-              "usr-local-cargo-registry": "/usr/local/cargo/registry",
+              "usr-local-cargo-registry": "/usr/local/cargo/registry"
             }
           skip-extraction: ${{ steps.cache.outputs.cache-hit }}
 
