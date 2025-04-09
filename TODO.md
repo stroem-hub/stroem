@@ -39,6 +39,7 @@
 - [ ] Cancel jobs
 - [ ] Pause jobs after current step (approval?)
 - [ ] Worker tags
-- [ ] Multi workspace support
+- [ ] Multi main workspace support
 - [ ] gix instead of git2
 - [ ] replace fs2 with fs4
+- [ ] Include workspaces (as libraries)
