@@ -105,6 +105,8 @@ impl Api {
 
 pub async fn run(api: Api, addr: &str) {
     let app = Router::new()
+        .route("/healthz", get(health_check))
+        .route("/readyz", get(ready_check))
         .route("/api/tasks", get(get_tasks))
         .route("/api/tasks/{:task_id}", get(get_task))
         .route("/api/jobs", get(get_jobs))
@@ -163,6 +165,18 @@ async fn serve_static(uri: Uri) -> impl IntoResponse {
         }
     }
 }
+
+#[axum::debug_handler]
+async fn health_check() -> impl IntoResponse {
+    StatusCode::OK
+}
+
+#[axum::debug_handler]
+async fn ready_check(State(api): State<Api>) -> impl IntoResponse {
+    // TODO: Add checks for DB connection, workspace availability.
+    StatusCode::OK
+}
+
 
 #[axum::debug_handler]
 async fn get_tasks(
