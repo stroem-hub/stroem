@@ -1,9 +1,11 @@
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
-use anyhow::{Context, Error};
+use std::fs;
+use anyhow::{bail, Context, Error};
+use futures_util::future::err;
 use git2::{Cred, FetchOptions, RemoteCallbacks, Repository, ResetType, Oid};
 use tokio::time::{sleep, Duration};
-use tracing::{debug};
+use tracing::{debug, error};
 use crate::server_config::GitAuth;
 use crate::workspace_source::WorkspaceSource;
 
@@ -100,17 +102,30 @@ impl WorkspaceSourceGit {
         if let Some(auth) = &self.auth {
             let mut callbacks = RemoteCallbacks::new();
 
-            if let Some(ssh_key) = auth.ssh_key.clone() {
+            if let Some(ssh_key_path) = auth.ssh_key_path.clone() {
                 let username = auth.username.clone().unwrap_or_else(|| "git".to_string());
                 callbacks.credentials(move |_url, _username_from_url, _allowed_types| {
                     Cred::ssh_key(
                         &username,
                         None,
-                        Path::new(&ssh_key),
-                        None
+                        Path::new(&ssh_key_path),
+                        None,
                     )
                 });
-            } else if let (Some(username), Some(token)) = (auth.username.clone(), auth.token.clone()) {
+            }
+            // If no ssh_key_path, check ssh_key for content
+            else if let Some(ssh_key) = auth.ssh_key.clone() {
+                let username = auth.username.clone().unwrap_or_else(|| "git".to_string());
+                callbacks.credentials(move |_url, _username_from_url, _allowed_types| {
+                    Cred::ssh_key_from_memory(
+                        &username,
+                        None,
+                        &ssh_key,
+                        None,
+                    )
+                });
+            }
+            else if let (Some(username), Some(token)) = (auth.username.clone(), auth.token.clone()) {
                 callbacks.credentials(move |_url, _username_from_url, _allowed_types| {
                     Cred::userpass_plaintext(&username, &token)
                 });
@@ -147,7 +162,10 @@ impl WorkspaceSource for WorkspaceSourceGit {
         let latest_commit = self.sync_repo();
         let revision = match latest_commit {
             Ok(commit_hash) => Some(commit_hash),
-            Err(_) => None,
+            Err(e) => {
+                error!("Could not clone or update the repo: {:#}", e);
+                None
+            },
         };
         self.set_revision(&revision)?;
 
@@ -165,15 +183,23 @@ impl WorkspaceSource for WorkspaceSourceGit {
             let interval = Duration::from_secs(self.poll_interval.unwrap_or(60));
             let mut last_commit: Option<Oid> = None;
             loop {
+                debug!("Watching for updates");
                 let latest_commit = self.sync_repo();
-                let commit_hash = latest_commit.ok().or(None);
+                let commit_hash = match latest_commit {
+                    Ok(commit_hash) => Some(commit_hash),
+                    Err(e) => {
+                        error!("Could not clone/update the repo: {:#}", e);
+                        None
+                    }
+                };
                 self.set_revision(&commit_hash).unwrap();
-
+                debug!("Current commit is: {:?}, latest commit is {:?}", last_commit, commit_hash);
                 if last_commit != commit_hash {
                     callback();
                 }
                 last_commit = commit_hash;
 
+                debug!("Sleeping for {:?}", interval);
                 sleep(interval).await;
             }
         });

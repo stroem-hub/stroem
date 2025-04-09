@@ -67,6 +67,7 @@ pub struct GitAuth {
     pub username: Option<String>,
     pub token: Option<String>,
     pub ssh_key: Option<String>,
+    pub ssh_key_path: Option<PathBuf>,
 }
 
 impl ServerConfig {
