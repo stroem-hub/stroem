@@ -10,7 +10,8 @@ use crate::repository::LogRepository;
 use crate::server_config::{WorkspaceSourceConfig, WorkspaceSourceType};
 
 pub trait WorkspaceSource: Send + Sync {
-    fn sync(&self) -> Result<String, Error>;
+    fn get_revision(&self) -> Option<String>;
+    fn sync(&self) -> Result<Option<String>, Error>;
     fn watch(self: Arc<Self>, callback: Box<dyn Fn() + Send + Sync>) -> Result<(), Error>;
     // async fn subscribe(&self) -> Result<watch::Receiver<bool>, Error>;
     // fn get_revision(&self) -> Result<String, Error>;

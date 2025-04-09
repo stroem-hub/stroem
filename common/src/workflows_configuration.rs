@@ -5,7 +5,7 @@ use config::Config;
 use globwalker::GlobWalkerBuilder;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tracing::{debug};
+use tracing::{debug, error};
 use std::process::Command;
 use strum_macros::{AsRefStr};
 
@@ -131,6 +131,7 @@ pub enum TriggerType {
 }
 
 #[derive(Debug, Deserialize, Clone)]
+#[derive(Default)]
 pub struct WorkflowsConfiguration {
     pub globals: Option<Globals>,
     pub actions: Option<HashMap<String, Action>>,
@@ -218,6 +219,13 @@ impl WorkflowsConfiguration {
         }
 
         Ok(cfg)
+    }
+
+    pub fn try_new_or_empty(workspace_path: PathBuf) -> Self {
+        Self::new(workspace_path).unwrap_or_else(|e| {
+            error!("Failed to load config, using empty configuration: {e}");
+            Self { ..Default::default() }
+        })
     }
 
     pub fn validate(&self) -> Result<(), Error> {

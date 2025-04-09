@@ -1,5 +1,5 @@
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use anyhow::{Context, Error};
 use git2::{Cred, FetchOptions, RemoteCallbacks, Repository, ResetType, Oid};
 use tokio::time::{sleep, Duration};
@@ -9,6 +9,7 @@ use crate::workspace_source::WorkspaceSource;
 
 pub struct WorkspaceSourceGit {
     pub path: PathBuf,
+    pub revision: Arc<RwLock<Option<String>>>,
     pub url: String,
     pub branch: Option<String>, // Defaults to "main"
     pub poll_interval: Option<u64>, // Seconds, defaults to 60
@@ -17,7 +18,14 @@ pub struct WorkspaceSourceGit {
 
 impl WorkspaceSourceGit {
     pub fn new(path: PathBuf, url: String, branch: Option<String>, poll_interval: Option<u64>, auth: Option<GitAuth>) -> Self {
-        Self { path, url, branch, poll_interval, auth }
+        Self {
+            path,
+            revision: Arc::new(RwLock::new(None)),
+            url,
+            branch,
+            poll_interval,
+            auth
+        }
     }
 
     fn update_repo(&self) -> Result<Oid, Error> {
@@ -112,36 +120,59 @@ impl WorkspaceSourceGit {
         }
         Ok(())
     }
+
+    fn sync_repo(&self) -> Result<Oid, Error> {
+        match self.update_repo() {
+            Ok(commit_hash) => Ok(commit_hash),
+            Err(_) => self.clone_repo(),
+        }
+    }
+
+    fn set_revision(&self, revision: &Option<Oid>) -> Result<(), Error> {
+        let mut rev_guard = self.revision.write().map_err(|_| "Failed to acquire write lock on revision").unwrap();
+        *rev_guard = match revision {
+            Some(last_commit_id) => {Some(last_commit_id.to_string().clone())},
+            None => {None}
+        };
+        Ok(())
+    }
 }
 
 impl WorkspaceSource for WorkspaceSourceGit {
-    fn sync(&self) -> Result<String, Error> {
-        let latest_commit = match self.update_repo() {
-            Ok(commit_hash) => commit_hash,
-            Err(_) => self.clone_repo()?,
+    fn get_revision(&self) -> Option<String> {
+        self.revision.read().ok().and_then(|r| r.clone())
+    }
+
+    fn sync(&self) -> Result<Option<String>, Error> {
+        let latest_commit = self.sync_repo();
+        let revision = match latest_commit {
+            Ok(commit_hash) => Some(commit_hash),
+            Err(_) => None,
+        };
+        self.set_revision(&revision)?;
+
+        let revision = match revision {
+            Some(commit_hash) => Some(commit_hash.to_string()),
+            None => None
         };
 
-        let latest_commit_hash = latest_commit.to_string();
-        debug!("Latest commit hash: {}", latest_commit_hash);
-
-        Ok(latest_commit_hash)
+        Ok(revision)
     }
 
     fn watch(self: Arc<Self>, callback: Box<dyn Fn() + Send + Sync>) -> Result<(), Error> {
-        let workspace_source = self.clone();
-        let git_path = self.path.clone();
         tokio::spawn(async move {
+            let workspace_source = self.clone();
             let interval = Duration::from_secs(self.poll_interval.unwrap_or(60));
             let mut last_commit: Option<Oid> = None;
             loop {
-                let repo = Repository::open(&git_path).unwrap();
+                let latest_commit = self.sync_repo();
+                let commit_hash = latest_commit.ok().or(None);
+                self.set_revision(&commit_hash).unwrap();
 
-                let commit_hash = self.clone_repo().unwrap();
-                if last_commit.is_some() && last_commit != Some(commit_hash) {
-                    let _ = workspace_source.sync();
+                if last_commit != commit_hash {
                     callback();
                 }
-                last_commit = Some(commit_hash);
+                last_commit = commit_hash;
 
                 sleep(interval).await;
             }

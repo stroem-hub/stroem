@@ -501,13 +501,12 @@ async fn save_step_logs(
 #[axum::debug_handler]
 async fn serve_workspace_tarball(
     State(mut api): State<Api>,
-) -> Result<impl IntoResponse, (StatusCode, String)> {
+) -> Result<impl IntoResponse, AppError> {
 
-    let gzipped = api.workspace.build_tarball()
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to build tarball: {}", e)))?;
+    let gzipped = api.workspace.build_tarball().await?;
 
-    let revision = api.workspace.get_revision()
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to calculate rev: {}", e)))?;
+    let revision = api.workspace.get_revision().unwrap_or("unknown".to_string());
+    debug!("Revision: {}", revision);
 
     let headers = [
         ("Content-Type", "application/gzip".to_string()),

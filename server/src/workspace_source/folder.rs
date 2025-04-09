@@ -11,6 +11,7 @@ use crate::workspace_source::WorkspaceSource;
 use tokio::sync::mpsc;
 use tokio::time;
 use tokio::time::{sleep, Instant};
+use stroem_common::walk_workspace_files;
 
 pub struct WorkspaceSourceFolder {
     pub path: PathBuf,
@@ -25,50 +26,44 @@ impl WorkspaceSourceFolder {
         }
     }
 
-    fn walk_files(&self) -> Vec<globwalker::DirEntry> {
-        let walker = GlobWalkerBuilder::from_patterns(&self.path, &["**/*"])
-            .max_depth(10)
-            .follow_links(true)
-            .build()
-            .unwrap();
-        let mut entries: Vec<_> = walker.into_iter().filter_map(Result::ok).collect();
-        entries.sort_by(|a, b| a.path().cmp(b.path()));
-        entries
-    }
 
-    pub fn get_revision(&self) -> Result<String, Error> {
-        let mut rev_guard = self.revision.write().map_err(|e| anyhow!("Failed to lock revision: {}", e))?;
-        if rev_guard.is_none() {
-            let mut hasher = Blake2b512::new();
+    pub fn calculate_revision(&self) -> Result<Option<String>, Error> {
+        let mut hasher = Blake2b512::new();
 
-            for entry in self.walk_files() {
-                let path = entry.path();
-                if path.is_file() {
-                    let relative_path = path.strip_prefix(&self.path).unwrap().to_string_lossy();
-                    hasher.update(relative_path.as_bytes());
+        for entry in walk_workspace_files(&self.path) {
+            let path = entry.path();
+            if path.is_file() {
+                let relative_path = path.strip_prefix(&self.path).unwrap().to_string_lossy();
+                hasher.update(relative_path.as_bytes());
 
-                    match fs::read(path) {
-                        Ok(contents) => hasher.update(&contents),
-                        Err(e) => {
-                            error!("Failed to read file {}: {}", path.display(), e);
-                            hasher.update(format!("error:{}", e).as_bytes());
-                        }
+                match fs::read(path) {
+                    Ok(contents) => hasher.update(&contents),
+                    Err(e) => {
+                        error!("Failed to read file {}: {}", path.display(), e);
+                        hasher.update(format!("error:{}", e).as_bytes());
                     }
                 }
             }
-
-            let revision = format!("{:x}", hasher.finalize());
-            *rev_guard = Some(revision.clone());
-            Ok(revision)
-        } else {
-            Ok(rev_guard.clone().unwrap())
         }
+
+        let revision = format!("{:x}", hasher.finalize());
+        Ok(Some(revision))
+
     }
 }
 
 impl WorkspaceSource for WorkspaceSourceFolder {
-    fn sync(&self) -> Result<String, Error> {
-        self.get_revision()
+    fn get_revision(&self) -> Option<String> {
+        self.revision.read().ok().and_then(|r| r.clone())
+    }
+    fn sync(&self) -> Result<Option<String>, Error> {
+        let new_revision = self.calculate_revision()?;
+        if let Ok(mut rev) = self.revision.write() {
+            *rev = new_revision.clone();
+        } else {
+            error!("Failed to acquire write lock on revision");
+        }
+        Ok(new_revision)
     }
 
     fn watch(self: Arc<Self>, callback: Box<dyn Fn() + Send + Sync>) -> Result<(), Error> {
@@ -113,7 +108,7 @@ impl WorkspaceSource for WorkspaceSourceFolder {
                        if last_event_time > last_sent {
                            let elapsed = Instant::now().duration_since(last_event_time);
                            if elapsed > Duration::from_secs(5) {
-                               let _ = workspace_source.sync();
+                               let _ = workspace_source.sync().ok();
                                callback();
                                last_sent = Instant::now();
                            }

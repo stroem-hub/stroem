@@ -32,6 +32,7 @@ use queue::Queue;
 use repository::JobRepository;
 use crate::repository::LogRepositoryFactory;
 use std::sync::{Arc, RwLock};
+use tracing_subscriber::util::SubscriberInitExt;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -74,6 +75,8 @@ async fn main() -> Result<(), Error>{
     create_dir_all(workspace_dir)?;
 
     let workspace = Arc::new(WorkspaceServer::new(cfg.workspace).await);
+    let revision = workspace.sync().await?;
+    info!("Workspace sync complete, revision: {}", revision.unwrap_or("unknown".to_string()));
     workspace.read_workflows()?;
     workspace.clone().watch().await;
 

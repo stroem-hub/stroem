@@ -13,6 +13,7 @@ use serde_json::Value;
 use regex::Regex;
 use std::io;
 use std::sync::Arc;
+use globwalker::GlobWalkerBuilder;
 use tracing_subscriber::{self, filter::LevelFilter, fmt, prelude::*};
 
 pub mod log_collector;
@@ -173,4 +174,15 @@ pub fn init_tracing(verbose: bool) {
         .with(stderr_layer)
         .with(stdout_layer)
         .init();
+}
+
+pub fn walk_workspace_files(path: &PathBuf) -> Vec<globwalker::DirEntry> {
+    let walker = GlobWalkerBuilder::from_patterns(path, &["**/*"])
+        .max_depth(10)
+        .follow_links(true)
+        .build()
+        .unwrap();
+    let mut entries: Vec<_> = walker.into_iter().filter_map(Result::ok).collect();
+    entries.sort_by(|a, b| a.path().cmp(b.path()));
+    entries
 }
