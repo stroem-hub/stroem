@@ -16,19 +16,17 @@ use sqlx::migrate::Migrator;
 
 
 mod scheduler;
-mod queue;
-mod api;
 mod repository;
 mod error;
 mod server_config;
 pub mod workspace_server;
 mod workspace_source;
+mod web;
 
 use stroem_common::JobRequest;
 use stroem_common::workflows_configuration::WorkflowsConfiguration;
 use workspace_server::WorkspaceServer;
 use scheduler::Scheduler;
-use queue::Queue;
 use repository::JobRepository;
 use crate::repository::LogRepositoryFactory;
 use std::sync::{Arc, RwLock};
@@ -89,9 +87,9 @@ async fn main() -> Result<(), Error>{
     scheduler.run().await;
 
     // Create Api
-    let server = api::Api::new(workspace, job_repo, logs_repo);
+    let state = web::WebState::new(workspace, job_repo, logs_repo);
     tokio::spawn(async move {
-        api::run(server, "0.0.0.0:8080").await;
+        web::run(state, "0.0.0.0:8080").await;
     });
 
     // Empty loop with graceful shutdown
