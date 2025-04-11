@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS job (
-  job_id TEXT PRIMARY KEY,
+  job_id uuid PRIMARY KEY,
   task_name TEXT,
   action_name TEXT,
   input JSONB,
@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS job (
 );
 
 CREATE TABLE IF NOT EXISTS job_step (
-  job_id TEXT NOT NULL,
+  job_id uuid NOT NULL,
   step_name TEXT NOT NULL,
   input JSONB,
   output JSONB,
