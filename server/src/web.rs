@@ -27,6 +27,7 @@ use api::JobEvent;
 
 mod worker;
 use worker::get_routes as worker_get_routes;
+use crate::auth::AuthService;
 
 #[derive(RustEmbed)]
 #[folder = "static/"]
@@ -39,16 +40,18 @@ pub struct WebState {
     pub job_repository: JobRepository,
     pub log_repository: Arc<dyn LogRepository + Send + Sync>,
     pub job_channels: Arc<Mutex<HashMap<String, Sender<JobEvent>>>>,
+    pub auth_service: AuthService,
 }
 
 
 impl WebState {
-    pub fn new(workspace: Arc<WorkspaceServer>, job_repository: JobRepository, log_repository: Arc<dyn LogRepository + Send + Sync>) -> Self {
+    pub fn new(workspace: Arc<WorkspaceServer>, job_repository: JobRepository, log_repository: Arc<dyn LogRepository + Send + Sync>, auth: AuthService) -> Self {
         Self {
             workspace,
             job_repository,
             log_repository,
             job_channels: Arc::new(Mutex::new(HashMap::new())),
+            auth_service: auth,
         }
     }
 }

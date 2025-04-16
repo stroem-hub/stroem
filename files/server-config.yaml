@@ -21,3 +21,19 @@ workspace:
 #   url:
 #   ssh_key: ....
 #   poll_interval: 30
+
+auth:
+  jwt_secret: secretstringgoeshere
+  jwt_expiration: 30d
+  auth_signup: true
+  initial_user:
+    name: Admin
+    email: admin@example.com
+    provider_id: main
+    password: 123
+  providers:
+    main:
+      type: internal
+      primary: true
+
+

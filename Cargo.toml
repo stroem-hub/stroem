@@ -17,7 +17,7 @@ flate2 = { version = "1.1.1" }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["fmt"] }
 config = "0.15.11"
-uuid = { version = "1.16.0", features = ["v4"] }
+uuid = { version = "1.16.0", features = ["v4", "serde"] }
 clap = { version = "4.5.35", features = ["derive"] }
 globwalker = "0.9.0"
 anyhow = "1.0.97"
@@ -53,3 +53,5 @@ tokio-util = { version = "0.7.14", features = ["compat"]  }
 tokio-tar = "0.3.1"
 aws-sdk-s3 = "1.82.0"
 aws-config = "1.6.1"
+argon2 = "0.5.3"
+jsonwebtoken = "9.3.1"

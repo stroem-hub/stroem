@@ -22,6 +22,7 @@ mod server_config;
 pub mod workspace_server;
 mod workspace_source;
 mod web;
+mod auth;
 
 use stroem_common::JobRequest;
 use stroem_common::workflows_configuration::WorkflowsConfiguration;
@@ -31,6 +32,7 @@ use repository::JobRepository;
 use crate::repository::LogRepositoryFactory;
 use std::sync::{Arc, RwLock};
 use tracing_subscriber::util::SubscriberInitExt;
+use crate::auth::{AuthService};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -79,15 +81,16 @@ async fn main() -> Result<(), Error>{
     workspace.clone().watch().await;
 
 
-    let job_repo = JobRepository::new(db_pool);
+    let job_repo = JobRepository::new(db_pool.clone());
     let logs_repo = LogRepositoryFactory::new(&cfg.log_storage).await?;
+    let auth_service = AuthService::new(cfg.auth.clone(), db_pool.clone());
 
     // Create Scheduler
     let mut scheduler = Scheduler::new(job_repo.clone(), workspace.subscribe());
     scheduler.run().await;
 
     // Create Api
-    let state = web::WebState::new(workspace, job_repo, logs_repo);
+    let state = web::WebState::new(workspace, job_repo, logs_repo, auth_service);
     tokio::spawn(async move {
         web::run(state, "0.0.0.0:8080").await;
     });

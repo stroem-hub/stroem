@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use config::{Config, Environment, File};
@@ -9,6 +10,7 @@ pub struct ServerConfig {
     pub db: DbConfig,
     pub log_storage: LogStorageConfig,
     pub workspace: WorkspaceSourceConfig,
+    pub auth: AuthConfig,
 }
 
 #[derive(Debug, Deserialize)]
@@ -70,6 +72,41 @@ pub struct GitAuth {
     pub ssh_key_path: Option<PathBuf>,
 }
 
+#[derive(Debug, Deserialize, Clone)]
+pub struct AuthConfig {
+    pub jwt_secret: String,
+    pub jwt_expiration: Option<u64>,
+    pub auth_signup: Option<bool>,
+    pub providers: HashMap<String, AuthProvider>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct AuthProvider {
+    #[serde(skip_deserializing, default = "default_id")]
+    pub id: String,
+    pub enabled: Option<bool>,
+    pub primary: Option<bool>,
+
+    #[serde(flatten)]
+    pub auth_type: AuthProviderType,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, AsRefStr)]
+#[strum(serialize_all = "snake_case")]
+#[serde(tag = "type", rename_all = "lowercase")]
+pub enum AuthProviderType {
+    Internal {
+    },
+    OIDC {
+    },
+    LDAP {
+    },
+}
+
+fn default_id() -> String { "".to_string() }
+
+
+
 impl ServerConfig {
     pub fn new(path: PathBuf) -> Result<Self, Error> {
 
@@ -79,7 +116,14 @@ impl ServerConfig {
         let cfg = cfg_builder.build()
             .with_context(|| format!("Failed to build config from file: {:?}", path))?;
 
-        cfg.try_deserialize::<Self>()
-            .map_err(|e| anyhow!("Failed to deserialize config: {}", e))
+        let mut cfg = cfg.try_deserialize::<Self>()
+            .map_err(|e| anyhow!("Failed to deserialize config: {}", e))?;
+
+
+        for (id, provider) in &mut cfg.auth.providers {
+            provider.id = id.clone();
+        }
+
+        Ok(cfg)
     }
 }
