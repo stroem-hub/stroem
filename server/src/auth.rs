@@ -29,6 +29,7 @@ pub struct User {
 #[derive(Deserialize)]
 struct SignupPayload {
     email: String,
+    #[serde(default)]
     password: Option<String>,
 }
 
@@ -64,7 +65,7 @@ impl AuthService {
         Self { config, pool, providers }
     }
 
-    pub async fn authenticate_with(&self, id: &str, payload: Option<Value>) -> Result<AuthResponse, Error> {
+    pub async fn authenticate_with(&self, id: &str, payload: HashMap<String, String>) -> Result<AuthResponse, Error> {
         let provider = self.providers.get(id)
             .ok_or_else(|| anyhow::anyhow!("Auth method not found"))?;
 
@@ -72,10 +73,14 @@ impl AuthService {
 
         if let AuthResponse::UserNotFound = auth_response {
             if self.config.auth_signup.unwrap_or(false) {
-                let SignupPayload { email, password } = serde_json::from_value(payload.unwrap().clone())?;
+                let email = match payload.get("email") {
+                    Some(e) => e,
+                    None => bail!("Missing 'email' in payload"),
+                };
+                let password = payload.get("password").map(String::as_str);
 
                 // Add user
-                let user_id = self.add_user(&email, None, password.as_deref()).await?;
+                let user_id = self.add_user(&email, None, password).await?;
                 let user = User {
                     user_id,
                     name: None,
@@ -107,7 +112,7 @@ impl AuthService {
         Ok(user_id)
     }
 
-    pub async fn issue_jwt(&self, auth_id: &str, user_id: &Uuid, email: String) -> Result<(String, String), Error> {
+    pub async fn issue_jwt(&self, user_id: &Uuid, email: String) -> Result<String, Error> {
         let claims = Claims {
             sub: user_id.to_string(),
             email,
@@ -118,7 +123,10 @@ impl AuthService {
             &claims,
             &EncodingKey::from_secret(self.config.jwt_secret.as_ref())
         )?;
-
+        Ok(jwt)
+    }
+    
+    pub async fn issue_refresh_token(&self, auth_id: &str, user_id: &Uuid) -> Result<String, Error> {
         let refresh_token = Uuid::new_v4().to_string();
         let refresh_hash = hash_password(&refresh_token)?;
         let expires_at = Utc::now() + Duration::days(30);
@@ -135,7 +143,7 @@ impl AuthService {
             .execute(&self.pool)
             .await?;
 
-        Ok((jwt, refresh_token))
+        Ok(refresh_token)
     }
 }
 
@@ -156,7 +164,7 @@ struct Claims {
 #[async_trait]
 pub trait AuthProviderImpl: Send + Sync {
     fn get_pool(&self) -> &PgPool;
-    async fn authenticate(&self, payload: &Option<Value>) -> Result<AuthResponse, Error>;
+    async fn authenticate(&self, payload: &HashMap<String, String>) -> Result<AuthResponse, Error>;
     // async fn add_user(&self, name: Option<String>, email: String, password: Option<String>) -> Result<Uuid, Error>;
     async fn create_link(&self, auth_id: &str, user_id: &Uuid, identifier: Option<&str>) -> Result<(), Error> {
         sqlx::query(

@@ -26,7 +26,10 @@ use api::get_routes as api_get_routes;
 use api::JobEvent;
 
 mod worker;
+mod auth;
+
 use worker::get_routes as worker_get_routes;
+use auth::get_routes as auth_get_routes;
 use crate::auth::AuthService;
 
 #[derive(RustEmbed)]
@@ -61,6 +64,7 @@ pub async fn run(state: WebState, addr: &str) {
     let app = Router::new()
         .route("/healthz", get(health_check))
         .route("/readyz", get(ready_check))
+        .merge(auth_get_routes())
         .merge(api_get_routes())
         .merge(worker_get_routes())
         .route("/{*path}", get(serve_static))

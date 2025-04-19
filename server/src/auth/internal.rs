@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use uuid::Uuid;
 use anyhow::{Error, bail, anyhow};
 use serde::{Deserialize, Serialize};
@@ -40,17 +41,19 @@ impl AuthProviderImpl for AuthProviderInternal {
         &self.pool
     }
 
-    async fn authenticate(&self, payload: &Option<Value>) -> Result<AuthResponse, Error> {
-        let credentials: AuthInternalCredentials = match payload {
-            Some(value) => serde_json::from_value(value.clone())?,
-            None => return Ok(AuthResponse::WrongCredentials),
+    async fn authenticate(&self, payload: &HashMap<String, String>) -> Result<AuthResponse, Error> {
+        let email = match payload.get("email") {
+            Some(e) if !e.is_empty() => e,
+            _ => return Ok(AuthResponse::WrongCredentials),
         };
-        if credentials.email.is_empty() || credentials.password.is_empty() {
-            return Ok(AuthResponse::WrongCredentials);
-        }
+
+        let password = match payload.get("password") {
+            Some(p) if !p.is_empty() => p,
+            _ => return Ok(AuthResponse::WrongCredentials),
+        };
 
         let user = sqlx::query("SELECT user_id, name, password_hash FROM user WHERE email = $1")
-            .bind(&credentials.email)
+            .bind(&email)
             .fetch_optional(&self.pool)
             .await?;
 
@@ -61,13 +64,13 @@ impl AuthProviderImpl for AuthProviderInternal {
                     Some(hash) => hash,
                     None => return Ok(AuthResponse::WrongCredentials),
                 };
-                if !verify_password(&credentials.password, &hash)? {
+                if !verify_password(&password, &hash)? {
                     return Ok(AuthResponse::WrongCredentials);
                 }
                 let user = User {
                     user_id: u.get::<Uuid, &str>("user_id").clone(),
                     name: u.get::<Option<String>, &str>("name").clone(),
-                    email: credentials.email.clone()
+                    email: email.to_string()
                 };
                 self.create_link(&self.id, &user.user_id, None).await?;
                 Ok(AuthResponse::Success(user))

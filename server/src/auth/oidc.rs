@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use anyhow::Error;
 use async_trait::async_trait;
 use serde_json::Value;
@@ -22,7 +23,7 @@ impl AuthProviderImpl for AuthProviderOIDC {
         &self.pool
     }
 
-    async fn authenticate(&self, payload: &Option<Value>) -> Result<AuthResponse, Error> {
+    async fn authenticate(&self, payload: &HashMap<String, String>) -> Result<AuthResponse, Error> {
         Ok(AuthResponse::WrongCredentials)
     }
 }
