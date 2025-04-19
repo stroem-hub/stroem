@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::time;
 use anyhow::{anyhow, bail};
 use axum::routing::{get, post};
 use serde_json::{json, Value};
@@ -8,11 +9,12 @@ use axum::{
     Json, Router
 };
 use axum::response::IntoResponse;
-use chrono::{Duration, TimeDelta};
 use axum_extra::extract::cookie::{Cookie, SameSite};
+use axum_extra::extract::CookieJar;
 use crate::auth::AuthResponse;
 use crate::error::ApiError;
 use crate::web::WebState;
+
 
 pub fn get_routes() -> Router<WebState> {
     Router::new()
@@ -26,8 +28,12 @@ pub fn get_routes() -> Router<WebState> {
 async fn get_providers(
     State(state): State<WebState>,
 ) -> Result<Json<Value>, ApiError> {
+    
+    let data = state.auth_service.get_providers();
+    
     Ok(json!({
         "success": true,
+        "data": data
     }).into())
 }
 
@@ -45,7 +51,7 @@ async fn post_login(
             let jwt = state.auth_service.issue_jwt(&user.user_id, user.email.clone()).await?;
             let refresh_token = state.auth_service.issue_refresh_token(&provider_id, &user.user_id).await?;
 
-            let mut cookie = Cookie::build(("refresh_token", refresh_token))
+            let cookie = Cookie::build(("refresh_token", refresh_token))
                 .http_only(true)
                 // .secure(true) // only over HTTPS!
                 .path("/")
@@ -68,7 +74,7 @@ async fn post_login(
                 }
             });
             
-            return Ok((headers, body.to_string()));
+            Ok((headers, body.to_string()))
         }
 
         AuthResponse::WrongCredentials => Err(ApiError::unauthorized("Wrong credentials")),
@@ -93,9 +99,21 @@ async fn oidc_callback(
 
 #[axum::debug_handler]
 async fn refresh_token(
-    State(api): State<WebState>,
-) -> Result<Json<Value>, ApiError> {
-    Ok(json!({
+    State(state): State<WebState>,
+    jar: CookieJar,
+) -> Result<impl IntoResponse, ApiError> {
+    let refresh_token = jar.get("refresh_token")
+        .ok_or_else(|| ApiError::unauthorized("Missing refresh token"))?
+        .value()
+        .to_string();
+
+    let jwt = state.auth_service
+        .refresh_access_token(&refresh_token)
+        .await
+        .map_err(|e| ApiError::unauthorized(&e.to_string()))?;
+
+    Ok(Json(json!({
         "success": true,
-    }).into())
+        "access_token": jwt
+    })))
 }

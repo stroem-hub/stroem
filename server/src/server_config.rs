@@ -76,8 +76,18 @@ pub struct GitAuth {
 pub struct AuthConfig {
     pub jwt_secret: String,
     pub jwt_expiration: Option<u64>,
+    pub refresh_token_secret: String,
     pub auth_signup: Option<bool>,
     pub providers: HashMap<String, AuthProvider>,
+    pub initial_user: Option<AuthInitialUser>
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct AuthInitialUser {
+    pub name: Option<String>,
+    pub email: String,
+    pub password: Option<String>,
+    pub provider_id: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -86,13 +96,14 @@ pub struct AuthProvider {
     pub id: String,
     pub enabled: Option<bool>,
     pub primary: Option<bool>,
+    pub name: Option<String>,
 
     #[serde(flatten)]
     pub auth_type: AuthProviderType,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, AsRefStr)]
-#[strum(serialize_all = "snake_case")]
+#[strum(serialize_all = "lowercase")]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum AuthProviderType {
     Internal {

@@ -25,6 +25,7 @@ workspace:
 auth:
   jwt_secret: secretstringgoeshere
   jwt_expiration: 30d
+  refresh_token_secret: secretforhmac
   auth_signup: true
   initial_user:
     name: Admin

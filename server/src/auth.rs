@@ -3,21 +3,22 @@ mod internal;
 mod oidc;
 
 use std::option::Option;
-use crate::auth::internal::hash_password;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use anyhow::{bail, Error};
 use async_trait::async_trait;
-use serde_json::Value;
-use sqlx::PgPool;
+use serde_json::{json, Value};
+use sqlx::{PgPool, Row};
 use uuid::Uuid;
-use chrono::{Utc, Duration};
+use chrono::{Utc, Duration, DateTime};
 use jsonwebtoken::{encode, Header, EncodingKey};
 use tracing::log::kv::Source;
-use crate::auth::internal::AuthProviderInternal;
+use crate::auth::internal::{hash_password, AuthProviderInternal};
 use crate::auth::oidc::AuthProviderOIDC;
 use crate::server_config::{AuthConfig, AuthProviderType};
+use sha3::{Digest, Sha3_256};
+use hmac::{Hmac, Mac};
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct User {
@@ -63,6 +64,24 @@ impl AuthService {
 
 
         Self { config, pool, providers }
+    }
+    
+    pub fn get_providers(&self) -> Vec<Value> {
+        let mut providers = Vec::new();
+        for (id, provider) in &self.config.providers {
+            if !provider.enabled.unwrap_or(true) {
+                continue;
+            }
+            
+            let provider_item = json!({
+                "id": id.clone(),
+                "type": provider.auth_type.as_ref(),
+                "primary": provider.primary,
+                "name": provider.name.clone().unwrap_or(id.clone()),
+            });
+            providers.push(provider_item);
+        }
+        providers
     }
 
     pub async fn authenticate_with(&self, id: &str, payload: HashMap<String, String>) -> Result<AuthResponse, Error> {
@@ -128,7 +147,7 @@ impl AuthService {
     
     pub async fn issue_refresh_token(&self, auth_id: &str, user_id: &Uuid) -> Result<String, Error> {
         let refresh_token = Uuid::new_v4().to_string();
-        let refresh_hash = hash_password(&refresh_token)?;
+        let refresh_hash = hash_token(&refresh_token, &self.config.refresh_token_secret)?;
         let expires_at = Utc::now() + Duration::days(30);
 
         sqlx::query(
@@ -144,6 +163,39 @@ impl AuthService {
             .await?;
 
         Ok(refresh_token)
+    }
+    pub async fn refresh_access_token(
+        &self,
+        refresh_token: &str
+    ) -> Result<String, Error> {
+        let token_hash = hash_token(&refresh_token, &self.config.refresh_token_secret)?;
+        
+        let row = sqlx::query(
+            "SELECT rt.user_id, rt.auth_id, rt.expires_at, rt.revoked_at, u.email
+             FROM refresh_token rt
+             JOIN \"user\" u ON rt.user_id = u.user_id
+             WHERE rt.token_hash = $1"
+        )
+            .bind(&token_hash)
+            .fetch_optional(&self.pool)
+            .await?;
+
+        let row = match row {
+            Some(row) => row,
+            None => bail!("Invalid refresh token"),
+        };
+
+        let expires_at: DateTime<Utc> = row.try_get("expires_at")?;
+        let revoked_at: Option<DateTime<Utc>> = row.try_get("revoked_at")?;
+
+        if revoked_at.is_some() || expires_at < Utc::now() {
+            bail!("Refresh token expired or revoked");
+        }
+
+        let user_id: Uuid = row.try_get("user_id")?;
+        let email: String = row.try_get("email")?;
+
+        self.issue_jwt(&user_id, email).await
     }
 }
 
@@ -177,4 +229,11 @@ pub trait AuthProviderImpl: Send + Sync {
             .await?;
         Ok(())
     }
+}
+
+fn hash_token(token: &str, secret: &str) -> Result<String, Error> {
+    let mut mac: Hmac<Sha3_256> = Hmac::new_from_slice(secret.as_bytes())?;
+    mac.update(token.as_bytes());
+    let result = mac.finalize();
+    Ok(format!("{:#x}", result.into_bytes()))
 }
