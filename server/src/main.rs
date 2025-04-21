@@ -84,6 +84,7 @@ async fn main() -> Result<(), Error>{
     let job_repo = JobRepository::new(db_pool.clone());
     let logs_repo = LogRepositoryFactory::new(&cfg.log_storage).await?;
     let auth_service = AuthService::new(cfg.auth.clone(), db_pool.clone());
+    auth_service.add_initial_user().await?;
 
     // Create Scheduler
     let mut scheduler = Scheduler::new(job_repo.clone(), workspace.subscribe());

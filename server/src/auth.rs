@@ -12,13 +12,14 @@ use serde_json::{json, Value};
 use sqlx::{PgPool, Row};
 use uuid::Uuid;
 use chrono::{Utc, Duration, DateTime};
-use jsonwebtoken::{encode, Header, EncodingKey};
+use jsonwebtoken::{encode, Header, EncodingKey, DecodingKey, Validation, decode};
 use tracing::log::kv::Source;
 use crate::auth::internal::{hash_password, AuthProviderInternal};
 use crate::auth::oidc::AuthProviderOIDC;
 use crate::server_config::{AuthConfig, AuthProviderType};
 use sha3::{Digest, Sha3_256};
 use hmac::{Hmac, Mac};
+use tracing::{debug, info, warn};
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct User {
@@ -121,7 +122,7 @@ impl AuthService {
         }
         let user_id  = Uuid::new_v4();
         sqlx::query(
-            "INSERT INTO user (user_id, name, email, password_hash) VALUES ($1, $2, $3, $4)")
+            "INSERT INTO \"user\" (user_id, name, email, password_hash) VALUES ($1, $2, $3, $4)")
             .bind(&user_id)
             .bind(name)
             .bind(email)
@@ -129,6 +130,51 @@ impl AuthService {
             .execute(&self.pool)
             .await?;
         Ok(user_id)
+    }
+
+    pub async fn add_initial_user(&self) -> Result<(), Error> {
+        // Check if user table is empty
+        let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM \"user\"")
+            .fetch_one(&self.pool)
+            .await?;
+
+        if count.0 > 0 {
+            debug!("Users already exist, skipping initial user creation.");
+            return Ok(());
+        }
+
+        let Some(config) = &self.config.initial_user else {
+            warn!("Initial user config is missing, but user table is empty.");
+            return Ok(());
+        };
+
+        let user_id = self.add_user(
+            &config.email,
+            config.name.as_deref(),
+            config.password.as_deref(),
+        ).await?;
+
+        let provider = self.providers.get(&config.provider_id)
+            .ok_or_else(|| anyhow::anyhow!("Auth provider '{}' not found", config.provider_id))?;
+
+        provider.create_link(&config.provider_id, &user_id, None).await?;
+
+        info!("Initial user '{}' created and linked to provider '{}'", config.email, config.provider_id);
+
+        Ok(())
+    }
+
+    pub async fn logout_user(&self, user_id: &Uuid) -> Result<(), Error> {
+        sqlx::query(
+            "UPDATE refresh_token
+             SET revoked_at = NOW()
+             WHERE user_id = $1 AND revoked_at IS NULL"
+        )
+            .bind(user_id)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(())
     }
 
     pub async fn issue_jwt(&self, user_id: &Uuid, email: String) -> Result<String, Error> {
@@ -143,6 +189,15 @@ impl AuthService {
             &EncodingKey::from_secret(self.config.jwt_secret.as_ref())
         )?;
         Ok(jwt)
+    }
+
+    pub fn decode_jwt(&self, token: &str) -> Result<Claims, Error> {
+        let token_data = decode::<Claims>(
+            token,
+            &DecodingKey::from_secret(self.config.jwt_secret.as_bytes()),
+            &Validation::default(), // you can customize if needed
+        )?;
+        Ok(token_data.claims)
     }
     
     pub async fn issue_refresh_token(&self, auth_id: &str, user_id: &Uuid) -> Result<String, Error> {
@@ -206,11 +261,11 @@ pub enum AuthResponse {
     Redirect(String), // URL to redirect
 }
 
-#[derive(Serialize)]
-struct Claims {
-    sub: String,
-    email: String,
-    exp: usize,
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Claims {
+    pub sub: String, // user_id
+    pub email: String,
+    pub exp: usize,
 }
 
 #[async_trait]
@@ -235,5 +290,5 @@ fn hash_token(token: &str, secret: &str) -> Result<String, Error> {
     let mut mac: Hmac<Sha3_256> = Hmac::new_from_slice(secret.as_bytes())?;
     mac.update(token.as_bytes());
     let result = mac.finalize();
-    Ok(format!("{:#x}", result.into_bytes()))
+    Ok(format!("{:x}", result.into_bytes()))
 }

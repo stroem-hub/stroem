@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-// workflow-server/src/api.rs
 use axum::{
     extract::{
         ws::{WebSocket, WebSocketUpgrade},
@@ -29,7 +28,8 @@ use anyhow::{anyhow, Error};
 use serde_json::{Value, json};
 use crate::workspace_server::WorkspaceServer;
 use crate::repository::{JobRepository, LogRepository};
-use crate::error::{ApiError, AppError};
+use crate::error::{AppError};
+use crate::web::api_response::{ApiResponse, ApiError};
 use std::sync::{Arc, RwLock, Mutex};
 use rust_embed::RustEmbed;
 use mime_guess::from_path;
@@ -40,6 +40,7 @@ use std::convert::Infallible;
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt;
 use std::{pin::Pin, task::{Context, Poll}};
+use crate::auth::User;
 use crate::web::WebState;
 
 pub fn get_routes() -> Router<WebState> {
@@ -95,7 +96,8 @@ impl<S> Drop for JobChannel<S> {
 #[axum::debug_handler]
 async fn get_tasks(
     State(api): State<WebState>,
-) -> Result<Json<Value>, ApiError> {
+    user: User,
+) -> Result<ApiResponse, ApiError> {
     let workflows_guard = api.workspace.workflows.read().map_err(|_| anyhow!("Could not read workspace"))?;
     let workflows = workflows_guard.as_ref().unwrap();
     let tasks = workflows.tasks.as_ref();
@@ -111,61 +113,49 @@ async fn get_tasks(
         }
         None => Value::Array(vec![]), // Empty array if no tasks
     };
-
-    Ok(json!({
-        "success": true,
-        "data": tasks_json,
-        "meta": {
-            "total": total
-        }
-    }).into())
+    
+    Ok(ApiResponse::data(tasks_json))
 }
 
 #[axum::debug_handler]
 async fn get_task(
     State(api): State<WebState>,
     Path(task_id): Path<String>,
-) -> Result<Json<Value>, ApiError> {
+    user: User,
+) -> Result<ApiResponse, ApiError> {
     let workflows_guard = api.workspace.workflows.read().map_err(|_| anyhow!("Could not read workspace"))?;
     let workflows = workflows_guard.as_ref().unwrap();
     let task = serde_json::to_value(workflows.get_task(task_id.as_str()))?;
-    Ok(json!({
-        "success": true,
-        "data": task,
-    }).into())
+    
+    Ok(ApiResponse::data(task))
 }
 
 #[axum::debug_handler]
 async fn get_jobs(
     State(api): State<WebState>,
     Query(params): Query<HashMap<String, String>>,
-) -> Result<Json<Value>, AppError> {
+    user: User,
+) -> Result<ApiResponse, AppError> {
     let jobs = api.job_repository.get_jobs().await?;
-    Ok(json!({
-        "success": true,
-        "data": serde_json::to_value(jobs)?,
-        "meta": {
-        }
-    }).into())
+    Ok(ApiResponse::data(serde_json::to_value(jobs)?))
 }
 
 #[axum::debug_handler]
 async fn get_job(
     State(api): State<WebState>,
     Path(job_id): Path<String>,
-) -> Result<Json<Value>, ApiError> {
+    user: User,
+) -> Result<ApiResponse, ApiError> {
     let task = api.job_repository.get_job(job_id.as_str()).await?;
-    Ok(json!({
-        "success": true,
-        "data": task,
-    }).into())
+    Ok(ApiResponse::data(serde_json::to_value(task)?))
 }
 
 #[axum::debug_handler]
 async fn get_job_logs(
     State(api): State<WebState>,
     Path(job_id): Path<String>,
-) -> Result<Json<Value>, ApiError> {
+    user: User,
+) -> Result<ApiResponse, ApiError> {
     let log_stream = api.log_repository.get_logs(job_id.as_str(), None).await?;
     let logs: Vec<LogEntry> = log_stream
         .collect::<Vec<Result<LogEntry, Error>>>()
@@ -173,17 +163,15 @@ async fn get_job_logs(
         .into_iter()
         .collect::<Result<Vec<_>, _>>()?;
 
-    Ok(json!({
-        "success": true,
-        "data": logs,
-    }).into())
+    Ok(ApiResponse::data(serde_json::to_value(logs)?))
 }
 
 #[axum::debug_handler]
 async fn get_job_step_logs(
     State(api): State<WebState>,
     Path((job_id, step_name)): Path<(String, String)>,
-) -> Result<Json<Value>, ApiError> {
+    user: User,
+) -> Result<ApiResponse, ApiError> {
     let log_stream = api.log_repository.get_logs(job_id.as_str(), Some(step_name.as_str())).await?;
     let logs: Vec<LogEntry> = log_stream
         .collect::<Vec<Result<LogEntry, Error>>>()
@@ -191,29 +179,25 @@ async fn get_job_step_logs(
         .into_iter()
         .collect::<Result<Vec<_>, _>>()?;
 
-    Ok(json!({
-        "success": true,
-        "data": logs,
-    }).into())
+    Ok(ApiResponse::data(serde_json::to_value(logs)?))
 }
 
 
 #[axum::debug_handler]
 async fn put_job(
     State(api): State<WebState>,
+    user: User,
     Json(job): Json<JobRequest>,
-) -> Result<Json<Value>, ApiError> {
+) -> Result<ApiResponse, ApiError> {
     let job_id = api.job_repository.enqueue_job(&job, "user", None).await?;
-    Ok(json!({
-        "success": true,
-        "data": &job_id,
-    }).into())
+    Ok(ApiResponse::data(serde_json::to_value(job_id)?))
 }
 
 #[axum::debug_handler]
 async fn get_job_sse(
     State(api): State<WebState>,
     Path(job_id): Path<String>,
+    user: User,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
 
     debug!("Received SSE connection for job {}", job_id);

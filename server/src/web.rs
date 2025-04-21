@@ -14,7 +14,8 @@ use axum::routing::get;
 use futures::Stream;
 use mime_guess::from_path;
 use rust_embed::RustEmbed;
-use serde_json::Value;
+use serde::Serialize;
+use serde_json::{json, Value};
 use tokio::net::TcpListener;
 use tokio::sync::broadcast::Sender;
 use tracing::{debug, info};
@@ -27,10 +28,12 @@ use api::JobEvent;
 
 mod worker;
 mod auth;
+mod api_response;
 
 use worker::get_routes as worker_get_routes;
 use auth::get_routes as auth_get_routes;
 use crate::auth::AuthService;
+use crate::error::ApiError;
 
 #[derive(RustEmbed)]
 #[folder = "static/"]

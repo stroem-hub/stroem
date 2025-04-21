@@ -52,7 +52,7 @@ impl AuthProviderImpl for AuthProviderInternal {
             _ => return Ok(AuthResponse::WrongCredentials),
         };
 
-        let user = sqlx::query("SELECT user_id, name, password_hash FROM user WHERE email = $1")
+        let user = sqlx::query("SELECT user_id, name, password_hash FROM \"user\" WHERE email = $1")
             .bind(&email)
             .fetch_optional(&self.pool)
             .await?;
