@@ -24,12 +24,12 @@ use crate::web::WebState;
 
 pub fn get_routes() -> Router<WebState> {
     Router::new()
-        .route("/auth/providers", get(get_providers))
-        .route("/auth/{:provider_id}/login", post(post_login))
+        .route("/api/auth/providers", get(get_providers))
+        .route("/api/auth/{:provider_id}/login", post(post_login))
         .route("/auth/{:provider_id}/callback", get(oidc_callback))
-        .route("/auth/refresh", post(refresh_token))
-        .route("/auth/logout", get(logout))
-        .route("/auth/info", get(user_info))
+        .route("/api/auth/refresh", post(refresh_token))
+        .route("/api/auth/logout", get(logout))
+        .route("/api/auth/info", get(user_info))
 }
 
 #[axum::debug_handler]
@@ -52,7 +52,7 @@ async fn post_login(
 
     match result {
         AuthResponse::Success(user) => {
-            let jwt = state.auth_service.issue_jwt(&user.user_id, user.email.clone()).await?;
+            let jwt = state.auth_service.issue_jwt(&user.user_id, &user.email).await?;
             let refresh_token = state.auth_service.issue_refresh_token(&provider_id, &user.user_id).await?;
 
             let cookie = Cookie::build(("refresh_token", refresh_token))
@@ -60,7 +60,7 @@ async fn post_login(
                 // .secure(true) // only over HTTPS!
                 .path("/")
                 .same_site(SameSite::Lax);
-                // .max_age(std::time::Duration::from_secs(30*24*60*60));
+                // .max_age(std::time::Duration::from_secs(30*24*60*60)); // TODO: Fix it
 
             let mut headers = HeaderMap::new();
             headers.insert(
@@ -70,11 +70,7 @@ async fn post_login(
 
             let data = json!({
                 "access_token": jwt,
-                "user": {
-                    "user_id": user.user_id,
-                    "email": user.email,
-                    "name": user.name,
-                }
+                "user": user
             });
             Ok(ApiResponse::with_headers(data, headers))
         }
@@ -108,14 +104,15 @@ async fn refresh_token(
         .value()
         .to_string();
 
-    let jwt = state.auth_service
+    let (jwt, user) = state.auth_service
         .refresh_access_token(&refresh_token)
         .await
         .map_err(|e| ApiError::unauthorized(&e.to_string()))?;
 
     Ok(ApiResponse::data(json!({
         "success": true,
-        "access_token": jwt
+        "access_token": jwt,
+        "user": user
     })))
 }
 
@@ -142,7 +139,7 @@ async fn logout(
         .http_only(true)
         .path("/")
         .same_site(SameSite::Lax);
-        // .max_age(time::Duration::seconds(0));
+        // .max_age(time::Duration::seconds(0)); // TODO: Fix it
 
     let mut headers = HeaderMap::new();
     headers.insert(

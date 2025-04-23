@@ -1,5 +1,10 @@
 <script>
 	import { goto } from '$app/navigation';
+	import { get } from 'svelte/store';
+	import { page } from '$app/state';
+	import { onMount } from 'svelte';
+	import { accessToken, authUser } from '$lib/stores';
+	import { refreshAccessToken } from '$lib/auth';
 	import { browser } from '$app/environment'; // Check if running in browser
 	import { Sidebar, SidebarWrapper, SidebarBrand, SidebarItem, SidebarGroup } from 'flowbite-svelte';
 	import { ChartPieSolid, GridSolid, MailBoxSolid, UserSolid, ArrowRightToBracketOutline, EditOutline, ArrowsRepeatOutline, HammerOutline, FlagSolid } from 'flowbite-svelte-icons';
@@ -15,7 +20,24 @@
 		img: 'https://cdn-icons-png.freepik.com/128/12707/12707916.png'
 	};
 
+	// Try to refresh token on mount if no access token
+	onMount(async () => {
+		const currentToken = get(accessToken);
+		const publicPaths = ['/login'];
+
+		if (currentToken || publicPaths.includes(page.url.pathname)) {
+			return;
+		}
+
+		const success = await refreshAccessToken();
+		if (!success) {
+			authUser.set(null);
+			goto('/login');
+		}
+	});
+
 </script>
+{#if $authUser}
 <div class="h-screen flex">
 <Sidebar class="sticky top-16 w-60 overflow-y-auto bg-gray-50">
 	<SidebarWrapper>
@@ -50,6 +72,11 @@
 	</main>
 
 </div>
+{:else}
+	<main>
+		{@render children()}
+	</main>
+{/if}
 
 
 

@@ -77,6 +77,7 @@ pub struct AuthConfig {
     pub jwt_secret: String,
     pub jwt_expiration: Option<u64>,
     pub refresh_token_secret: String,
+    pub refresh_token_expiration: Option<u64>,
     pub auth_signup: Option<bool>,
     pub providers: HashMap<String, AuthProvider>,
     pub initial_user: Option<AuthInitialUser>
@@ -108,8 +109,16 @@ pub struct AuthProvider {
 pub enum AuthProviderType {
     Internal {
     },
-    OIDC {
-    },
+    OIDC { /*
+        issuer: String,
+        authorisation_url: String,
+        token_url: String,
+        userinfo_url: String,
+        logout_url: String,
+        client_id: String,
+        client_secret: String,
+        scopes: Vec<String>,
+    */ },
     LDAP {
     },
 }

@@ -26,6 +26,8 @@ auth:
   jwt_secret: secretstringgoeshere
   jwt_expiration: 30d
   refresh_token_secret: secretforhmac
+  refresh_token_expiration: 30d
+  secure_cookie: true
   auth_signup: true
   initial_user:
     name: Admin

@@ -66,23 +66,36 @@ impl AuthService {
 
         Self { config, pool, providers }
     }
-    
+
     pub fn get_providers(&self) -> Vec<Value> {
-        let mut providers = Vec::new();
+        let mut primary = None;
+        let mut others = Vec::new();
+
         for (id, provider) in &self.config.providers {
             if !provider.enabled.unwrap_or(true) {
                 continue;
             }
-            
+
             let provider_item = json!({
-                "id": id.clone(),
-                "type": provider.auth_type.as_ref(),
-                "primary": provider.primary,
-                "name": provider.name.clone().unwrap_or(id.clone()),
-            });
-            providers.push(provider_item);
+            "id": id.clone(),
+            "type": provider.auth_type.as_ref(),
+            "primary": provider.primary,
+            "name": provider.name.clone().unwrap_or(id.clone()),
+        });
+
+            if provider.primary.unwrap_or(false) {
+                primary = Some(provider_item);
+            } else {
+                others.push(provider_item);
+            }
         }
-        providers
+
+        let mut result = Vec::new();
+        if let Some(p) = primary {
+            result.push(p);
+        }
+        result.extend(others);
+        result
     }
 
     pub async fn authenticate_with(&self, id: &str, payload: HashMap<String, String>) -> Result<AuthResponse, Error> {
@@ -177,10 +190,10 @@ impl AuthService {
         Ok(())
     }
 
-    pub async fn issue_jwt(&self, user_id: &Uuid, email: String) -> Result<String, Error> {
+    pub async fn issue_jwt(&self, user_id: &Uuid, email: &String) -> Result<String, Error> {
         let claims = Claims {
             sub: user_id.to_string(),
-            email,
+            email: email.clone(),
             exp: (Utc::now() + Duration::minutes(15)).timestamp() as usize,
         };
         let jwt = encode(
@@ -222,11 +235,11 @@ impl AuthService {
     pub async fn refresh_access_token(
         &self,
         refresh_token: &str
-    ) -> Result<String, Error> {
+    ) -> Result<(String, User), Error> {
         let token_hash = hash_token(&refresh_token, &self.config.refresh_token_secret)?;
         
         let row = sqlx::query(
-            "SELECT rt.user_id, rt.auth_id, rt.expires_at, rt.revoked_at, u.email
+            "SELECT rt.user_id, rt.auth_id, rt.expires_at, rt.revoked_at, u.email, u.name
              FROM refresh_token rt
              JOIN \"user\" u ON rt.user_id = u.user_id
              WHERE rt.token_hash = $1"
@@ -246,11 +259,15 @@ impl AuthService {
         if revoked_at.is_some() || expires_at < Utc::now() {
             bail!("Refresh token expired or revoked");
         }
+        
+        let user = User {
+            user_id: row.try_get("user_id")?,
+            name: row.try_get("name")?,
+            email: row.try_get("email")?
+        };
 
-        let user_id: Uuid = row.try_get("user_id")?;
-        let email: String = row.try_get("email")?;
-
-        self.issue_jwt(&user_id, email).await
+        let jwt = self.issue_jwt(&user.user_id, &user.email).await?;
+        Ok((jwt, user))
     }
 }
 

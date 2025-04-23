@@ -48,6 +48,8 @@ argon2 = { workspace = true }
 jsonwebtoken = { workspace = true }
 sha3 = { workspace = true }
 hmac =  { workspace = true }
+parse_duration = { workspace = true }
+time = { workspace = true }
 
 [build-dependencies]
 refinery = { workspace = true }
