@@ -50,6 +50,8 @@ sha3 = { workspace = true }
 hmac =  { workspace = true }
 parse_duration = { workspace = true }
 time = { workspace = true }
+openid = { workspace = true }
+reqwest = { workspace = true }
 
 [build-dependencies]
 refinery = { workspace = true }

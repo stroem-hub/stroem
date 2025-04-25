@@ -19,6 +19,7 @@ use crate::auth::oidc::AuthProviderOIDC;
 use crate::server_config::{AuthConfig, AuthProviderType};
 use sha3::{Digest, Sha3_256};
 use hmac::{Hmac, Mac};
+use reqwest::Url;
 use tracing::{debug, info, warn};
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -37,25 +38,39 @@ struct SignupPayload {
 
 #[derive(Clone)]
 pub struct AuthService {
+    public_url: Url,
     config: AuthConfig,
     pool: PgPool,
     providers: HashMap<String, Arc<dyn AuthProviderImpl>>
 }
 
 impl AuthService {
-    pub fn new(config: AuthConfig, pool: PgPool) -> Self {
+    pub async fn new(config: AuthConfig, pool: PgPool, public_url: Url) -> Self {
         let mut providers = HashMap::new();
         for (id, provider) in &config.providers {
             if !provider.enabled.unwrap_or(true) {
                 continue;
             }
 
-            let provider: Arc<dyn AuthProviderImpl> = match provider.auth_type {
+            let provider: Arc<dyn AuthProviderImpl> = match &provider.auth_type {
                 AuthProviderType::Internal {} => {
                     Arc::new(AuthProviderInternal::new(id.clone(), pool.clone()))
                 },
-                AuthProviderType::OIDC {} => {
-                    Arc::new(AuthProviderOIDC::new(id.clone(), pool.clone()))
+                AuthProviderType::OIDC {
+                    issuer_url,
+                    client_id,
+                    client_secret,
+                    scopes,
+                    name_claim,
+                    email_claim,
+                } => {
+                    let callback_url = public_url.join(&format!("/auth/{}/callback", id)).unwrap();
+                    Arc::new(AuthProviderOIDC::new(
+                        id.clone(), pool.clone(),
+                        issuer_url.clone(), client_id.clone(), client_secret.clone(), scopes.clone(),
+                        callback_url,
+                        name_claim.clone(), email_claim.clone(),
+                    ).await.unwrap())
                 }
                 _ => todo!()
             };
@@ -64,7 +79,7 @@ impl AuthService {
         }
 
 
-        Self { config, pool, providers }
+        Self { public_url, config, pool, providers }
     }
 
     pub fn get_providers(&self) -> Vec<Value> {
@@ -77,11 +92,11 @@ impl AuthService {
             }
 
             let provider_item = json!({
-            "id": id.clone(),
-            "type": provider.auth_type.as_ref(),
-            "primary": provider.primary,
-            "name": provider.name.clone().unwrap_or(id.clone()),
-        });
+                "id": id.clone(),
+                "type": provider.auth_type.as_ref(),
+                "primary": provider.primary,
+                "name": provider.name.clone().unwrap_or(id.clone()),
+            });
 
             if provider.primary.unwrap_or(false) {
                 primary = Some(provider_item);

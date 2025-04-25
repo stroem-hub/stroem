@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::time;
-use anyhow::{anyhow, bail};
+use anyhow::{anyhow, bail, Error};
 use async_trait::async_trait;
 use axum::routing::{get, post};
 use serde_json::{json, Value};
@@ -9,18 +9,28 @@ use axum::{
     http::{header, HeaderMap, HeaderValue, Response, StatusCode},
     Json, Router
 };
-use axum::extract::FromRequestParts;
+use axum::extract::{FromRequestParts, Query};
 use axum::http::request::Parts;
 use axum::response::IntoResponse;
 use axum_extra::extract::cookie::{Cookie, SameSite};
-use axum_extra::extract::CookieJar;
-use futures_util::future::BoxFuture;
+use axum_extra::extract::{CookieJar, Host, Scheme, SchemeMissing};
 use uuid::Uuid;
 use crate::auth::{AuthResponse, User};
 // use crate::error::ApiError;
 use crate::web::api_response::{ApiResponse, ApiError};
 use crate::web::WebState;
+use time::{Duration, };
+use serde::{Deserialize, Serialize};
+use tracing::{error, info};
 
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct OIDCResponse {
+    pub state: Option<String>,
+    pub session_state: Option<String>,
+    pub code: Option<String>,
+    pub error: Option<String>,
+    pub error_description: Option<String>
+}
 
 pub fn get_routes() -> Router<WebState> {
     Router::new()
@@ -45,8 +55,13 @@ async fn get_providers(
 async fn post_login(
     State(state): State<WebState>,
     Path(provider_id): Path<String>,
-    Json(payload): Json<HashMap<String, String>>,
+    Json(mut payload): Json<HashMap<String, String>>,
 ) -> Result<impl IntoResponse, ApiError> {
+
+    let oidc_redirect_url = state.public_url.join(&format!("/auth/{}/callback", provider_id))?;
+    info!("OIDC redirect url: {:?}", oidc_redirect_url);
+    // let oidc_redirect_url = format!("/auth/{}/callback", provider_id);
+    payload.insert("oidc_redirect_url".to_string(), oidc_redirect_url.to_string());
 
     let result = state.auth_service.authenticate_with(&provider_id, payload).await?;
 
@@ -55,18 +70,7 @@ async fn post_login(
             let jwt = state.auth_service.issue_jwt(&user.user_id, &user.email).await?;
             let refresh_token = state.auth_service.issue_refresh_token(&provider_id, &user.user_id).await?;
 
-            let cookie = Cookie::build(("refresh_token", refresh_token))
-                .http_only(true)
-                // .secure(true) // only over HTTPS!
-                .path("/")
-                .same_site(SameSite::Lax);
-                // .max_age(std::time::Duration::from_secs(30*24*60*60)); // TODO: Fix it
-
-            let mut headers = HeaderMap::new();
-            headers.insert(
-                header::SET_COOKIE,
-                HeaderValue::from_str(&cookie.to_string())?,
-            );
+            let headers = refresh_token_cookie(state.public_url.scheme() == "https", refresh_token)?;
 
             let data = json!({
                 "access_token": jwt,
@@ -84,14 +88,77 @@ async fn post_login(
     }
 }
 
+fn refresh_token_cookie(secure: bool, refresh_token: String) -> Result<HeaderMap, Error> {
+    let cookie = Cookie::build(("refresh_token", refresh_token))
+        .http_only(true)
+        .secure(secure) // only over HTTPS!
+        .path("/")
+        .same_site(SameSite::Lax);
+    // .max_age(std::time::Duration::from_secs(30*24*60*60)); // TODO: Fix it
+
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        header::SET_COOKIE,
+        HeaderValue::from_str(&cookie.to_string())?,
+    );
+    Ok(headers)
+}
+
+
+pub struct LoginError(anyhow::Error);
+impl IntoResponse for LoginError {
+    fn into_response(self) -> axum::response::Response {
+        let mut headers = HeaderMap::new();
+        headers.append(header::LOCATION, HeaderValue::from_static("/login"));
+        // , format!("Error: {}", self.0)
+        error!("LoginError: {:?}", self.0);
+        (StatusCode::TEMPORARY_REDIRECT, headers).into_response()
+    }
+}
+impl<E> From<E> for LoginError
+where
+    E: Into<anyhow::Error>,
+{
+    fn from(err: E) -> Self {
+        Self(err.into())
+    }
+}
+
 #[axum::debug_handler]
 async fn oidc_callback(
     State(state): State<WebState>,
     Path(provider_id): Path<String>,
-) -> Result<Json<Value>, ApiError> {
-    Ok(json!({
-        "success": true,
-    }).into())
+    Query(oidc_response): Query<HashMap<String, String>>,
+) -> Result<impl IntoResponse, LoginError> {
+    // http://localhost:8080/auth/allunite/callback?
+    // session_state=013a4cf2-b2be-4746-be95-9d56fb61cd47
+    // &iss=https%3A%2F%2Fauth.allunite.com%2Frealms%2Finternal
+    // &code=9c334c47-daeb-401b-bf55-07371a2724a9.013a4cf2-b2be-4746-be95-9d56fb61cd47.fbbcddfe-96c2-43c0-8b33-230f322a6c00
+    info!("oidc_response: {:?}", oidc_response);
+    if oidc_response.is_empty() {
+        error!("oidc_response empty");
+         return Err(anyhow!("OIDC call returned an empty response"))?;
+    }
+    
+    if let Some(error) = oidc_response.get("error") {
+        let error_description = oidc_response.get("error_description").unwrap();
+        error!("OIDC error: {} - {:?}", error, error_description);
+        return Err(anyhow!("OIDC call returned an error: {} ({})", error_description, error))?;
+    }
+
+    let result = state.auth_service.authenticate_with(&provider_id, oidc_response).await?;
+    match result {
+        AuthResponse::Success(user) => {
+            let refresh_token = state.auth_service.issue_refresh_token(&provider_id, &user.user_id).await?;
+            let mut headers = refresh_token_cookie(state.public_url.scheme() == "https", refresh_token)?;
+            
+            headers.append(header::LOCATION, HeaderValue::from_static("/"));
+            return Ok((StatusCode::TEMPORARY_REDIRECT, headers, "Success"));
+        }
+        _ => {}
+    }
+
+    Err(anyhow!("Error logging in"))?
 }
 
 #[axum::debug_handler]
@@ -100,14 +167,14 @@ async fn refresh_token(
     jar: CookieJar,
 ) -> Result<impl IntoResponse, ApiError> {
     let refresh_token = jar.get("refresh_token")
-        .ok_or_else(|| ApiError::unauthorized("Missing refresh token"))?
+        .ok_or_else(|| anyhow!("Missing refresh token"))?
         .value()
         .to_string();
 
     let (jwt, user) = state.auth_service
         .refresh_access_token(&refresh_token)
         .await
-        .map_err(|e| ApiError::unauthorized(&e.to_string()))?;
+        .map_err(|e| anyhow!(e.to_string()))?;
 
     Ok(ApiResponse::data(json!({
         "success": true,

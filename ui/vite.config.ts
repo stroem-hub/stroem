@@ -9,7 +9,8 @@ export default defineConfig({
 	],
 	server: {
 		proxy: {
-			'/api': 'http://localhost:8080' // Proxy API to Rust backend during dev
+			'/api': 'http://localhost:8080', // Proxy API to Rust backend during dev
+			'/auth': 'http://localhost:8080',
 		}
 	}
 });

@@ -78,7 +78,7 @@
 
 	let eventSource: EventSource | null = null;
 	function connectSse(jobId : string) {
-		eventSource = new EventSource(`/api/jobs/${jobId}/sse`);
+		eventSource = new EventSource(`/api/jobs/${jobId}/sse`, undefined, true);
 		eventSource.onopen = () => console.log(`Connected to SSE for job ${jobId}`);
 
 		eventSource.addEventListener('step_logs', (event) => {

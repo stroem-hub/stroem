@@ -9,6 +9,6 @@ export const load: PageLoad = async ({ fetch, params }) => {
 
 	return {
 		"task": res,
-		"jobs": fetch('/api/jobs?taskId=' + params.taskId).then(response => response.json()),
+		"jobs": callApi('/api/jobs?taskId=' + params.taskId, undefined, fetch).then(response => response?.json()),
 	};
 };

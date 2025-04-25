@@ -13,6 +13,7 @@ use axum::Router;
 use axum::routing::get;
 use futures::Stream;
 use mime_guess::from_path;
+use reqwest::Url;
 use rust_embed::RustEmbed;
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -47,17 +48,25 @@ pub struct WebState {
     pub log_repository: Arc<dyn LogRepository + Send + Sync>,
     pub job_channels: Arc<Mutex<HashMap<String, Sender<JobEvent>>>>,
     pub auth_service: AuthService,
+    pub public_url: Url,
 }
 
 
 impl WebState {
-    pub fn new(workspace: Arc<WorkspaceServer>, job_repository: JobRepository, log_repository: Arc<dyn LogRepository + Send + Sync>, auth: AuthService) -> Self {
+    pub fn new(
+        workspace: Arc<WorkspaceServer>,
+        job_repository: JobRepository,
+        log_repository: Arc<dyn LogRepository + Send + Sync>,
+        auth: AuthService,
+        public_url: Url,
+    ) -> Self {
         Self {
             workspace,
             job_repository,
             log_repository,
             job_channels: Arc::new(Mutex::new(HashMap::new())),
             auth_service: auth,
+            public_url,
         }
     }
 }

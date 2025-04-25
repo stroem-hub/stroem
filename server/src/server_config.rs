@@ -3,10 +3,12 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use config::{Config, Environment, File};
 use anyhow::{Context, Error, anyhow};
+use reqwest::Url;
 use strum_macros::{AsRefStr};
 
 #[derive(Debug, Deserialize)]
 pub struct ServerConfig {
+    pub public_url: Url,
     pub db: DbConfig,
     pub log_storage: LogStorageConfig,
     pub workspace: WorkspaceSourceConfig,
@@ -109,21 +111,25 @@ pub struct AuthProvider {
 pub enum AuthProviderType {
     Internal {
     },
-    OIDC { /*
-        issuer: String,
-        authorisation_url: String,
-        token_url: String,
-        userinfo_url: String,
-        logout_url: String,
+    OIDC {
+        issuer_url: String,
         client_id: String,
-        client_secret: String,
-        scopes: Vec<String>,
-    */ },
+        client_secret: Option<String>,
+        #[serde(default = "default_scopes")]
+        scopes: String,
+        #[serde(default = "default_name_claim")]
+        name_claim: String,
+        #[serde(default = "default_email_claim")]
+        email_claim: String,
+    },
     LDAP {
     },
 }
 
 fn default_id() -> String { "".to_string() }
+fn default_scopes() -> String { "openid email profile".to_string() }
+fn default_name_claim() -> String { "name".to_string() }
+fn default_email_claim() -> String { "email".to_string() }
 
 
 

@@ -83,7 +83,7 @@ async fn main() -> Result<(), Error>{
 
     let job_repo = JobRepository::new(db_pool.clone());
     let logs_repo = LogRepositoryFactory::new(&cfg.log_storage).await?;
-    let auth_service = AuthService::new(cfg.auth.clone(), db_pool.clone());
+    let auth_service = AuthService::new(cfg.auth.clone(), db_pool.clone(), cfg.public_url.clone()).await;
     auth_service.add_initial_user().await?;
 
     // Create Scheduler
@@ -91,7 +91,7 @@ async fn main() -> Result<(), Error>{
     scheduler.run().await;
 
     // Create Api
-    let state = web::WebState::new(workspace, job_repo, logs_repo, auth_service);
+    let state = web::WebState::new(workspace, job_repo, logs_repo, auth_service, cfg.public_url.clone());
     tokio::spawn(async move {
         web::run(state, "0.0.0.0:8080").await;
     });
