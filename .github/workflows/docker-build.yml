@@ -25,7 +25,7 @@ jobs:
           images: Build
 
       - name: Cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         id: cache
         with:
           path: |
@@ -35,7 +35,7 @@ jobs:
           key: cache-${{ hashFiles('Dockerfile.server', 'Dockerfile.worker') }}
 
       - name: inject cache into docker
-        uses: reproducible-containers/buildkit-cache-dance@v3.1.0
+        uses: reproducible-containers/buildkit-cache-dance@v3.1.2
         with:
           cache-map: |
             {
@@ -53,7 +53,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push server image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           cache-from: type=gha
@@ -65,7 +65,7 @@ jobs:
             ghcr.io/${{ github.repository }}/server:latest
 
       - name: Build and push worker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           cache-from: type=gha
