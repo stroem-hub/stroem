@@ -1,25 +1,23 @@
+use axum_cookie::prelude::*;
+use axum_cookie::cookie::Cookie;
 use std::collections::HashMap;
 use std::time;
-use anyhow::{anyhow, bail, Error};
-use async_trait::async_trait;
+use anyhow::{anyhow, Error};
 use axum::routing::{get, post};
 use serde_json::{json, Value};
 use axum::{
     extract::{Path, State},
-    http::{header, HeaderMap, HeaderValue, Response, StatusCode},
+    http::{header, HeaderMap, HeaderValue, StatusCode},
     Json, Router
 };
 use axum::extract::{FromRequestParts, Query};
 use axum::http::request::Parts;
 use axum::response::IntoResponse;
-use axum_extra::extract::cookie::{Cookie, SameSite};
-use axum_extra::extract::{CookieJar, Host, Scheme, SchemeMissing};
+use chrono::{DateTime, Utc};
 use uuid::Uuid;
 use crate::auth::{AuthResponse, User};
-// use crate::error::ApiError;
 use crate::web::api_response::{ApiResponse, ApiError};
 use crate::web::WebState;
-use time::{Duration, };
 use serde::{Deserialize, Serialize};
 use tracing::{error, info};
 
@@ -40,6 +38,7 @@ pub fn get_routes() -> Router<WebState> {
         .route("/api/auth/refresh", post(refresh_token))
         .route("/api/auth/logout", get(logout))
         .route("/api/auth/info", get(user_info))
+        .layer(CookieLayer::default())
 }
 
 #[axum::debug_handler]
@@ -57,15 +56,15 @@ async fn post_login(
     Path(provider_id): Path<String>,
     Json(payload): Json<HashMap<String, String>>,
 ) -> Result<impl IntoResponse, ApiError> {
-    
+
     let result = state.auth_service.authenticate_with(&provider_id, payload).await?;
 
     match result {
         AuthResponse::Success(user) => {
             let jwt = state.auth_service.issue_jwt(&user.user_id, &user.email).await?;
-            let refresh_token = state.auth_service.issue_refresh_token(&provider_id, &user.user_id).await?;
+            let (refresh_token, expiration) = state.auth_service.issue_refresh_token(&provider_id, &user.user_id).await?;
 
-            let headers = refresh_token_cookie(state.public_url.scheme() == "https", refresh_token)?;
+            let headers = refresh_token_cookie(state.public_url.scheme() == "https", refresh_token, expiration)?;
 
             let data = json!({
                 "access_token": jwt,
@@ -83,13 +82,14 @@ async fn post_login(
     }
 }
 
-fn refresh_token_cookie(secure: bool, refresh_token: String) -> Result<HeaderMap, Error> {
-    let cookie = Cookie::build(("refresh_token", refresh_token))
+fn refresh_token_cookie(secure: bool, refresh_token: String, expiration: DateTime<Utc>) -> Result<HeaderMap, Error> {
+    let cookie = Cookie::builder("refresh_token", refresh_token)
         .http_only(true)
         .secure(secure) // only over HTTPS!
         .path("/")
-        .same_site(SameSite::Lax);
-    // .max_age(std::time::Duration::from_secs(30*24*60*60)); // TODO: Fix it
+        .same_site(SameSite::Lax)
+        .max_age((expiration - Utc::now()).to_std()?)
+        .build();
 
     let mut headers = HeaderMap::new();
     headers.insert(
@@ -144,8 +144,8 @@ async fn oidc_callback(
     let result = state.auth_service.authenticate_with(&provider_id, oidc_response).await?;
     match result {
         AuthResponse::Success(user) => {
-            let refresh_token = state.auth_service.issue_refresh_token(&provider_id, &user.user_id).await?;
-            let mut headers = refresh_token_cookie(state.public_url.scheme() == "https", refresh_token)?;
+            let (refresh_token, expiration) = state.auth_service.issue_refresh_token(&provider_id, &user.user_id).await?;
+            let mut headers = refresh_token_cookie(state.public_url.scheme() == "https", refresh_token, expiration)?;
             
             headers.append(header::LOCATION, HeaderValue::from_static("/"));
             return Ok((StatusCode::TEMPORARY_REDIRECT, headers, "Success"));
@@ -159,7 +159,7 @@ async fn oidc_callback(
 #[axum::debug_handler]
 async fn refresh_token(
     State(state): State<WebState>,
-    jar: CookieJar,
+    jar: CookieManager,
 ) -> Result<impl IntoResponse, ApiError> {
     let refresh_token = jar.get("refresh_token")
         .ok_or_else(|| anyhow!("Missing refresh token"))?
@@ -197,11 +197,12 @@ async fn logout(
     state.auth_service.logout_user(&user.user_id).await?;
 
     // Clear the refresh_token cookie
-    let mut cookie = Cookie::build(("refresh_token", ""))
+    let mut cookie = Cookie::builder("refresh_token", "")
         .http_only(true)
         .path("/")
-        .same_site(SameSite::Lax);
-        // .max_age(time::Duration::seconds(0)); // TODO: Fix it
+        .same_site(SameSite::Lax)
+        .max_age(std::time::Duration::from_secs(0))
+        .build();
 
     let mut headers = HeaderMap::new();
     headers.insert(

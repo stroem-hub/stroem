@@ -11,13 +11,12 @@ use async_trait::async_trait;
 use serde_json::{json, Value};
 use sqlx::{PgPool, Row};
 use uuid::Uuid;
-use chrono::{Utc, Duration, DateTime};
+use chrono::{Utc, DateTime};
 use jsonwebtoken::{encode, Header, EncodingKey, DecodingKey, Validation, decode};
-use tracing::log::kv::Source;
 use crate::auth::internal::{hash_password, AuthProviderInternal};
 use crate::auth::oidc::AuthProviderOIDC;
 use crate::server_config::{AuthConfig, AuthProviderType};
-use sha3::{Digest, Sha3_256};
+use sha3::Sha3_256;
 use hmac::{Hmac, Mac};
 use reqwest::Url;
 use tracing::{debug, info, warn};
@@ -27,13 +26,6 @@ pub struct User {
     pub user_id: Uuid,
     pub name: Option<String>,
     pub email: String,
-}
-
-#[derive(Deserialize)]
-struct SignupPayload {
-    email: String,
-    #[serde(default)]
-    password: Option<String>,
 }
 
 #[derive(Clone)]
@@ -48,7 +40,7 @@ impl AuthService {
     pub async fn new(config: AuthConfig, pool: PgPool, public_url: Url) -> Self {
         let mut providers = HashMap::new();
         for (id, provider) in &config.providers {
-            if !provider.enabled.unwrap_or(true) {
+            if !provider.enabled {
                 continue;
             }
 
@@ -87,7 +79,7 @@ impl AuthService {
         let mut others = Vec::new();
 
         for (id, provider) in &self.config.providers {
-            if !provider.enabled.unwrap_or(true) {
+            if !provider.enabled {
                 continue;
             }
 
@@ -98,7 +90,7 @@ impl AuthService {
                 "name": provider.name.clone().unwrap_or(id.clone()),
             });
 
-            if provider.primary.unwrap_or(false) {
+            if provider.primary {
                 primary = Some(provider_item);
             } else {
                 others.push(provider_item);
@@ -117,29 +109,11 @@ impl AuthService {
         let provider = self.providers.get(id)
             .ok_or_else(|| anyhow::anyhow!("Auth method not found"))?;
 
-        let auto_signup = self.config.auto_signup.unwrap_or(false);
+        let auto_signup = self.config.auto_signup;
         info!("Auto signup: {}", auto_signup);
         let auth_response = provider.authenticate(&payload, auto_signup).await?;
         
         Ok(auth_response)
-    }
-
-
-    pub async fn add_user(&self, email: &str, name: Option<&str>, password: Option<&str>) -> Result<(Uuid), Error> {
-        let mut password_hash: Option<String> = None;
-        if let Some(password) = password {
-            password_hash = Some(hash_password(password)?);
-        }
-        let user_id  = Uuid::new_v4();
-        sqlx::query(
-            "INSERT INTO \"user\" (user_id, name, email, password_hash) VALUES ($1, $2, $3, $4)")
-            .bind(&user_id)
-            .bind(name)
-            .bind(email)
-            .bind(password_hash)
-            .execute(&self.pool)
-            .await?;
-        Ok(user_id)
     }
 
     pub async fn add_initial_user(&self) -> Result<(), Error> {
@@ -158,14 +132,14 @@ impl AuthService {
             return Ok(());
         };
 
-        let user_id = self.add_user(
+        let provider = self.providers.get(&config.provider_id)
+            .ok_or_else(|| anyhow::anyhow!("Auth provider '{}' not found", config.provider_id))?;
+
+        let user_id = provider.add_user(
             &config.email,
             config.name.as_deref(),
             config.password.as_deref(),
         ).await?;
-
-        let provider = self.providers.get(&config.provider_id)
-            .ok_or_else(|| anyhow::anyhow!("Auth provider '{}' not found", config.provider_id))?;
 
         provider.create_link(&config.provider_id, &user_id, None).await?;
 
@@ -191,7 +165,7 @@ impl AuthService {
         let claims = Claims {
             sub: user_id.to_string(),
             email: email.clone(),
-            exp: (Utc::now() + Duration::minutes(15)).timestamp() as usize,
+            exp: (Utc::now() + self.config.jwt_expiration).timestamp() as usize,
         };
         let jwt = encode(
             &Header::default(),
@@ -210,10 +184,10 @@ impl AuthService {
         Ok(token_data.claims)
     }
     
-    pub async fn issue_refresh_token(&self, auth_id: &str, user_id: &Uuid) -> Result<String, Error> {
+    pub async fn issue_refresh_token(&self, auth_id: &str, user_id: &Uuid) -> Result<(String, DateTime<Utc>), Error> {
         let refresh_token = Uuid::new_v4().to_string();
         let refresh_hash = hash_token(&refresh_token, &self.config.refresh_token_secret)?;
-        let expires_at = Utc::now() + Duration::days(30);
+        let expires_at = Utc::now() + self.config.refresh_token_expiration;
 
         sqlx::query(
             "INSERT INTO refresh_token (user_id, auth_id, token_hash, expires_at)
@@ -227,7 +201,7 @@ impl AuthService {
             .execute(&self.pool)
             .await?;
 
-        Ok(refresh_token)
+        Ok((refresh_token, expires_at))
     }
     pub async fn refresh_access_token(
         &self,
@@ -298,7 +272,7 @@ pub trait AuthProviderImpl: Send + Sync {
         Ok(())
     }
 
-    async fn add_user(&self, email: &str, name: Option<&str>, password: Option<&str>) -> Result<(Uuid), Error> {
+    async fn add_user(&self, email: &str, name: Option<&str>, password: Option<&str>) -> Result<Uuid, Error> {
         let mut password_hash: Option<String> = None;
         if let Some(password) = password {
             password_hash = Some(hash_password(password)?);

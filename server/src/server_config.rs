@@ -4,7 +4,9 @@ use std::path::PathBuf;
 use config::{Config, Environment, File};
 use anyhow::{Context, Error, anyhow};
 use reqwest::Url;
-use strum_macros::{AsRefStr};
+use strum::{AsRefStr};
+use std::time::Duration;
+use duration_str::deserialize_duration;
 
 #[derive(Debug, Deserialize)]
 pub struct ServerConfig {
@@ -18,7 +20,8 @@ pub struct ServerConfig {
 #[derive(Debug, Deserialize)]
 pub struct DbConfig {
     pub host: String,
-    pub port: Option<u16>,
+    #[serde(default = "default_db_port")]
+    pub port: u16,
     pub database: String,
     pub username: String,
     pub password: String,
@@ -60,8 +63,10 @@ pub enum WorkspaceSourceType {
     Folder {},
     Git {
         url: String,
-        branch: Option<String>, // Defaults to "main"
-        poll_interval: Option<u64>, // Seconds, defaults to 60
+        #[serde(default = "default_git_branch")]
+        branch: String,
+        #[serde(default="default_git_poll_interval", deserialize_with = "deserialize_duration")]
+        poll_interval: Duration,
         auth: Option<GitAuth>,
     },
 }
@@ -77,10 +82,13 @@ pub struct GitAuth {
 #[derive(Debug, Deserialize, Clone)]
 pub struct AuthConfig {
     pub jwt_secret: String,
-    pub jwt_expiration: Option<u64>,
+    #[serde(default="default_jwt_expiration", deserialize_with = "deserialize_duration")]
+    pub jwt_expiration: Duration,
     pub refresh_token_secret: String,
-    pub refresh_token_expiration: Option<u64>,
-    pub auto_signup: Option<bool>,
+    #[serde(default="default_refresh_token_expiration", deserialize_with = "deserialize_duration")]
+    pub refresh_token_expiration: Duration,
+    #[serde(default = "default_false")]
+    pub auto_signup: bool,
     pub providers: HashMap<String, AuthProvider>,
     pub initial_user: Option<AuthInitialUser>
 }
@@ -97,8 +105,10 @@ pub struct AuthInitialUser {
 pub struct AuthProvider {
     #[serde(skip_deserializing, default = "default_id")]
     pub id: String,
-    pub enabled: Option<bool>,
-    pub primary: Option<bool>,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default = "default_false")]
+    pub primary: bool,
     pub name: Option<String>,
 
     #[serde(flatten)]
@@ -127,9 +137,20 @@ pub enum AuthProviderType {
 }
 
 fn default_id() -> String { "".to_string() }
+
+fn default_true() -> bool { true }
+fn default_false() -> bool { false }
+
+fn default_db_port() -> u16 { 5432 }
+
+fn default_git_branch() -> String { "main".to_string() }
+fn default_git_poll_interval() -> Duration { Duration::from_secs(60) }
 fn default_scopes() -> String { "openid email profile".to_string() }
 fn default_name_claim() -> String { "name".to_string() }
 fn default_email_claim() -> String { "email".to_string() }
+
+fn default_jwt_expiration() -> Duration { Duration::from_secs(15*60) }
+fn default_refresh_token_expiration() -> Duration { Duration::from_secs(30 * 24 * 3600) }
 
 
 

@@ -2,15 +2,14 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
-use anyhow::{anyhow, Error};
+use anyhow::Error;
 use blake2::{Blake2b512, Digest};
-use globwalker::GlobWalkerBuilder;
 use notify::{RecommendedWatcher, RecursiveMode, Watcher, Config as NotifyConfig};
-use tracing::{debug, error, info};
+use tracing::{debug, error};
 use crate::workspace_source::WorkspaceSource;
 use tokio::sync::mpsc;
 use tokio::time;
-use tokio::time::{sleep, Instant};
+use tokio::time::Instant;
 use stroem_common::walk_workspace_files;
 
 pub struct WorkspaceSourceFolder {
@@ -119,10 +118,6 @@ impl WorkspaceSource for WorkspaceSourceFolder {
                         last_event_time = Instant::now();
                    }
            }}
-
-            loop {
-                sleep(Duration::from_secs(5)).await;
-            }
         });
 
         /*

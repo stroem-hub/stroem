@@ -26,4 +26,3 @@ upon = { workspace = true }
 notify = {workspace = true}
 async-trait = { workspace = true }
 strum = { workspace = true}
-strum_macros = { workspace = true }

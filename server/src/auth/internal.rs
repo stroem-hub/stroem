@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 use uuid::Uuid;
-use anyhow::{Error, bail, anyhow};
+use anyhow::{Error, anyhow};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use sqlx::{PgPool, Row};
 use crate::auth::{AuthProviderImpl, AuthResponse, User};
 use argon2::{

@@ -6,7 +6,6 @@ use git::WorkspaceSourceGit;
 
 use std::sync::Arc;
 use anyhow::Error;
-use crate::repository::LogRepository;
 use crate::server_config::{WorkspaceSourceConfig, WorkspaceSourceType};
 
 pub trait WorkspaceSource: Send + Sync {

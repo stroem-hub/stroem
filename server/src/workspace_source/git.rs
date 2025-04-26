@@ -1,8 +1,6 @@
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
-use std::fs;
-use anyhow::{bail, Context, Error};
-use futures_util::future::err;
+use anyhow::{Context, Error};
 use git2::{Cred, FetchOptions, RemoteCallbacks, Repository, ResetType, Oid};
 use tokio::time::{sleep, Duration};
 use tracing::{debug, error};
@@ -13,13 +11,13 @@ pub struct WorkspaceSourceGit {
     pub path: PathBuf,
     pub revision: Arc<RwLock<Option<String>>>,
     pub url: String,
-    pub branch: Option<String>, // Defaults to "main"
-    pub poll_interval: Option<u64>, // Seconds, defaults to 60
+    pub branch: String,
+    pub poll_interval: Duration,
     pub auth: Option<GitAuth>,
 }
 
 impl WorkspaceSourceGit {
-    pub fn new(path: PathBuf, url: String, branch: Option<String>, poll_interval: Option<u64>, auth: Option<GitAuth>) -> Self {
+    pub fn new(path: PathBuf, url: String, branch: String, poll_interval: Duration, auth: Option<GitAuth>) -> Self {
         Self {
             path,
             revision: Arc::new(RwLock::new(None)),
@@ -34,16 +32,14 @@ impl WorkspaceSourceGit {
         let repo = Repository::open(&self.path)?;
         let mut fetch_options = FetchOptions::new();
         self.configure_git_callbacks(&mut fetch_options).context("Failed to configure git config")?;
-
-        let binding = "main".to_string();
-        let branch = self.branch.as_ref().unwrap_or(&binding);
+        
 
         let mut remote = repo.find_remote("origin")?;
-        remote.fetch(&[branch], Some(&mut fetch_options), None)
+        remote.fetch(&[&self.branch], Some(&mut fetch_options), None)
             .context("Failed to fetch latest changes")?;
 
         let fetch_head = repo
-            .find_reference(&format!("refs/remotes/origin/{}", branch))
+            .find_reference(&format!("refs/remotes/origin/{}", &self.branch))
             .context("Failed to find fetched branch reference")?;
         let target = fetch_head
             .target()
@@ -54,35 +50,32 @@ impl WorkspaceSourceGit {
 
         repo.reset(target_commit.as_object(), ResetType::Hard, None)
             .context("Failed to reset repository to latest commit")?;
-        repo.set_head(&format!("refs/heads/{}", branch))
+        repo.set_head(&format!("refs/heads/{}", &self.branch))
             .context("Failed to set HEAD to the branch")?;
         repo.checkout_head(None)
             .context("Failed to checkout HEAD")?;
 
-        debug!("Repository updated to commit {} on branch '{}'.", target, branch);
+        debug!("Repository updated to commit {} on branch '{}'.", target, &self.branch);
         Ok(target)
     }
 
     fn clone_repo(&self) -> Result<Oid, Error> {
-        let binding = "main".to_string();
-        let branch = self.branch.as_ref().unwrap_or(&binding);
-
         let mut fetch_options = FetchOptions::new();
         self.configure_git_callbacks(&mut fetch_options).context("Failed to configure git config")?;
 
         let mut builder = git2::build::RepoBuilder::new();
-        builder.branch(branch);
+        builder.branch(&self.branch);
         builder.fetch_options(fetch_options);
         let repo = builder.clone(self.url.as_str(), self.path.as_path())
             .context("Failed to clone repository")?;
 
         // Checkout the branch
         let obj = repo
-            .revparse_single(&format!("refs/remotes/origin/{}", branch))
+            .revparse_single(&format!("refs/remotes/origin/{}", &self.branch))
             .context("Failed to find branch reference")?;
         repo.checkout_tree(&obj, None)
             .context("Failed to checkout branch")?;
-        repo.set_head(&format!("refs/heads/{}", branch))
+        repo.set_head(&format!("refs/heads/{}", &self.branch))
             .context("Failed to set HEAD to the branch")?;
 
         // Get the commit hash (Oid) of the HEAD
@@ -94,7 +87,7 @@ impl WorkspaceSourceGit {
 
         drop(obj);
 
-        debug!("Repository cloned and checked out to commit {} on branch '{}'.", commit_hash, branch);
+        debug!("Repository cloned and checked out to commit {} on branch '{}'.", commit_hash, &self.branch);
         Ok(commit_hash)
     }
 
@@ -179,8 +172,6 @@ impl WorkspaceSource for WorkspaceSourceGit {
 
     fn watch(self: Arc<Self>, callback: Box<dyn Fn() + Send + Sync>) -> Result<(), Error> {
         tokio::spawn(async move {
-            let workspace_source = self.clone();
-            let interval = Duration::from_secs(self.poll_interval.unwrap_or(60));
             let mut last_commit: Option<Oid> = None;
             loop {
                 debug!("Watching for updates");
@@ -199,8 +190,8 @@ impl WorkspaceSource for WorkspaceSourceGit {
                 }
                 last_commit = commit_hash;
 
-                debug!("Sleeping for {:?}", interval);
-                sleep(interval).await;
+                debug!("Sleeping for {:?}", self.poll_interval);
+                sleep(self.poll_interval).await;
             }
         });
         Ok(())

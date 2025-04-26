@@ -1,4 +1,3 @@
-use aws_config::defaults;
 use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use serde_json::{json, Value};
@@ -76,15 +75,6 @@ impl ApiError {
     pub fn not_found(msg: &str) -> Self {
         Self {
             status: StatusCode::NOT_FOUND,
-            success: false,
-            error: Some(anyhow::anyhow!(msg.to_string())),
-            ..Default::default()
-        }
-    }
-
-    pub fn bad_request(msg: &str) -> Self {
-        Self {
-            status: StatusCode::BAD_REQUEST,
             success: false,
             error: Some(anyhow::anyhow!(msg.to_string())),
             ..Default::default()

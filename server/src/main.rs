@@ -1,16 +1,11 @@
 use std::fs::create_dir_all;
-use std::ops::DerefMut;
 // workflow-server/src/main.rs
 use clap::Parser;
-use tracing::{error, info, Level};
+use tracing::{info, Level};
 use tracing_subscriber;
 use tokio::signal;
 use std::path::PathBuf;
-use config::{Config, Environment, File};
-use anyhow::{bail, Context, Error};
-use deadpool_postgres;
-use tokio_postgres::NoTls;
-use refinery::embed_migrations;
+use anyhow::Error;
 use sqlx::postgres::PgPoolOptions;
 use sqlx::migrate::Migrator;
 
@@ -24,14 +19,11 @@ mod workspace_source;
 mod web;
 mod auth;
 
-use stroem_common::JobRequest;
-use stroem_common::workflows_configuration::WorkflowsConfiguration;
 use workspace_server::WorkspaceServer;
 use scheduler::Scheduler;
 use repository::JobRepository;
 use crate::repository::LogRepositoryFactory;
-use std::sync::{Arc, RwLock};
-use tracing_subscriber::util::SubscriberInitExt;
+use std::sync::Arc;
 use crate::auth::{AuthService};
 
 #[derive(Parser, Debug)]
@@ -59,8 +51,8 @@ async fn main() -> Result<(), Error>{
     let db_pool = PgPoolOptions::new()
         .max_connections(5) // Adjust as needed, default max connections
         .connect(&format!(
-            "postgres://{}:{}@{}/{}",
-            cfg.db.username, cfg.db.password, cfg.db.host, cfg.db.database
+            "postgres://{}:{}@{}:{}/{}",
+            cfg.db.username, cfg.db.password, cfg.db.host, cfg.db.port, cfg.db.database
         ))
         .await?;
 

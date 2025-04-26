@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing::{debug, error};
 use std::process::Command;
-use strum_macros::{AsRefStr};
+use strum::{AsRefStr};
 
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
