@@ -26,8 +26,12 @@
 - [ ] Basic UI for viewing tasks
 - [ ] Basic UI for viewing task details
 - [X] Basic UI for starting the task
-- [ ] Auth using internal email/pass
-- [ ] OIDC2 auth
+- [X] Auth using internal email/pass
+- [X] OIDC2 auth
+- [ ] Users manager
+- [ ] Users Groups, Roles
+- [ ] Defaults in the config
+- [ ] Parse durations (30d, 30m etc) parse_duration
 - [ ] LDAP auth
 - [ ] key-value storage
 - [ ] allow non existent keys for templating
