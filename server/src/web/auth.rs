@@ -55,14 +55,9 @@ async fn get_providers(
 async fn post_login(
     State(state): State<WebState>,
     Path(provider_id): Path<String>,
-    Json(mut payload): Json<HashMap<String, String>>,
+    Json(payload): Json<HashMap<String, String>>,
 ) -> Result<impl IntoResponse, ApiError> {
-
-    let oidc_redirect_url = state.public_url.join(&format!("/auth/{}/callback", provider_id))?;
-    info!("OIDC redirect url: {:?}", oidc_redirect_url);
-    // let oidc_redirect_url = format!("/auth/{}/callback", provider_id);
-    payload.insert("oidc_redirect_url".to_string(), oidc_redirect_url.to_string());
-
+    
     let result = state.auth_service.authenticate_with(&provider_id, payload).await?;
 
     match result {

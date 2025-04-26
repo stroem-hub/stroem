@@ -41,7 +41,7 @@ impl AuthProviderImpl for AuthProviderInternal {
         &self.pool
     }
 
-    async fn authenticate(&self, payload: &HashMap<String, String>) -> Result<AuthResponse, Error> {
+    async fn authenticate(&self, payload: &HashMap<String, String>, auto_signup: bool) -> Result<AuthResponse, Error> {
         let email = match payload.get("email") {
             Some(e) if !e.is_empty() => e,
             _ => return Ok(AuthResponse::WrongCredentials),
@@ -76,6 +76,17 @@ impl AuthProviderImpl for AuthProviderInternal {
                 Ok(AuthResponse::Success(user))
             }
             None => {
+                if auto_signup {
+                    // Add user
+                    let user_id = self.add_user(&email, None, Some(password)).await?;
+                    let user = User {
+                        user_id,
+                        name: None,
+                        email: email.to_string(),
+                    };
+                    self.create_link(&self.id, &user.user_id, None).await?;
+                    return Ok(AuthResponse::Success(user));
+                }
                 Ok(AuthResponse::UserNotFound)
             }
         }

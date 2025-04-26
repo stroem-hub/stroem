@@ -117,28 +117,10 @@ impl AuthService {
         let provider = self.providers.get(id)
             .ok_or_else(|| anyhow::anyhow!("Auth method not found"))?;
 
-        let auth_response = provider.authenticate(&payload).await?;
-
-        if let AuthResponse::UserNotFound = auth_response {
-            if self.config.auth_signup.unwrap_or(false) {
-                let email = match payload.get("email") {
-                    Some(e) => e,
-                    None => bail!("Missing 'email' in payload"),
-                };
-                let password = payload.get("password").map(String::as_str);
-
-                // Add user
-                let user_id = self.add_user(&email, None, password).await?;
-                let user = User {
-                    user_id,
-                    name: None,
-                    email: email.to_string(),
-                };
-                provider.create_link(id, &user.user_id, None).await?;
-                return Ok(AuthResponse::Success(user));
-            }
-        }
-
+        let auto_signup = self.config.auto_signup.unwrap_or(false);
+        info!("Auto signup: {}", auto_signup);
+        let auth_response = provider.authenticate(&payload, auto_signup).await?;
+        
         Ok(auth_response)
     }
 
@@ -303,8 +285,7 @@ pub struct Claims {
 #[async_trait]
 pub trait AuthProviderImpl: Send + Sync {
     fn get_pool(&self) -> &PgPool;
-    async fn authenticate(&self, payload: &HashMap<String, String>) -> Result<AuthResponse, Error>;
-    // async fn add_user(&self, name: Option<String>, email: String, password: Option<String>) -> Result<Uuid, Error>;
+    async fn authenticate(&self, payload: &HashMap<String, String>, auto_signup: bool) -> Result<AuthResponse, Error>;
     async fn create_link(&self, auth_id: &str, user_id: &Uuid, identifier: Option<&str>) -> Result<(), Error> {
         sqlx::query(
             "INSERT INTO user_auth_link (user_id, auth_id, identifier) VALUES ($1, $2, $3)
@@ -315,6 +296,23 @@ pub trait AuthProviderImpl: Send + Sync {
             .execute(self.get_pool())
             .await?;
         Ok(())
+    }
+
+    async fn add_user(&self, email: &str, name: Option<&str>, password: Option<&str>) -> Result<(Uuid), Error> {
+        let mut password_hash: Option<String> = None;
+        if let Some(password) = password {
+            password_hash = Some(hash_password(password)?);
+        }
+        let user_id  = Uuid::new_v4();
+        sqlx::query(
+            "INSERT INTO \"user\" (user_id, name, email, password_hash) VALUES ($1, $2, $3, $4)")
+            .bind(&user_id)
+            .bind(name)
+            .bind(email)
+            .bind(password_hash)
+            .execute(self.get_pool())
+            .await?;
+        Ok(user_id)
     }
 }
 

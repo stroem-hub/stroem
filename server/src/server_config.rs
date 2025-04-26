@@ -80,7 +80,7 @@ pub struct AuthConfig {
     pub jwt_expiration: Option<u64>,
     pub refresh_token_secret: String,
     pub refresh_token_expiration: Option<u64>,
-    pub auth_signup: Option<bool>,
+    pub auto_signup: Option<bool>,
     pub providers: HashMap<String, AuthProvider>,
     pub initial_user: Option<AuthInitialUser>
 }

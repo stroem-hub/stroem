@@ -40,7 +40,7 @@
         // OIDC redirect
         const redirectUrl = body.data?.redirect;
         if (redirectUrl) {
-          window.location.href = redirectUrl;
+          window.location = redirectUrl;
           return
         }
 
@@ -107,10 +107,7 @@
         class="w-full mb-4 transition-transform transform hover:scale-105"
         on:click={() => loginOIDC(provider.id)}
       >
-        <svg class="w-5 h-5 mr-2" viewBox="0 0 24 24">
-          <path fill="currentColor" d="M12.545,10.917v3.666h5.47c-.222,1.167-.834,2.167-1.834,2.917l2.917,2.25c1.667-1.5,2.667-3.667,2.667-6.167c0-.583-.083-1.167-.25-1.666h-8.97zm-1.666-2.5H7.212v8.334h3.667v-8.334zm-5-3.334H1.545v13.334h4.334V5.083zm6.666-1.666v1.666h3.334v1.666h-3.334v1.666h5v-5h-5z"/>
-        </svg>
-        Login with Google
+        Login with {provider.name}
       </Button>
     {/if}
         </div>
