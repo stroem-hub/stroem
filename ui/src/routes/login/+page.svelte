@@ -40,7 +40,7 @@
         // OIDC redirect
         const redirectUrl = body.data?.redirect;
         if (redirectUrl) {
-          window.location = redirectUrl;
+          window.location.replace(redirectUrl);
           return
         }
 
