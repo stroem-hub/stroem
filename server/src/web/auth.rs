@@ -1,7 +1,6 @@
 use axum_cookie::prelude::*;
 use axum_cookie::cookie::Cookie;
 use std::collections::HashMap;
-use std::time;
 use anyhow::{anyhow, Error};
 use axum::routing::{get, post};
 use serde_json::{json, Value};
@@ -180,7 +179,7 @@ async fn refresh_token(
 
 #[axum::debug_handler]
 async fn user_info(
-    State(state): State<WebState>,
+    State(_state): State<WebState>,
     user: User,
 ) -> Result<ApiResponse, ApiError> {
     Ok(ApiResponse::data(json!({
@@ -197,7 +196,7 @@ async fn logout(
     state.auth_service.logout_user(&user.user_id).await?;
 
     // Clear the refresh_token cookie
-    let mut cookie = Cookie::builder("refresh_token", "")
+    let cookie = Cookie::builder("refresh_token", "")
         .http_only(true)
         .path("/")
         .same_site(SameSite::Lax)

@@ -28,7 +28,7 @@ use anyhow::{anyhow, Error};
 use serde_json::{Value, json};
 use crate::workspace_server::WorkspaceServer;
 use crate::repository::{JobRepository, LogRepository};
-use crate::error::{ApiError, AppError};
+use crate::error::AppError;
 use std::sync::{Arc, RwLock, Mutex};
 use rust_embed::RustEmbed;
 use mime_guess::from_path;

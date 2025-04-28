@@ -34,7 +34,6 @@ mod api_response;
 use worker::get_routes as worker_get_routes;
 use auth::get_routes as auth_get_routes;
 use crate::auth::AuthService;
-use crate::error::ApiError;
 
 #[derive(RustEmbed)]
 #[folder = "static/"]

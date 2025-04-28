@@ -30,7 +30,6 @@ pub struct User {
 
 #[derive(Clone)]
 pub struct AuthService {
-    public_url: Url,
     config: AuthConfig,
     pool: PgPool,
     providers: HashMap<String, Arc<dyn AuthProviderImpl>>
@@ -71,7 +70,7 @@ impl AuthService {
         }
 
 
-        Self { public_url, config, pool, providers }
+        Self { config, pool, providers }
     }
 
     pub fn get_providers(&self) -> Vec<Value> {

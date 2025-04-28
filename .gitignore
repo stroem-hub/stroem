@@ -5,6 +5,7 @@ files/logs-cache
 files/workspace/results
 files/logs
 .idea
+.vscode
 data
 .DS_Store
 server/static
