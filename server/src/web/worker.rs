@@ -39,6 +39,12 @@ use std::convert::Infallible;
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt;
 use std::{pin::Pin, task::{Context, Poll}};
+use axum::extract::FromRequestParts;
+use axum::http::header;
+use axum::http::request::Parts;
+use uuid::Uuid;
+use crate::auth::User;
+use crate::web::api_response::ApiError;
 use crate::web::WebState;
 
 pub fn get_routes() -> Router<WebState> {
@@ -66,6 +72,7 @@ async fn enqueue_job(
 async fn get_next_job(
     State(api): State<WebState>,
     Query(params): Query<HashMap<String, String>>,
+    _worker: Worker,
 ) -> Result<Json<Option<JobRequest>>, AppError> {
     let worker_id = params.get("worker_id").unwrap();
     let job = api.job_repository.get_next_job(worker_id).await?;
@@ -77,6 +84,7 @@ async fn update_job_start(
     State(api): State<WebState>,
     Path(job_id): Path<String>,
     Query(params): Query<HashMap<String, String>>,
+    _worker: Worker,
     Json(payload): Json<Value>,
 ) -> Result<(), AppError> {
     let worker_id = params.get("worker_id").unwrap();
@@ -103,6 +111,7 @@ async fn update_job_result(
     State(api): State<WebState>,
     Path(job_id): Path<String>,
     Query(params): Query<HashMap<String, String>>,
+    _worker: Worker,
     Json(payload): Json<JobResult>,
 ) -> Result<(), AppError> {
     debug!("Payload: {:?}", payload);
@@ -129,6 +138,7 @@ async fn update_step_start(
     State(api): State<WebState>,
     Path((job_id, step_name)): Path<(String, String)>,
     Query(params): Query<HashMap<String, String>>,
+    _worker: Worker,
     Json(payload): Json<Value>,
 ) -> Result<(), AppError> {
     let worker_id = params.get("worker_id").unwrap();
@@ -154,6 +164,7 @@ async fn update_step_result(
     State(api): State<WebState>,
     Path((job_id, step_name)): Path<(String, String)>,
     Query(params): Query<HashMap<String, String>>,
+    _worker: Worker,
     Json(payload): Json<JobResult>,
 ) -> Result<(), AppError> {
     let worker_id = params.get("worker_id").unwrap();
@@ -174,6 +185,7 @@ async fn update_step_result(
 async fn save_job_logs(
     State(api): State<WebState>,
     Path(job_id): Path<String>,
+    _worker: Worker,
     Json(logs): Json<Vec<LogEntry>>,
 ) -> Result<(), AppError> {
     api.log_repository.save_logs(&job_id, None, &logs).await?;
@@ -189,6 +201,7 @@ async fn save_job_logs(
 async fn save_step_logs(
     State(api): State<WebState>,
     Path((job_id, step_name)): Path<(String, String)>,
+    _worker: Worker,
     Json(logs): Json<Vec<LogEntry>>,
 ) -> Result<(), AppError> {
     api.log_repository.save_logs(&job_id, Some(&step_name), &logs).await?;
@@ -205,6 +218,7 @@ async fn save_step_logs(
 #[axum::debug_handler]
 async fn serve_workspace_tarball(
     State(mut api): State<WebState>,
+    _worker: Worker,
 ) -> Result<impl IntoResponse, AppError> {
 
     let gzipped = api.workspace.build_tarball().await?;
@@ -223,4 +237,30 @@ async fn serve_workspace_tarball(
         headers,
         gzipped,
     ))
+}
+
+pub struct Worker {}
+
+
+impl FromRequestParts<WebState> for Worker {
+    type Rejection = (StatusCode, &'static str);
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &WebState,
+    ) -> Result<Self, Self::Rejection> {
+        let auth_header = parts.headers.get(header::AUTHORIZATION)
+            .and_then(|value| value.to_str().ok())
+            .ok_or((StatusCode::UNAUTHORIZED, "Missing Authorization header"))?;
+
+        let token = auth_header
+            .strip_prefix("Bearer ")
+            .ok_or((StatusCode::UNAUTHORIZED, "Invalid Authorization format"))?;
+
+        if token != state.worker_token {
+            return Err((StatusCode::UNAUTHORIZED, "Invalid worker token"));
+        }
+
+        Ok(Worker{})
+    }
 }

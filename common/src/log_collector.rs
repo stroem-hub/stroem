@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use anyhow::{Error, anyhow};
 use chrono::{DateTime, Utc};
-use reqwest::Client;
+use reqwest::{header, Client};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, RwLock};
 use tokio::task::JoinHandle;
@@ -35,6 +35,7 @@ pub struct LogCollectorServer {
     server: String,
     job_id: String,
     worker_id: String,
+    token: String,
     client: Client,
     step_name: Arc<RwLock<Option<String>>>,
     buffer: Arc<RwLock<VecDeque<LogEntry>>>,
@@ -44,7 +45,7 @@ pub struct LogCollectorServer {
 }
 
 impl LogCollectorServer {
-    pub fn new(server: String, job_id: String, worker_id: String, step_name: Option<String>, buffer_size: Option<usize>) -> Self {
+    pub fn new(server: String, job_id: String, worker_id: String, token: String, step_name: Option<String>, buffer_size: Option<usize>) -> Self {
         let buffer_size = buffer_size.unwrap_or(10);
         let (sender, mut receiver) = mpsc::channel::<LogEntry>(100);
 
@@ -53,6 +54,7 @@ impl LogCollectorServer {
             server,
             job_id,
             worker_id,
+            token,
             client: Client::new(),
             step_name: Arc::new(RwLock::new(step_name)),
             buffer: Arc::new(RwLock::new(VecDeque::with_capacity(buffer_size))),
@@ -98,6 +100,7 @@ impl LogCollectorServer {
         let url = self.get_url("logs").await;
         debug!("Sending {} logs to {}", buffer.len(), url);
         let response = self.client.post(&url)
+            .header(header::AUTHORIZATION, format!("Bearer {}", self.token))
             .json(&buffer)
             .send()
             .await;
@@ -173,6 +176,7 @@ impl LogCollector for LogCollectorServer {
         let url = self.get_url("start").await;
 
         let response = self.client.post(&url)
+            .header(header::AUTHORIZATION, format!("Bearer {}", self.token))
             .json(&start_payload)
             .send()
             .await;
@@ -198,6 +202,7 @@ impl LogCollector for LogCollectorServer {
     async fn store_results(&self, result: JobResult) -> Result<(), Error>  {
         let url = self.get_url("results").await;
         let response = self.client.post(&url)
+            .header(header::AUTHORIZATION, format!("Bearer {}", self.token))
             .json(&result)
             .send()
             .await;

@@ -3,7 +3,7 @@ use clap::Parser;
 use tracing::{info, error, debug};
 use tracing_subscriber;
 use tokio::time::{self, Duration};
-use reqwest::Client;
+use reqwest::{header, Client};
 use stroem_common::{JobRequest, JobResult};
 use uuid::Uuid;
 use chrono::{Utc};
@@ -24,6 +24,8 @@ struct Args {
     verbose: bool,
     #[arg(long, default_value = "5")]
     max_runners: usize,
+    #[arg(short, long, required = true)]
+    token: String
 }
 
 #[tokio::main]
@@ -36,6 +38,7 @@ async fn main() {
 
     let client = Client::new();
     let worker_id = Uuid::new_v4().to_string();
+    let token = args.token;
     info!("Worker started with ID: {}, polling jobs from {}, max runners: {}", worker_id, args.server, args.max_runners);
 
     let semaphore = Arc::new(Semaphore::new(args.max_runners));
@@ -50,14 +53,15 @@ async fn main() {
             }
         };
 
-        match poll_job(&client, &args.server, &worker_id).await {
+        match poll_job(&client, &args.server, &worker_id, &token).await {
             Ok(Some(job)) => {
                 let client_clone = client.clone();
                 let server = args.server.clone();
                 let worker_id_clone = worker_id.clone();
+                let token_clone = token.clone();
                 tokio::spawn(async move {
                     let _permit = permit;  // Hold the permit until this task completes
-                    if let Err(e) = execute_job(&client_clone, &job, &server, &worker_id_clone).await {
+                    if let Err(e) = execute_job(&client_clone, &job, &server, &worker_id_clone, &token_clone).await {
                         error!("Failed to execute job {:?}: {}", job, e);
                     }
                 });
@@ -76,9 +80,10 @@ async fn main() {
     }
 }
 
-async fn poll_job(client: &Client, server: &str, worker_id: &str) -> Result<Option<JobRequest>, Error> {
+async fn poll_job(client: &Client, server: &str, worker_id: &str, token: &str) -> Result<Option<JobRequest>, Error> {
     let url = format!("{}/jobs/next?worker_id={}", server, worker_id);
     let response = client.get(&url)
+        .header(header::AUTHORIZATION, format!("Bearer {}", token))
         .send()
         .await?;
         // .map_err(|e| format!("Failed to poll job: {}", e))?;
@@ -93,7 +98,7 @@ async fn poll_job(client: &Client, server: &str, worker_id: &str) -> Result<Opti
     }
 }
 
-async fn execute_job(client: &Client, job: &JobRequest, server: &str, worker_id: &str) -> Result<(), Error> {
+async fn execute_job(client: &Client, job: &JobRequest, server: &str, worker_id: &str, token: &str) -> Result<(), Error> {
     let uuid = job.uuid.as_ref().unwrap();
     let start_time = Utc::now();
 
@@ -101,6 +106,7 @@ async fn execute_job(client: &Client, job: &JobRequest, server: &str, worker_id:
         server.to_string(),
         job.uuid.as_ref().unwrap().to_string(),
         worker_id.to_string(),
+        token.to_string(),
         None,
         Some(10),
     ));
@@ -113,6 +119,7 @@ async fn execute_job(client: &Client, job: &JobRequest, server: &str, worker_id:
     });
 
     client.post(format!("{}/jobs/{}/start?worker_id={}", server, uuid, worker_id))
+        .header(header::AUTHORIZATION, format!("Bearer {}", token))
         .json(&payload)
         .send()
         .await?;
@@ -135,6 +142,7 @@ async fn execute_job(client: &Client, job: &JobRequest, server: &str, worker_id:
     let url = format!("{}/jobs/{}/results?worker_id={}", server, uuid, worker_id);
     debug!("{}", url);
     let result = client.post(&url)
+        .header(header::AUTHORIZATION, format!("Bearer {}", token))
         .json(&result)
         .send()
         .await?;

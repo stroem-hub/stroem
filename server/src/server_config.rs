@@ -15,6 +15,7 @@ pub struct ServerConfig {
     pub log_storage: LogStorageConfig,
     pub workspace: WorkspaceSourceConfig,
     pub auth: AuthConfig,
+    pub worker_token: String
 }
 
 #[derive(Debug, Deserialize)]

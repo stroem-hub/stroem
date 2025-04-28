@@ -83,7 +83,7 @@ async fn main() -> Result<(), Error>{
     scheduler.run().await;
 
     // Create Api
-    let state = web::WebState::new(workspace, job_repo, logs_repo, auth_service, cfg.public_url.clone());
+    let state = web::WebState::new(workspace, job_repo, logs_repo, auth_service, cfg.public_url.clone(), cfg.worker_token.clone());
     tokio::spawn(async move {
         web::run(state, "0.0.0.0:8080").await;
     });

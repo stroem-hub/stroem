@@ -28,10 +28,11 @@
 - [X] Basic UI for starting the task
 - [X] Auth using internal email/pass
 - [X] OIDC2 auth
+- [X] Simple worker authorisation with token
 - [ ] Users manager
 - [ ] Users Groups, Roles
-- [ ] Defaults in the config
-- [ ] Parse durations (30d, 30m etc) parse_duration
+- [X] Defaults in the config
+- [X] Parse durations (30d, 30m etc)
 - [ ] LDAP auth
 - [ ] key-value storage
 - [ ] allow non existent keys for templating

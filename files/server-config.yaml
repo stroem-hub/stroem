@@ -41,3 +41,4 @@ auth:
       primary: true
 
 
+worker_token: secrettokenstring

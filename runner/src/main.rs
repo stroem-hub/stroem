@@ -26,6 +26,8 @@ struct Args {
     input: Option<String>,
     #[arg(long, required = true)]
     worker_id: String,
+    #[arg(short, long, required = true)]
+    token: String,
     #[arg(long, default_value = "/tmp/workspace")]
     workspace: String,
 }
@@ -69,6 +71,7 @@ async fn main() {
         args.server.clone(),
         args.job_id.clone(),
         args.worker_id.clone(),
+        args.token.clone(),
         None,
         Some(10)
     ));

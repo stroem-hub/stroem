@@ -48,6 +48,7 @@ pub struct WebState {
     pub job_channels: Arc<Mutex<HashMap<String, Sender<JobEvent>>>>,
     pub auth_service: AuthService,
     pub public_url: Url,
+    pub worker_token: String,
 }
 
 
@@ -58,6 +59,7 @@ impl WebState {
         log_repository: Arc<dyn LogRepository + Send + Sync>,
         auth: AuthService,
         public_url: Url,
+        worker_token: String,
     ) -> Self {
         Self {
             workspace,
@@ -66,6 +68,7 @@ impl WebState {
             job_channels: Arc::new(Mutex::new(HashMap::new())),
             auth_service: auth,
             public_url,
+            worker_token
         }
     }
 }
