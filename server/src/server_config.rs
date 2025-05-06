@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use config::{Config, Environment, File};
 use anyhow::{Context, Error, anyhow};
 use reqwest::Url;
-use strum::{AsRefStr};
+use strum::AsRefStr;
 use std::time::Duration;
 use duration_str::deserialize_duration;
 
@@ -160,7 +160,7 @@ impl ServerConfig {
 
         let mut cfg_builder = Config::builder();
         cfg_builder = cfg_builder.add_source(File::with_name(path.to_str().unwrap()));
-        cfg_builder = cfg_builder.add_source(Environment::with_prefix("STROEM").separator("__"));
+        cfg_builder = cfg_builder.add_source(Environment::with_prefix("STROEM").separator("__").prefix_separator("__"));
         let cfg = cfg_builder.build()
             .with_context(|| format!("Failed to build config from file: {:?}", path))?;
 
