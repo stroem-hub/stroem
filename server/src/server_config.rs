@@ -160,7 +160,7 @@ impl ServerConfig {
 
         let mut cfg_builder = Config::builder();
         cfg_builder = cfg_builder.add_source(File::with_name(path.to_str().unwrap()));
-        cfg_builder = cfg_builder.add_source(Environment::with_prefix("STROEM").separator("_"));
+        cfg_builder = cfg_builder.add_source(Environment::with_prefix("STROEM").separator("__"));
         let cfg = cfg_builder.build()
             .with_context(|| format!("Failed to build config from file: {:?}", path))?;
 

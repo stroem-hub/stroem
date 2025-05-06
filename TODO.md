@@ -48,3 +48,4 @@
 - [ ] gix instead of git2
 - [ ] replace fs2 with fs4
 - [ ] Include workspaces (as libraries)
+- [ ] MCP server for integrations with LLM
