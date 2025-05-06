@@ -16,8 +16,8 @@
   let { data }: PageProps = $props();
   const providers = data.providers;
 
-  let email = '';
-  let password = '';
+  let email = $state('');
+  let password = $state('');
   const showAll = writable(false);
 
   let errorMessage = $state('');
@@ -67,7 +67,7 @@
 
 </script>
 {#if showError}
-  <Alert color="red" class="mb-4 absolute w-full" on:close={() => showError = false} dismissable>
+  <Alert color="red" class="mb-4 absolute w-full" onclose={() => showError = false} dismissable>
     <InfoCircleSolid slot="icon" class="w-5 h-5" />
     {errorMessage}
   </Alert>
@@ -97,7 +97,7 @@
       <Button
         color="blue"
         class="w-full mb-4 transition-transform transform hover:scale-105"
-        on:click={() => loginInternal(provider.id)}
+        onclick={() => loginInternal(provider.id)}
       >
         Log in
       </Button>
@@ -105,7 +105,7 @@
       <Button
         color="blue"
         class="w-full mb-4 transition-transform transform hover:scale-105"
-        on:click={() => loginOIDC(provider.id)}
+        onclick={() => loginOIDC(provider.id)}
       >
         Login with {provider.name}
       </Button>
@@ -116,7 +116,7 @@
     {#if providers.length > 1 && !$showAll}
       <Button
         class="text-blue-500 underline text-sm mt-4"
-        on:click={() => showAll.set(true)}
+        onclick={() => showAll.set(true)}
         disabled={$showAll}
       >
         Show another login options
