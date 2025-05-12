@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 stroem-common = { path = "../common" }
 axum = { version = "0.8.4", features = ["macros"] }
-tokio = { version = "1.43", features = ["full"] }
+tokio = { version = "1.45", features = ["full"] }
 serde = { version = "1.0.218", features = ["derive"] }
 serde_json = "1.0.139"
 tar = "0.4.44"
@@ -15,7 +15,7 @@ tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
 config = "0.15.8"
 uuid = { version = "1.15.0", features = ["v4"] }
-clap = { version = "4.5.31", features = ["derive"] }
+clap = { version = "4.5.38", features = ["derive"] }
 globwalker = "0.9.0"
 anyhow = "1.0.96"
 tera = "1.20.0"
