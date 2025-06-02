@@ -18,14 +18,14 @@ tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["fmt"] }
 config = "0.15.11"
 uuid = { version = "1.17.0", features = ["v4", "serde"] }
-clap = { version = "4.5.38", features = ["derive"] }
+clap = { version = "4.5.39", features = ["derive"] }
 globwalker = "0.9.0"
 anyhow = "1.0.98"
 tera = "1.20.0"
 cron = "0.15.0"
 chrono = { version = "0.4.41", features = ["serde"] }
 # chrono-tz = "0.10.3"
-reqwest = { version = "0.12.15", features = ["json", "rustls-tls"] }
+reqwest = { version = "0.12.18", features = ["json", "rustls-tls"] }
 notify = "8.0.0"
 blake2 = "0.10.6"
 fs2 = "0.4.3"
