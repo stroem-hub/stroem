@@ -13,12 +13,12 @@ tokio = { version = "1.45.1", features = ["full"] }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
 tar = "0.4.44"
-flate2 = { version = "1.1.1" }
+flate2 = { version = "1.1.2" }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["fmt"] }
 config = "0.15.11"
 uuid = { version = "1.17.0", features = ["v4", "serde"] }
-clap = { version = "4.5.38", features = ["derive"] }
+clap = { version = "4.5.40", features = ["derive"] }
 globwalker = "0.9.0"
 anyhow = "1.0.98"
 tera = "1.20.0"
@@ -30,7 +30,7 @@ notify = "8.0.0"
 blake2 = "0.10.6"
 fs2 = "0.4.3"
 sqlx = { version = "0.8.6", features = ["runtime-tokio", "tls-rustls", "postgres", "chrono", "json", "uuid"] }
-sqlx-paginated = { version = "0.2.31", features = ["postgres"] }
+sqlx-paginated = { version = "0.2.32", features = ["postgres"] }
 futures = "0.3.31"
 tokio-stream = { version = "0.1.17", features = ["io-util", "sync"] }
 regex = "1.11.1"
@@ -43,12 +43,12 @@ mime_guess = "2.0.5"
 futures-util = "0.3.31"
 strum = { version = "0.27.1", features = ["derive"] }
 # object_store = "0.12.0"
-async-compression = { version = "0.4.23", features = ["tokio", "gzip"] }
+async-compression = { version = "0.4.24", features = ["tokio", "gzip"] }
 async-tar = "0.5.0"
 tokio-util = { version = "0.7.15", features = ["compat"]  }
 tokio-tar = "0.3.1"
 aws-sdk-s3 = "1.85.0"
-aws-config = "1.6.3"
+aws-config = "1.8.0"
 argon2 = "0.5.3"
 jsonwebtoken = "9.3.1"
 sha3 = "0.10.8"
