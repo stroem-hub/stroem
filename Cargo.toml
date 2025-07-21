@@ -9,16 +9,16 @@ resolver = "2"
 [workspace.dependencies]
 axum = { version = "0.8.4", features = ["macros", "ws"] }
 axum-cookie = "0.2.3"
-tokio = { version = "1.45.1", features = ["full"] }
+tokio = { version = "1.46.1", features = ["full"] }
 serde = { version = "1.0.219", features = ["derive"] }
-serde_json = "1.0.140"
+serde_json = "1.0.141"
 tar = "0.4.44"
 flate2 = { version = "1.1.2" }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["fmt"] }
-config = "0.15.11"
+config = "0.15.13"
 uuid = { version = "1.17.0", features = ["v4", "serde"] }
-clap = { version = "4.5.40", features = ["derive"] }
+clap = { version = "4.5.41", features = ["derive"] }
 globwalker = "0.9.0"
 anyhow = "1.0.98"
 tera = "1.20.0"
@@ -41,14 +41,14 @@ async-trait = "0.1.88"
 rust-embed = "8.7.2"
 mime_guess = "2.0.5"
 futures-util = "0.3.31"
-strum = { version = "0.27.1", features = ["derive"] }
+strum = { version = "0.27.2", features = ["derive"] }
 # object_store = "0.12.0"
-async-compression = { version = "0.4.24", features = ["tokio", "gzip"] }
+async-compression = { version = "0.4.27", features = ["tokio", "gzip"] }
 async-tar = "0.5.0"
 tokio-util = { version = "0.7.15", features = ["compat"]  }
 tokio-tar = "0.3.1"
 aws-sdk-s3 = "1.85.0"
-aws-config = "1.8.0"
+aws-config = "1.8.1"
 argon2 = "0.5.3"
 jsonwebtoken = "9.3.1"
 sha3 = "0.10.8"
