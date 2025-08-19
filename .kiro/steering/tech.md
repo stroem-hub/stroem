@@ -25,14 +25,12 @@
 ## Infrastructure
 - **Database**: PostgreSQL 17 Alpine
 - **Containerization**: Docker with multi-stage builds
-- **Orchestration**: Docker Compose for local development
-- **Process Management**: Zellij layout for development workflow
 
 ## Common Commands
 
 ### Development
 ```bash
-# Start db 
+# Start db if it is not started
 docker-compose up -d postgres
 
 # Build workspace
@@ -45,7 +43,7 @@ cargo run --package stroem-server --bin stroem-server -- -v --config /Users/ala/
 cargo run --package workflow-worker --bin workflow-worker -- --verbose --server http://localhost:8080
 
 # Frontend development
-cd ui && npm run dev
+cd ui && pnpm dev
 
 # Database migrations
 # Handled automatically by server on startup
@@ -55,13 +53,13 @@ cd ui && npm run dev
 ```bash
 # Format code
 cargo fmt
-cd ui && npm run format
+cd ui && pnpm format
 
 # Lint frontend
-cd ui && npm run lint
+cd ui && pnpm lint
 
 # Type checking
-cd ui && npm run check
+cd ui && pnpm check
 ```
 
 ### Build & Deploy
@@ -71,5 +69,5 @@ docker build -f Dockerfile.server -t stroem-server .
 docker build -f Dockerfile.worker -t stroem-worker .
 
 # Build frontend for production
-cd ui && npm run build
+cd ui && pnpm build
 ```
