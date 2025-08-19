@@ -1,18 +1,12 @@
-use sqlx::{PgPool, postgres::PgRow};
+use sqlx::{PgPool};
 use sqlx::Row;
-use std::path::{Path, PathBuf};
 use tracing::{info, error, debug};
 use chrono::{DateTime, Utc};
 use serde_json::Value;
-use anyhow::{Error, anyhow, bail};
-use tokio::fs::{File, OpenOptions};
-use tokio::io::{AsyncWriteExt, BufReader, AsyncBufReadExt};
-use std::collections::HashMap;
-use fs2::FileExt;
-use tokio_stream::{self, StreamExt, wrappers::LinesStream};
-use futures::Stream;
+use anyhow::{Error, bail};
+
 use serde::{Deserialize, Serialize};
-use stroem_common::{JobRequest, JobResult, log_collector::LogEntry};
+use stroem_common::{JobRequest, JobResult};
 
 #[derive(sqlx::FromRow, Debug, Serialize, Deserialize)]
 pub struct JobStep {

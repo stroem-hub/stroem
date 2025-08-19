@@ -1,50 +1,22 @@
 use std::collections::HashMap;
 use axum::{
     extract::{
-        ws::{WebSocket, WebSocketUpgrade},
         Path, Query, State
     },
-
-    http::{StatusCode, Uri},
-    response::{IntoResponse, Response},
-    response::sse::{Event, Sse},
+    http::StatusCode,
+    response::IntoResponse,
     routing::{get, post},
-    Json, Router,
-    body::Body
+    Json, Router
 };
-use std::path::PathBuf;
-use tokio::net::TcpListener;
-use tracing::{info, error, debug};
-use stroem_common::{JobRequest, log_collector::LogEntry, JobResult};
-use tar::Builder;
-use flate2::write::GzEncoder;
-use flate2::Compression;
-use globwalker::GlobWalkerBuilder;
-use std::fs::File;
-use std::io::{Write, Cursor, Read};
-use serde::{Deserialize, Serialize};
+use tracing::{debug};
+use stroem_common::{JobRequest, JobResult, log_collector::LogEntry};
 use chrono::{DateTime, Utc};
-use anyhow::{anyhow, Error};
 use serde_json::{Value, json};
-use crate::workspace_server::WorkspaceServer;
-use crate::repository::{JobRepository, LogRepository};
 use crate::error::AppError;
-use std::sync::{Arc, RwLock, Mutex};
-use rust_embed::RustEmbed;
-use mime_guess::from_path;
-use stroem_common::workflows_configuration::Task;
-use tokio::sync::broadcast::{self, Sender};
-use futures_util::stream::Stream;
-use std::convert::Infallible;
-use tokio_stream::wrappers::BroadcastStream;
-use tokio_stream::StreamExt;
-use std::{pin::Pin, task::{Context, Poll}};
 use axum::extract::FromRequestParts;
 use axum::http::header;
 use axum::http::request::Parts;
-use uuid::Uuid;
-use crate::auth::User;
-use crate::web::api_response::ApiError;
+
 use crate::web::WebState;
 
 pub fn get_routes() -> Router<WebState> {

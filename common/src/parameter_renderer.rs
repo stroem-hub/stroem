@@ -1,7 +1,7 @@
-use std::process::Command;
-use serde_json::{Value, Map};
-use upon::Engine;
 use anyhow::{Result, anyhow};
+use serde_json::{Map, Value};
+use std::process::Command;
+use upon::Engine;
 
 pub struct ParameterRenderer {
     context: Value,
@@ -21,12 +21,11 @@ fn merge(a: &mut Value, b: &Value) {
     }
 }
 
-
 impl ParameterRenderer {
     /// Creates a new ParameterRenderer with an empty context.
     pub fn new() -> Self {
         let mut engine = Engine::new();
-        engine.add_filter("vals", |vals_ref: &str| {
+        engine.add_function("vals", |vals_ref: &str| {
             run_vals(vals_ref).unwrap_or_else(|e| {
                 eprintln!("vals filter error: {}", e);
                 "".to_string() // Return empty string on error, consistent with upon's default
@@ -63,10 +62,13 @@ impl ParameterRenderer {
     pub fn render(&self, input: Value) -> Result<Value> {
         match input {
             Value::String(template) => {
-                let compiled = self.engine.compile(&template)
+                let compiled = self
+                    .engine
+                    .compile(&template)
                     .map_err(|e| anyhow!("Failed to compile template: {}", e))?;
-                let rendered = compiled.render(&self.engine, &self.context)
-                    .to_string()  // Returns Result<String, upon::Error>
+                let rendered = compiled
+                    .render(&self.engine, &self.context)
+                    .to_string() // Returns Result<String, upon::Error>
                     .map_err(|e| anyhow!("Failed to render template: {}", e))?;
                 Ok(Value::String(rendered))
             }
@@ -78,7 +80,8 @@ impl ParameterRenderer {
                 Ok(Value::Object(rendered_map))
             }
             Value::Array(vec) => {
-                let rendered_vec: Vec<Value> = vec.into_iter()
+                let rendered_vec: Vec<Value> = vec
+                    .into_iter()
                     .map(|v| self.render(v))
                     .collect::<Result<Vec<_>>>()?;
                 Ok(Value::Array(rendered_vec))
@@ -130,7 +133,9 @@ mod tests {
     #[test]
     fn test_render() {
         let mut renderer = ParameterRenderer::new();
-        renderer.add_to_context(json!({"name": "Alice", "age": 30})).unwrap();
+        renderer
+            .add_to_context(json!({"name": "Alice", "age": 30}))
+            .unwrap();
 
         // Test string rendering with existing value
         let input = json!("Hello, {{ name }}! You are {{ age }} years old.");
@@ -151,13 +156,16 @@ mod tests {
             }
         });
         let rendered = renderer.render(input).unwrap();
-        assert_eq!(rendered, json!({
-            "greeting": "Hi, Alice",
-            "details": {
-                "age": "30",
-                "unknown": ""
-            }
-        }));
+        assert_eq!(
+            rendered,
+            json!({
+                "greeting": "Hi, Alice",
+                "details": {
+                    "age": "30",
+                    "unknown": ""
+                }
+            })
+        );
 
         // Test array
         let input = json!(["{{ name }}", "{{ age }}", "{{ missing }}"]);

@@ -1,11 +1,9 @@
 use std::path::{PathBuf};
 use tracing::{info, debug};
 use chrono::{DateTime, Duration, Utc};
-use serde_json::Value;
 use anyhow::{Error, anyhow, bail, Context};
 use tokio::fs::{File, OpenOptions};
-use tokio::io::{AsyncWriteExt, BufWriter, BufReader, AsyncBufReadExt};
-use std::collections::HashMap;
+use tokio::io::{AsyncWriteExt, BufReader, AsyncBufReadExt};
 use std::sync::Arc;
 use async_compression::tokio::bufread::GzipDecoder;
 use async_trait::async_trait;
@@ -17,7 +15,7 @@ use async_tar::Archive;
 use tokio::fs;
 use tokio_tar::Builder;
 use tokio_util::compat::TokioAsyncReadCompatExt;
-use stroem_common::{JobRequest, JobResult, log_collector::LogEntry};
+use stroem_common::{log_collector::LogEntry};
 use crate::server_config::{LogStorageConfig, LogStorageType};
 use std::fs::File as StdFile;
 

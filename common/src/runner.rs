@@ -16,15 +16,15 @@ use crate::workspace_client::WorkspaceClient;
 
 
 pub struct Runner {
-    server: Option<String>,
+    _server: Option<String>,
     job_id: Option<String>,
     worker_id: Option<String>,
     task: Option<String>,
     action: Option<String>,
     input: Option<Value>,
     workspace: WorkspaceClient,
-    workspace_revision: Option<String>,
-    client: Client,
+    _workspace_revision: Option<String>,
+    _client: Client,
     log_collector: Arc<dyn LogCollector + Send + Sync>,
     action_executors: HashMap<String, Box<dyn ActionExecutor>>,
 }
@@ -34,15 +34,15 @@ impl Runner {
         let mut action_executors: HashMap<String, Box<dyn ActionExecutor>> = HashMap::new();
         action_executors.insert("shell".to_string(), Box::new(ShellAction));
         Runner {
-            server,
+            _server: server,
             job_id,
             worker_id,
             task,
             action,
             input,
             workspace,
-            workspace_revision,
-            client: Client::new(),
+            _workspace_revision: workspace_revision,
+            _client: Client::new(),
             log_collector,
             action_executors,
         }

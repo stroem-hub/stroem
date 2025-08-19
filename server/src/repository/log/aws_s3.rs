@@ -8,7 +8,7 @@ use tokio::fs::{File};
 use aws_sdk_s3::Client;
 use aws_sdk_s3::config::{Region, Credentials};
 use aws_sdk_s3::primitives::ByteStream;
-use futures::StreamExt;
+
 
 #[derive(Clone)]
 pub struct LogRepositoryAWSS3 {

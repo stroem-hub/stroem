@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use anyhow::Error;
 use async_trait::async_trait;
-use serde_json::Value;
+
 use sqlx::{PgPool, Row};
 use crate::auth::{AuthProviderImpl, AuthResponse, User};
 use openid;
