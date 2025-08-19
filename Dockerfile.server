@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.4
-FROM node:20-alpine AS frontend-builder
+FROM node:22-alpine AS frontend-builder
 
 WORKDIR /build
 COPY ./ui/package.json ./ui/package-lock.json ./
@@ -7,7 +7,7 @@ RUN npm ci
 COPY ./ui .
 RUN npm run build
 
-FROM rust:1.85-slim-bookworm AS server-builder
+FROM rust:1.89-slim-bookworm AS server-builder
 WORKDIR /build
 RUN apt-get update && apt-get install -y git libssl-dev pkg-config
 COPY . .

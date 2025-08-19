@@ -1,4 +1,4 @@
-FROM rust:1.85-slim-bookworm AS worker-builder
+FROM rust:1.89-slim-bookworm AS worker-builder
 WORKDIR /build
 RUN apt-get update && apt-get install -y git libssl-dev pkg-config
 COPY . .
