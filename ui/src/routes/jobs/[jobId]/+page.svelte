@@ -1,6 +1,8 @@
 <script lang="ts">
 	import type { PageProps } from './$types';
-	import { Card, Badge, Accordion, AccordionItem } from 'flowbite-svelte';
+	import Card from '$lib/components/atoms/Card.svelte';
+	import Badge from '$lib/components/atoms/Badge.svelte';
+	import Accordion from '$lib/components/atoms/Accordion.svelte';
 	import { onMount } from 'svelte';
 
 	// Define the JobStep type
@@ -43,6 +45,9 @@
 
 	// Reactive store for logs (keyed by step name)
 	let logs: { [key: string]: LogEntry[] } = $state({});
+	
+	// State for managing open/closed steps
+	let openSteps = $state<Set<string>>(new Set());
 
 	// Helper to format dates
 	function formatDate(isoString: string): string {
@@ -52,6 +57,16 @@
 	// Helper to stringify JSON values nicely
 	function formatJson(value: any): string {
 		return JSON.stringify(value, null, 2);
+	}
+
+	// Toggle step open/closed state
+	function toggleStep(stepName: string) {
+		if (openSteps.has(stepName)) {
+			openSteps.delete(stepName);
+		} else {
+			openSteps.add(stepName);
+		}
+		openSteps = new Set(openSteps); // Trigger reactivity
 	}
 
 	// Fetch logs for a specific step
@@ -78,7 +93,7 @@
 
 	let eventSource: EventSource | null = null;
 	function connectSse(jobId : string) {
-		eventSource = new EventSource(`/api/jobs/${jobId}/sse`, undefined, true);
+		eventSource = new EventSource(`/api/jobs/${jobId}/sse`);
 		eventSource.onopen = () => console.log(`Connected to SSE for job ${jobId}`);
 
 		eventSource.addEventListener('step_logs', (event) => {
@@ -91,32 +106,40 @@
 		});
 		eventSource.addEventListener('result', (event) => {
 			const update = JSON.parse(event.data);
-			job.data.success = update.result.success;
-			job.data.end_datetime = update.result.end_datetime;
-			job.data.output = update.result.output;
+			if (job.data) {
+				job.data.success = update.result.success;
+				job.data.end_datetime = update.result.end_datetime;
+				job.data.output = update.result.output;
+			}
 		});
 		eventSource.addEventListener('step_result', (event) => {
 			const update = JSON.parse(event.data);
-			for (const step of job.data.steps) {
-				if (step.name == update.step_name) {
-					step.output = update.result.output;
-					step.success = update.result.success;
-					break;
+			if (job.data) {
+				for (const step of job.data.steps) {
+					if (step.name == update.step_name) {
+						step.output = update.result.output;
+						step.success = update.result.success;
+						step.end_datetime = update.result.end_datetime || new Date().toISOString();
+						break;
+					}
 				}
 			}
-
 		});
 		eventSource.addEventListener('step_start', (event) => {
 			const update = JSON.parse(event.data);
-			let step = {
-				"name": update.step_name,
-				"input": update.input,
+			let step: JobStep = {
+				name: update.step_name,
+				input: update.input,
+				success: false,
+				start_datetime: new Date().toISOString(),
+				end_datetime: ''
 			}
-			job.data.steps.push(step);
+			if (job.data) {
+				job.data.steps.push(step);
+			}
 		});
 		eventSource.addEventListener('start', (event) => {
-			const update = JSON.parse(event.data);
-			// Update step state
+			// Job started event - could update job status here if needed
 		});
 	}
 
@@ -150,7 +173,7 @@
 
 			<!-- Job Status Badge -->
 			<div>
-				<Badge color={job.data.success == null ? 'yellow' : job.data.success ? 'green' : 'red'} large>
+				<Badge variant={job.data.success == null ? 'warning' : job.data.success ? 'success' : 'error'} size="lg">
 					{job.data.status}
 				</Badge>
 			</div>
@@ -225,99 +248,114 @@
 				</div>
 			</Card>
 
-			<!-- Steps Accordion -->
-			<Card class="max-w-none">
-				<h3 class="text-lg font-semibold text-gray-900 mb-4">Steps</h3>
-				{#if job.data.steps.length > 0}
-					<Accordion>
-						{#each job.data.steps as step}
-							<AccordionItem>
-								<span slot="header" class="flex items-center space-x-2">
-									<Badge color={step.success ? 'green' : 'red'}>{step.success ? 'Success' : 'Failed'}</Badge>
-									<span>{step.name}</span>
-								</span>
-								<div class="space-y-4">
-									<!-- Input/Output Section -->
-									<div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
-										<div>
-											<dt class="text-sm font-medium text-gray-500">Input</dt>
-											<dd class="mt-1 text-gray-900">
-												{#if step.input}
-													<pre class="bg-gray-100 p-2 rounded">{formatJson(step.input)}</pre>
-												{:else}
-													N/A
-												{/if}
-											</dd>
+			<!-- Steps -->
+			<Card>
+				<div class="p-6">
+					<h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Steps</h3>
+					{#if job.data.steps.length > 0}
+						<div class="space-y-4">
+							{#each job.data.steps as step, i}
+								{@const isOpen = openSteps.has(step.name)}
+								<div class="border border-gray-200 dark:border-gray-700 rounded-lg">
+									<button
+										class="w-full px-4 py-3 text-left flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-200 rounded-t-lg"
+										onclick={() => toggleStep(step.name)}
+									>
+										<div class="flex items-center space-x-3">
+											<Badge variant={step.success ? 'success' : 'error'}>
+												{step.success ? 'Success' : 'Failed'}
+											</Badge>
+											<span class="font-medium text-gray-900 dark:text-gray-100">{step.name}</span>
 										</div>
-										<div>
-											<dt class="text-sm font-medium text-gray-500">Output</dt>
-											<dd class="mt-1 text-gray-900">
-												{#if step.output}
-													<pre class="bg-gray-100 p-2 rounded">{formatJson(step.output)}</pre>
-												{:else}
-													N/A
-												{/if}
-											</dd>
+										<svg 
+											class="w-5 h-5 text-gray-500 transition-transform duration-200 {isOpen ? 'rotate-180' : ''}"
+											fill="none" 
+											stroke="currentColor" 
+											viewBox="0 0 24 24"
+										>
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+										</svg>
+									</button>
+									
+									{#if isOpen}
+										<div class="px-4 pb-4 border-t border-gray-200 dark:border-gray-700">
+											<div class="pt-4 space-y-4">
+												<!-- Input/Output Section -->
+												<div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+													<div>
+														<dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Input</dt>
+														<dd class="mt-1 text-gray-900 dark:text-gray-100">
+															{#if step.input}
+																<pre class="bg-gray-100 dark:bg-gray-800 p-2 rounded text-sm overflow-auto">{formatJson(step.input)}</pre>
+															{:else}
+																N/A
+															{/if}
+														</dd>
+													</div>
+													<div>
+														<dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Output</dt>
+														<dd class="mt-1 text-gray-900 dark:text-gray-100">
+															{#if step.output}
+																<pre class="bg-gray-100 dark:bg-gray-800 p-2 rounded text-sm overflow-auto">{formatJson(step.output)}</pre>
+															{:else}
+																N/A
+															{/if}
+														</dd>
+													</div>
+												</div>
+
+												<!-- Log Section -->
+												<div>
+													<dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Logs</dt>
+													<dd class="mt-1">
+														{#if logs[step.name] === undefined}
+															<p class="text-gray-600 dark:text-gray-400 italic">Loading logs...</p>
+														{:else if logs[step.name].length > 0}
+															<div class="bg-gray-900 dark:bg-gray-800 rounded-lg p-4 max-h-64 overflow-auto">
+																{#each logs[step.name] as log}
+																	<div class="flex items-start space-x-2 text-sm font-mono">
+																		<span class="text-gray-400 text-xs whitespace-nowrap">{formatDate(log.timestamp)}</span>
+																		<span class="text-gray-100 {log.is_stderr ? 'text-red-400' : ''}">{log.message}</span>
+																	</div>
+																{/each}
+															</div>
+														{:else}
+															<p class="text-gray-600 dark:text-gray-400 italic">No logs available</p>
+														{/if}
+													</dd>
+												</div>
+											</div>
 										</div>
-									</div>
-
-									<!-- Log Section -->
-									<div>
-										<dt class="text-sm font-medium text-gray-500">Log</dt>
-										<dd class="mt-1 text-gray-900">
-											{#if logs[step.name] === undefined}
-												<p class="text-gray-600 italic">Loading logs...</p>
-											{:else if logs[step.name].length > 0}
-												<ul class="space-y-2">
-													{#each logs[step.name] as log}
-														<li class="flex items-start space-x-2">
-															<span class="text-xs text-gray-500">{formatDate(log.timestamp)}</span>
-															<span class:text-red-600={log.is_stderr} class="font-mono">{log.message}</span>
-														</li>
-													{/each}
-												</ul>
-											{:else}
-												<p class="text-gray-600 italic">No logs available</p>
-											{/if}
-										</dd>
-									</div>
-
-							</AccordionItem>
-						{/each}
-					</Accordion>
-				{:else}
-					<p class="text-gray-600">No steps available for this job.</p>
-				{/if}
+									{/if}
+								</div>
+							{/each}
+						</div>
+					{:else}
+						<p class="text-gray-600 dark:text-gray-400">No steps available for this job.</p>
+					{/if}
+				</div>
 			</Card>
 
-			<!-- Runner logs Accordion -->
-					<Accordion>
-							<AccordionItem>
-								<span slot="header" class="flex items-center space-x-2">
-									<span>Runner logs</span>
-								</span>
-
-								<div>
-									<dt class="text-sm font-medium text-gray-500">Log</dt>
-									<dd class="mt-1 text-gray-900">
-										{#if logs["-"] === undefined}
-											<p class="text-gray-600 italic">Loading logs...</p>
-										{:else if logs["-"].length > 0}
-											<ul class="space-y-2">
-												{#each logs["-"] as log}
-													<li class="flex items-start space-x-2">
-														<span class="text-xs text-gray-500">{formatDate(log.timestamp)}</span>
-														<span class:text-red-600={log.is_stderr} class="font-mono">{log.message}</span>
-													</li>
-												{/each}
-											</ul>
-										{:else}
-											<p class="text-gray-600 italic">No logs available</p>
-										{/if}
-									</dd>
+			<!-- Runner Logs -->
+			<Card>
+				<div class="p-6">
+					<h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Runner Logs</h3>
+					{#if logs["-"] === undefined}
+						<p class="text-gray-600 dark:text-gray-400 italic">Loading logs...</p>
+					{:else if logs["-"].length > 0}
+						<div class="bg-gray-900 dark:bg-gray-800 rounded-lg p-4 max-h-64 overflow-auto">
+							{#each logs["-"] as log}
+								<div class="flex items-start space-x-2 text-sm font-mono">
+									<span class="text-gray-400 text-xs whitespace-nowrap">{formatDate(log.timestamp)}</span>
+									<span class="text-gray-100 {log.is_stderr ? 'text-red-400' : ''}">{log.message}</span>
 								</div>
-							</AccordionItem>
-					</Accordion>
+							{/each}
+						</div>
+					{:else}
+						<p class="text-gray-600 dark:text-gray-400 italic">No logs available</p>
+					{/if}
+				</div>
+			</Card>
 
 		</div>
 

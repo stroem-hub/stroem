@@ -1,7 +1,8 @@
 <script lang="ts">
   import type { PageProps } from './$types';
-  import { Button, Input, Label, Alert } from 'flowbite-svelte';
-  import { InfoCircleSolid } from 'flowbite-svelte-icons';
+  import Button from '$lib/components/atoms/Button.svelte';
+  import Input from '$lib/components/atoms/Input.svelte';
+  import Card from '$lib/components/atoms/Card.svelte';
   import { goto } from '$app/navigation';
   import { writable } from 'svelte/store';
   import { accessToken, authUser } from '$lib/stores';
@@ -66,73 +67,81 @@
   };
 
 </script>
-{#if showError}
-  <Alert color="red" class="mb-4 absolute w-full" onclose={() => showError = false} dismissable>
-    <InfoCircleSolid slot="icon" class="w-5 h-5" />
-    {errorMessage}
-  </Alert>
-{/if}
+<div class="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
+  {#if showError}
+    <div class="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 max-w-md w-full mx-4">
+      <div class="bg-error-50 dark:bg-error-900/20 border border-error-200 dark:border-error-800 text-error-800 dark:text-error-200 px-4 py-3 rounded-lg shadow-lg flex items-center">
+        <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+        </svg>
+        <span class="flex-1">{errorMessage}</span>
+        <button 
+          onclick={() => showError = false}
+          class="ml-3 opacity-70 hover:opacity-100"
+          aria-label="Close error message"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  {/if}
 
-<div class="flex items-center justify-center min-h-screen bg-gray-100">
-  <div class="w-full max-w-md p-6 bg-white rounded-lg shadow-md">
-    <h1 class="mb-6 text-2xl font-bold text-center text-gray-800">Login to Strøm</h1>
+  <Card class="w-full max-w-md">
+    <div class="p-6">
+      <h1 class="mb-6 text-2xl font-bold text-center text-gray-900 dark:text-gray-100">Login to Strøm</h1>
 
-    {#each providers as provider, i}
-      {#if i === 0 || $showAll}
-      <div class="space-y-4 m-6">
-        <h3 class="mb-6 font-bold text-center text-gray-800">Login with {provider.name} authentication</h3>
-    {#if provider.type === 'internal'}
-      <Input
-        class="block w-full mt-2 p-2 border rounded-md"
-        type="email"
-        placeholder="E-mail"
-        bind:value={email}
-      />
-      <Input
-        class="block w-full mt-2 p-2 border rounded-md"
-        type="password"
-        placeholder="Password"
-        bind:value={password}
-      />
-      <Button
-        color="blue"
-        class="w-full mb-4 transition-transform transform hover:scale-105"
-        onclick={() => loginInternal(provider.id)}
-      >
-        Log in
-      </Button>
-    {:else}
-      <Button
-        color="blue"
-        class="w-full mb-4 transition-transform transform hover:scale-105"
-        onclick={() => loginOIDC(provider.id)}
-      >
-        Login with {provider.name}
-      </Button>
-    {/if}
+      {#each providers as provider, i}
+        {#if i === 0 || $showAll}
+        <div class="space-y-4 mb-6">
+          <h3 class="mb-4 font-semibold text-center text-gray-800 dark:text-gray-200">Login with {provider.name} authentication</h3>
+          {#if provider.type === 'internal'}
+            <Input
+              type="email"
+              placeholder="Email"
+              value={email}
+              oninput={(e) => email = (e.target as HTMLInputElement).value}
+              class="w-full"
+            />
+            <Input
+              type="password"
+              placeholder="Password"
+              value={password}
+              oninput={(e) => password = (e.target as HTMLInputElement).value}
+              class="w-full"
+            />
+            <Button
+              variant="primary"
+              fullWidth
+              onclick={() => loginInternal(provider.id)}
+            >
+              Log in
+            </Button>
+          {:else}
+            <Button
+              variant="primary"
+              fullWidth
+              onclick={() => loginOIDC(provider.id)}
+            >
+              Login with {provider.name}
+            </Button>
+          {/if}
         </div>
+        {/if}
+      {/each}
+      
+      {#if providers.length > 1 && !$showAll}
+        <Button
+          variant="ghost"
+          onclick={() => showAll.set(true)}
+          disabled={$showAll}
+          class="w-full text-sm"
+        >
+          Show other login options
+        </Button>
       {/if}
-    {/each}
-    {#if providers.length > 1 && !$showAll}
-      <Button
-        class="text-blue-500 underline text-sm mt-4"
-        onclick={() => showAll.set(true)}
-        disabled={$showAll}
-      >
-        Show another login options
-      </Button>
-    {/if}
-
-  </div>
+    </div>
+  </Card>
 </div>
 
-<style>
-  .animate-fade-in {
-    animation: fadeIn 0.3s ease-in;
-  }
-
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-</style>

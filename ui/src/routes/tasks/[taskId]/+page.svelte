@@ -1,10 +1,8 @@
 <script lang="ts">
-	import { Card, Button } from 'flowbite-svelte';
-	import { Input, Label, Helper } from 'flowbite-svelte';
-	import { Tabs, TabItem } from 'flowbite-svelte';
-	import { Table, TableBody, TableBodyCell, TableBodyRow, TableHead, TableHeadCell, Tooltip } from 'flowbite-svelte';
-	import { CloseCircleSolid, CheckCircleSolid, QuestionCircleSolid, InfoCircleSolid } from 'flowbite-svelte-icons';
-	import { Alert } from 'flowbite-svelte';
+	import Card from '$lib/components/atoms/Card.svelte';
+	import Button from '$lib/components/atoms/Button.svelte';
+	import Input from '$lib/components/atoms/Input.svelte';
+	import Table from '$lib/components/atoms/Table.svelte';
 	import { goto } from '$app/navigation';
 	import type { PageProps } from './$types';
 
@@ -35,6 +33,7 @@
 	let { data }: PageProps = $props();
 
 	let task = data.task.data as Task;
+	let activeTab = $state('activity');
 
 	function getSortedInputs(input?: Record<string, InputField>): InputField[] {
 		if (!input) {
@@ -72,7 +71,7 @@
 
 			runResponse = await res.json();
 		} catch (err) {
-			runResponse = { success: false, data: null, meta: null, error: 'Failed to run task' };
+			runResponse = { success: false, data: null, error: 'Failed to run task' };
 			console.error(err);
 		}
 
@@ -92,127 +91,194 @@
 </script>
 
 {#if !runResponse.success}
-	<Alert border color="red">
-		<InfoCircleSolid slot="icon" class="w-5 h-5" />
-		<span class="font-medium">Could not run the task.</span>
-		{runResponse.error}
-	</Alert>
+	<div class="mb-6">
+		<div class="bg-error-50 dark:bg-error-900/20 border border-error-200 dark:border-error-800 text-error-800 dark:text-error-200 px-4 py-3 rounded-lg flex items-center">
+			<svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+			</svg>
+			<div>
+				<span class="font-medium">Could not run the task.</span>
+				<p class="text-sm mt-1">{runResponse.error}</p>
+			</div>
+		</div>
+	</div>
 {/if}
 
-<div class="p-6">
+<div class="space-y-6">
 	{#if !data.task.success}
-		<Card class="max-w-none mb-6 bg-red-50 border-red-200">
-			<h3 class="text-lg font-semibold text-red-900">Error</h3>
-			<p class="text-red-700">{data.task.error}</p>
-			<button
-				class="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-				onclick={goBack}
-			>
-				Back to Tasks
-			</button>
+		<Card variant="outlined" class="border-error-200 dark:border-error-800 bg-error-50 dark:bg-error-900/20">
+			<div class="p-6">
+				<h3 class="text-lg font-semibold text-error-900 dark:text-error-100 mb-2">Error</h3>
+				<p class="text-error-700 dark:text-error-300 mb-4">{data.task.error}</p>
+				<Button variant="primary" onclick={goBack}>
+					Back to Tasks
+				</Button>
+			</div>
 		</Card>
 	{:else if data.task.data}
+		<div class="mb-6">
+			<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">
+				{task.name || task.id}
+			</h1>
+			{#if task.description}
+				<p class="text-gray-600 dark:text-gray-400 mt-2">{task.description}</p>
+			{/if}
+		</div>
 
-		<h1>TASK: {task.name || task.id}</h1>
+		{@const tabs = [
+			{
+				id: 'activity',
+				title: 'Activity',
+				content: () => {}
+			},
+			{
+				id: 'run',
+				title: 'Run Task',
+				content: () => {}
+			}
+		]}
 
-		<Tabs tabStyle="underline">
-			<TabItem open>
-				<div slot="title" class="flex items-center gap-2">
-					Activity
-				</div>
+		<div class="w-full">
+			<!-- Tab Headers -->
+			<div class="border-b border-gray-200 dark:border-gray-700 mb-6">
+				<nav class="-mb-px flex space-x-8" aria-label="Tabs">
+					<button
+						onclick={() => activeTab = 'activity'}
+						class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm transition-colors duration-200
+							{activeTab === 'activity'
+								? 'border-primary-500 text-primary-600 dark:text-primary-400'
+								: 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'}"
+					>
+						Activity
+					</button>
+					<button
+						onclick={() => activeTab = 'run'}
+						class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm transition-colors duration-200
+							{activeTab === 'run'
+								? 'border-primary-500 text-primary-600 dark:text-primary-400'
+								: 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'}"
+					>
+						Run Task
+					</button>
+				</nav>
+			</div>
+
+			<!-- Tab Content -->
+			{#if activeTab === 'activity'}
 				{#await data.jobs}
-					Loading...
+					<div class="flex items-center justify-center py-8">
+						<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+						<span class="ml-3 text-gray-600 dark:text-gray-400">Loading jobs...</span>
+					</div>
 				{:then jobs}
-
-					{#if !jobs.success }
-						<Card class="max-w-none mb-6 bg-red-50 border-red-200">
-							<h3 class="text-lg font-semibold text-red-900">Error</h3>
-							<p class="text-red-700">{jobs.error}</p>
+					{#if !jobs.success}
+						<Card variant="outlined" class="border-error-200 dark:border-error-800 bg-error-50 dark:bg-error-900/20">
+							<div class="p-6">
+								<h3 class="text-lg font-semibold text-error-900 dark:text-error-100 mb-2">Error</h3>
+								<p class="text-error-700 dark:text-error-300">{jobs.error}</p>
+							</div>
 						</Card>
-					{:else if jobs.data}
+					{:else if jobs.data && jobs.data.length > 0}
+						{@const columns = [
+							{ key: 'status', label: 'Status', width: '80px' },
+							{ key: 'start_datetime', label: 'Started' },
+							{ key: 'output', label: 'Output' },
+							{ key: 'source', label: 'Triggered by' }
+						]}
+						
+						{@const tableData = jobs.data.map((job: any) => ({
+							...job,
+							source: `${job.source_type}:${job.source_id || 'unknown'}`
+						}))}
 
-						<Table hoverable={true}>
-							<TableHead>
-								<TableHeadCell class="p-4!"></TableHeadCell>
-								<TableHeadCell>Started</TableHeadCell>
-								<TableHeadCell>Output</TableHeadCell>
-								<TableHeadCell>Triggered by</TableHeadCell>
-							</TableHead>
-							<TableBody tableBodyClass="divide-y cursor-pointer">
-								{#each jobs.data as job}
-									<TableBodyRow onclick={ () =>{ openJob(job.job_id)} }>
-										<TableBodyCell class="p-4!">
-											{#if job.success === null}
-												<QuestionCircleSolid class="text-yellow-400 dark:text-yellow-400 shrink-0 h-5 w-5" />
-											{:else if job.success}
-												<CheckCircleSolid class="text-green-400 dark:text-green-400 shrink-0 h-5 w-5" />
-											{:else}
-												<CloseCircleSolid class="text-red-500 dark:text-red-500 shrink-0 h-5 w-5" />
-											{/if}
-											<Tooltip placement='left'>{job.status}</Tooltip>
-										</TableBodyCell>
-										<TableBodyCell>{job.start_datetime}
-										</TableBodyCell>
-										<TableBodyCell>{job.output || "(No output)"}
-										</TableBodyCell>
-										<TableBodyCell>{job.source_type}:{job.source_id || "unknown"}
-										</TableBodyCell>
-									</TableBodyRow>
-								{/each}
-
-							</TableBody>
-						</Table>
-
+						<Table 
+							data={tableData}
+							columns={columns}
+							onRowClick={(row: any) => openJob(row.job_id)}
+						/>
 					{:else}
-						<Card class="max-w-none mb-6">
-							<p class="text-gray-600">No jobs yet</p>
+						<Card>
+							<div class="p-6 text-center">
+								<p class="text-gray-600 dark:text-gray-400">No jobs found for this task yet.</p>
+							</div>
 						</Card>
 					{/if}
-
 				{:catch error}
-					<p>error loading comments: {error.message}</p>
+					<Card variant="outlined" class="border-error-200 dark:border-error-800 bg-error-50 dark:bg-error-900/20">
+						<div class="p-6">
+							<h3 class="text-lg font-semibold text-error-900 dark:text-error-100 mb-2">Error</h3>
+							<p class="text-error-700 dark:text-error-300">Error loading jobs: {error.message}</p>
+						</div>
+					</Card>
 				{/await}
+			{:else if activeTab === 'run'}
+				<Card>
+					<div class="p-6">
+						<form onsubmit={runTask} class="space-y-4">
+							{#each getSortedInputs(task.input) as field}
+								<div>
+									<label for={field.id} class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+										{field.name || field.id} ({field.type})
+										{#if field.required}
+											<span class="text-error-500">*</span>
+										{/if}
+										{#if field.order !== undefined}
+											<span class="text-xs text-gray-500">[Order: {field.order}]</span>
+										{/if}
+									</label>
+									
+									{#if field.description}
+										<p class="text-sm text-gray-500 dark:text-gray-400 mb-2">{field.description}</p>
+									{/if}
 
-
-
-			</TabItem>
-			<TabItem>
-			<div slot="title" class="flex items-center gap-2">
-				Run
-			</div>
-
-		<form onsubmit={runTask} class="space-y-4">
-		{#each getSortedInputs(task.input) as field}
-			<div>
-				<Label for={field.id} class="block mb-2 text-sm font-medium text-gray-700">
-					{field.name || field.id } ({field.type}) {field.required ? '*' : ''} {field.order !== undefined ? `[Order: ${field.order}]` : ''}
-				</Label>
-				{#if field.type === "string"}
-					<Input
-						id={field.id}
-						name={field.id}
-						type="text"
-						value={field.default}
-						required={field.required}
-						class="w-full"
-					/>
-				{:else if field.type === "number"}
-				{/if}
-			</div>
-
-		{/each}
-			<Button type="submit" color="blue" class="w-full">Run</Button>
-		</form>
-
-			</TabItem>
-		</Tabs>
-
-
-
+									{#if field.type === "string"}
+										<Input
+											id={field.id}
+											name={field.id}
+											type="text"
+											value={field.default?.toString() || ''}
+											required={field.required}
+										/>
+									{:else if field.type === "number"}
+										<Input
+											id={field.id}
+											name={field.id}
+											type="number"
+											value={field.default?.toString() || ''}
+											required={field.required}
+										/>
+									{:else}
+										<Input
+											id={field.id}
+											name={field.id}
+											type="text"
+											value={field.default?.toString() || ''}
+											required={field.required}
+										/>
+										<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+											Unsupported field type: {field.type}
+										</p>
+									{/if}
+								</div>
+							{/each}
+							
+							<div class="pt-4">
+								<Button type="submit" variant="primary" fullWidth>
+									Run Task
+								</Button>
+							</div>
+						</form>
+					</div>
+				</Card>
+			{/if}
+		</div>
 	{:else}
-		<Card class="max-w-none mb-6">
-			<h3 class="text-lg font-semibold text-gray-900">Loading...</h3>
-			<p class="text-gray-600">Fetching task details...</p>
+		<Card>
+			<div class="p-6 text-center">
+				<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-4"></div>
+				<h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Loading...</h3>
+				<p class="text-gray-600 dark:text-gray-400">Fetching task details...</p>
+			</div>
 		</Card>
 	{/if}
 </div>

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { PageProps } from './$types';
-	import { Card } from 'flowbite-svelte';
+	import Card from '$lib/components/atoms/Card.svelte';
 	import { goto } from '$app/navigation';
 
 
