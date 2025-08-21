@@ -13,6 +13,7 @@ use serde_json::Value;
 use regex::Regex;
 use std::io;
 use std::sync::Arc;
+use uuid;
 use globwalker::GlobWalkerBuilder;
 use tracing_subscriber::{self, filter::LevelFilter, fmt, prelude::*};
 
@@ -32,7 +33,7 @@ pub struct JobRequest {
     pub task: Option<String>,
     pub action: Option<String>,
     pub input: Option<serde_json::Value>,
-    pub uuid: Option<String>,
+    pub uuid: Option<uuid::Uuid>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
