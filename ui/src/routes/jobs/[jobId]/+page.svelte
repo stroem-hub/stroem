@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { callApi } from '$lib/auth';
 	import type { PageProps } from './$types';
 	import { Card, Badge, Accordion, AccordionItem } from 'flowbite-svelte';
 	import { onMount } from 'svelte';
@@ -65,8 +66,8 @@
 			const url = stepName
 				? `/api/jobs/${jobId}/steps/${stepName}/logs`
 				: `/api/jobs/${jobId}/logs`;
-			const response = await fetch(url);
-			const result = await response.json();
+			const response = await callApi(url);
+			const result = await response?.json();
 			if (result.success) {
 				logs[key] = result.data;
 			}
@@ -78,7 +79,7 @@
 
 	let eventSource: EventSource | null = null;
 	function connectSse(jobId : string) {
-		eventSource = new EventSource(`/api/jobs/${jobId}/sse`, undefined, true);
+		eventSource = new EventSource(`/api/jobs/${jobId}/sse`, undefined);
 		eventSource.onopen = () => console.log(`Connected to SSE for job ${jobId}`);
 
 		eventSource.addEventListener('step_logs', (event) => {

@@ -20,8 +20,6 @@ use std::convert::Infallible;
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt;
 use std::{pin::Pin, task::{Context, Poll}};
-use aws_sdk_s3::primitives::event_stream::HeaderValue::Uuid;
-use uuid::uuid;
 use crate::auth::User;
 use crate::web::WebState;
 

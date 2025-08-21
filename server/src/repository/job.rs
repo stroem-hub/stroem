@@ -6,7 +6,7 @@ use sqlx::Row;
 use tracing::{debug, error, info};
 
 use serde::{Deserialize, Serialize};
-use uuid::{uuid, Uuid};
+use uuid::Uuid;
 use stroem_common::{JobRequest, JobResult};
 
 #[derive(sqlx::FromRow, Debug, Serialize, Deserialize)]
