@@ -49,7 +49,7 @@ impl Runner {
     }
 
     pub async fn execute(&mut self) -> anyhow::Result<bool> {
-        let mut success = true;
+        let success;
 
         let workflows = self.workspace.workflows.as_ref().unwrap();
 

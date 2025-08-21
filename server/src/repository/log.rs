@@ -52,9 +52,6 @@ impl LogRepositoryFactory {
                     endpoint.clone(),
                 ).await?))
             }
-            _ => {
-                bail!("Not implemented yet");
-            }
         }
     }
 }
@@ -128,7 +125,7 @@ pub trait LogRepository: Send + Sync {
                 let file = File::open(&archive_name).await?;
                 let buf_reader = BufReader::new(file);
                 let gzip_decoder = GzipDecoder::new(buf_reader);
-                let mut archive = Archive::new(gzip_decoder.compat());
+                let archive = Archive::new(gzip_decoder.compat());
                 archive.unpack(self.get_cache_folder()).await?;
                 fs::remove_file(archive_name).await?;
             }

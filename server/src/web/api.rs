@@ -76,18 +76,18 @@ impl<S> Drop for JobChannel<S> {
 #[axum::debug_handler]
 async fn get_tasks(
     State(api): State<WebState>,
-    user: User,
+    _user: User,
 ) -> Result<ApiResponse, ApiError> {
     let workflows_guard = api.workspace.workflows.read().map_err(|_| anyhow!("Could not read workspace"))?;
     let workflows = workflows_guard.as_ref().unwrap();
-    let tasks = workflows.tasks.as_ref();
+    let _tasks = workflows.tasks.as_ref();
 
-    let mut total = 0;
+    let mut _total = 0;
 
     let tasks_json = match &workflows.tasks {
         Some(tasks) => {
-            let mut task_array: Vec<Value> = tasks.iter().map(|(name, task)| serde_json::to_value(task).unwrap()).collect();
-            total = task_array.len();
+            let task_array: Vec<Value> = tasks.iter().map(|(_name, task)| serde_json::to_value(task).unwrap()).collect();
+            _total = task_array.len();
             // task_array.sort_by(|a, b| a.get("name").unwrap().as_str().cmp(&b.get("name").unwrap().as_str()));
             serde_json::to_value(task_array)?
         }
@@ -101,7 +101,7 @@ async fn get_tasks(
 async fn get_task(
     State(api): State<WebState>,
     Path(task_id): Path<String>,
-    user: User,
+    _user: User,
 ) -> Result<ApiResponse, ApiError> {
     let workflows_guard = api.workspace.workflows.read().map_err(|_| anyhow!("Could not read workspace"))?;
     let workflows = workflows_guard.as_ref().unwrap();
@@ -113,8 +113,8 @@ async fn get_task(
 #[axum::debug_handler]
 async fn get_jobs(
     State(api): State<WebState>,
-    Query(params): Query<HashMap<String, String>>,
-    user: User,
+    Query(_params): Query<HashMap<String, String>>,
+    _user: User,
 ) -> Result<ApiResponse, AppError> {
     let jobs = api.job_repository.get_jobs().await?;
     Ok(ApiResponse::data(serde_json::to_value(jobs)?))
@@ -124,7 +124,7 @@ async fn get_jobs(
 async fn get_job(
     State(api): State<WebState>,
     Path(job_id): Path<String>,
-    user: User,
+    _user: User,
 ) -> Result<ApiResponse, ApiError> {
     let task = api.job_repository.get_job(job_id.as_str()).await?;
     Ok(ApiResponse::data(serde_json::to_value(task)?))
@@ -134,7 +134,7 @@ async fn get_job(
 async fn get_job_logs(
     State(api): State<WebState>,
     Path(job_id): Path<String>,
-    user: User,
+    _user: User,
 ) -> Result<ApiResponse, ApiError> {
     let log_stream = api.log_repository.get_logs(job_id.as_str(), None).await?;
     let logs: Vec<LogEntry> = log_stream
@@ -150,7 +150,7 @@ async fn get_job_logs(
 async fn get_job_step_logs(
     State(api): State<WebState>,
     Path((job_id, step_name)): Path<(String, String)>,
-    user: User,
+    _user: User,
 ) -> Result<ApiResponse, ApiError> {
     let log_stream = api.log_repository.get_logs(job_id.as_str(), Some(step_name.as_str())).await?;
     let logs: Vec<LogEntry> = log_stream
@@ -166,7 +166,7 @@ async fn get_job_step_logs(
 #[axum::debug_handler]
 async fn put_job(
     State(api): State<WebState>,
-    user: User,
+    _user: User,
     Json(job): Json<JobRequest>,
 ) -> Result<ApiResponse, ApiError> {
     let job_id = api.job_repository.enqueue_job(&job, "user", None).await?;
@@ -177,13 +177,13 @@ async fn put_job(
 async fn get_job_sse(
     State(api): State<WebState>,
     Path(job_id): Path<String>,
-    user: User,
+    _user: User,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
 
     debug!("Received SSE connection for job {}", job_id);
 
 
-    let mut rx = {
+    let rx = {
         let mut channels = api.job_channels.lock().unwrap();
         if let Some(tx) = channels.get(&job_id) {
             tx.subscribe()
@@ -222,7 +222,7 @@ async fn get_job_sse(
 
 pub async fn send_sse_event(api: &WebState, job_id: &str, name: &str, data: Value) -> Result<(), Error> {
     let channels = api.job_channels.lock().map_err(|_| anyhow!("Could not lock job channels"))?;
-    if let Some(mut tx) = channels.get(job_id) {
+    if let Some(tx) = channels.get(job_id) {
         let event = JobEvent {
             event_name: name.to_string(),
             data

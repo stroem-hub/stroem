@@ -105,7 +105,7 @@ impl WorkspaceServer {
 
 
     pub async fn build_tarball(&self) -> Result<Vec<u8>, Error> {
-        let mut tarball = Vec::new();
+        let tarball = Vec::new();
         // let mut builder = Builder::new(&mut tarball);
 
         let encoder = GzipEncoder::new(tarball);

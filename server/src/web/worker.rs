@@ -139,7 +139,7 @@ async fn update_step_result(
     _worker: Worker,
     Json(payload): Json<JobResult>,
 ) -> Result<(), AppError> {
-    let worker_id = params.get("worker_id").unwrap();
+    let _worker_id = params.get("worker_id").unwrap();
     debug!("Payload: {:?}", payload);
     api.job_repository
         .update_step_result(&job_id, &step_name, &payload)
@@ -189,7 +189,7 @@ async fn save_step_logs(
 
 #[axum::debug_handler]
 async fn serve_workspace_tarball(
-    State(mut api): State<WebState>,
+    State(api): State<WebState>,
     _worker: Worker,
 ) -> Result<impl IntoResponse, AppError> {
 
