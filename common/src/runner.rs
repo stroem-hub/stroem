@@ -16,15 +16,15 @@ use crate::workspace_client::WorkspaceClient;
 
 
 pub struct Runner {
-    server: Option<String>,
+    _server: Option<String>,
     job_id: Option<String>,
     worker_id: Option<String>,
     task: Option<String>,
     action: Option<String>,
     input: Option<Value>,
     workspace: WorkspaceClient,
-    workspace_revision: Option<String>,
-    client: Client,
+    _workspace_revision: Option<String>,
+    _client: Client,
     log_collector: Arc<dyn LogCollector + Send + Sync>,
     action_executors: HashMap<String, Box<dyn ActionExecutor>>,
 }
@@ -34,22 +34,23 @@ impl Runner {
         let mut action_executors: HashMap<String, Box<dyn ActionExecutor>> = HashMap::new();
         action_executors.insert("shell".to_string(), Box::new(ShellAction));
         Runner {
-            server,
+            _server: server,
             job_id,
             worker_id,
             task,
             action,
             input,
             workspace,
-            workspace_revision,
-            client: Client::new(),
+            _workspace_revision: workspace_revision,
+            _client: Client::new(),
             log_collector,
             action_executors,
         }
     }
 
-    pub async fn execute(&mut self) -> anyhow::Result<bool> {
-        let mut success = true;
+    pub async fn execute(&mut self) -> anyhow::Result<(bool, Option<Value>)> {
+        let success;
+        let mut output = None;
 
         let workflows = self.workspace.workflows.as_ref().unwrap();
 
@@ -57,7 +58,7 @@ impl Runner {
             (Some(task), None) => {
                 info!("Running task: {}", task);
                 if let Some(task_def) = workflows.get_task(&task) {
-                    success = self.execute_task(&task_def.flow, workflows).await?;
+                    (success, output) = self.execute_task(&task_def.flow, workflows).await?;
                 } else {
                     error!("Task '{}' not found in workspace config", task);
                     success = false;
@@ -66,16 +67,19 @@ impl Runner {
             (None, Some(action_name)) => {
                 info!("Running action: {}", action_name);
                 if let Some(action_def) = workflows.get_action(&action_name) {
-                    let (action_success, _) = self.execute_action(&action_name, action_def, self.input.clone()).await?;
+                    let (action_success, action_output) = self.execute_action(&action_name, action_def, self.input.clone()).await?;
                     success = action_success;
+                    output = action_output;
                 } else {
                     error!("Action '{}' not found in workspace config", action_name);
                     success = false;
+                    output = None;
                 }
             }
             _ => {
                 error!("Must specify either --task or --action");
                 success = false;
+                output = None;
             }
         }
 
@@ -83,7 +87,7 @@ impl Runner {
             self.handle_error(None).await?;
         }
 
-        Ok(success)
+        Ok((success, output))
     }
 
     async fn handle_error(&self, step_name: Option<&str>) -> anyhow::Result<()> {
@@ -122,9 +126,10 @@ impl Runner {
         Ok(())
     }
 
-    async fn execute_task(&self, flow: &HashMap<String, FlowStep>, config: &WorkflowsConfiguration) -> anyhow::Result<bool> {
+    async fn execute_task(&self, flow: &HashMap<String, FlowStep>, config: &WorkflowsConfiguration) -> anyhow::Result<(bool, Option<Value>)> {
         let mut dag = DagWalker::new(flow)?; // Rename from DagExecutor
         let mut success = true;
+        let mut last_step_output: Option<Value> = None;
 
         let mut renderer = ParameterRenderer::new();
         renderer.add_to_context(json!({"secrets": config.secrets}))?;
@@ -146,11 +151,13 @@ impl Runner {
 
                 let (step_success, step_output) = self.execute_action(&step_name, config.get_action(&step.action).unwrap(), step_input).await?;
                 if step_success {
+                    last_step_output = step_output.clone();
                     if let Some(output_value) = step_output {
                         renderer.add_to_context(json!({step_name.clone(): {"output": output_value}}))?;
                     }
                 }
                 else {
+                    last_step_output = None;
                     self.handle_error(Some(step_name.as_str())).await?;
                     if !step.continue_on_fail.unwrap_or(false) {
                         success = false;
@@ -166,7 +173,7 @@ impl Runner {
             }
         }
 
-        Ok(success)
+        Ok((success, last_step_output))
     }
 
     async fn execute_action(&self, step_name: &str, action: &Action, step_input: Option<Value>) -> anyhow::Result<(bool, Option<Value>)> {

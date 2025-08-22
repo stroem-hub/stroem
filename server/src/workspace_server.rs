@@ -1,21 +1,9 @@
 
-use std::path::{Path, PathBuf};
-use config::{Config, FileFormat};
-use globwalker::GlobWalkerBuilder;
-use serde::{Deserialize, Serialize};
-use serde_json::{Value, Map};
-use std::collections::HashMap;
+use std::path::{PathBuf};
 use std::fs;
-use anyhow::{anyhow, bail, Error, Context};
-use tracing::{debug, error, info};
-use blake2::{Blake2b512, Blake2s256, Digest};
-use tar::{Builder, Archive};
-use std::fs::File as StdFile;
-use std::io::{Read, Write};
-use fs2::FileExt;
-use tokio::sync::watch;
-use notify::{RecommendedWatcher, RecursiveMode, Watcher, Config as NotifyConfig};
-use tokio::time::{sleep, Duration}; // For watcher task loop
+use anyhow::{anyhow, Error};
+use tracing::{error, info};
+use tokio::sync::watch; // For watcher task loop
 use std::sync::{Arc, RwLock};
 use tokio::fs::File;
 use async_compression::tokio::write::GzipEncoder;
@@ -117,7 +105,7 @@ impl WorkspaceServer {
 
 
     pub async fn build_tarball(&self) -> Result<Vec<u8>, Error> {
-        let mut tarball = Vec::new();
+        let tarball = Vec::new();
         // let mut builder = Builder::new(&mut tarball);
 
         let encoder = GzipEncoder::new(tarball);

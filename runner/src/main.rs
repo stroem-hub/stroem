@@ -47,7 +47,8 @@ async fn main() {
 
      */
 
-    let workspace_path = fs::canonicalize(args.workspace).unwrap();
+    fs::create_dir_all(&args.workspace).expect("Could not create workspace folder");
+    let workspace_path = fs::canonicalize(args.workspace).expect("Could not get real workspace folder");
 
     info!("Runner started for job_id: {}, worker_id: {}", args.job_id, args.worker_id);
 
@@ -58,7 +59,7 @@ async fn main() {
         }));
 
     let mut workspace = WorkspaceClient::new(PathBuf::from(&workspace_path)).await;
-    let revision = workspace.sync(&args.server).await.unwrap_or_else(|e| {
+    let revision = workspace.sync(&args.server, &args.token).await.unwrap_or_else(|e| {
         error!("Failed to get workspace: {}", e);
         std::process::exit(1);
     });
@@ -77,12 +78,16 @@ async fn main() {
     ));
 
     let mut runner = Runner::new(Some(args.server), Some(args.job_id), Some(args.worker_id), args.task, args.action, input, workspace, Some(revision), log_collector);
-    let success = runner.execute().await.unwrap_or_else(|e| {
+    let (success, output) = runner.execute().await.unwrap_or_else(|e| {
         error!("Execution failed: {}", e);
-        false
+        (false, None)
     });
 
     if !success {
         std::process::exit(1);
+    }
+
+    if let Some(output) = output {
+        println!("OUTPUT:{}", serde_json::to_string(&output).unwrap().to_string());
     }
 }

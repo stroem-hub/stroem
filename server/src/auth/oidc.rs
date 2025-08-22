@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use anyhow::Error;
 use async_trait::async_trait;
-use serde_json::Value;
+
 use sqlx::{PgPool, Row};
 use crate::auth::{AuthProviderImpl, AuthResponse, User};
 use openid;
@@ -54,7 +54,7 @@ impl AuthProviderOIDC {
                      name_claim: String,
                      email_claim: String,
     ) -> Result<Self, Error> {
-        let http_client = reqwest::ClientBuilder::new()
+        let _http_client = reqwest::ClientBuilder::new()
             // Following redirects opens the client up to SSRF vulnerabilities.
             .redirect(reqwest::redirect::Policy::none())
             .build()?;
@@ -135,6 +135,6 @@ impl AuthProviderImpl for AuthProviderOIDC {
             });
             return Ok(AuthResponse::Redirect(auth_url.to_string()));
         }
-        Ok(AuthResponse::WrongCredentials)
+        // Ok(AuthResponse::WrongCredentials)
     }
 }

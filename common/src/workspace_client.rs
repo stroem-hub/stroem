@@ -6,7 +6,7 @@ use tar::{Archive};
 use std::fs::{File};
 use std::io::{Read, Write};
 use flate2::read::GzDecoder;
-use reqwest::Client;
+use reqwest::{header, Client};
 use fs2::FileExt;
 use crate::workflows_configuration::WorkflowsConfiguration;
 
@@ -28,12 +28,13 @@ impl WorkspaceClient {
         }
     }
 
-    pub async fn sync(&mut self, server: &str) -> Result<String, Error> {
+    pub async fn sync(&mut self, server: &str, token: &str) -> Result<String, Error> {
         let client = Client::new();
         let url = format!("{}/files/workspace.tar.gz", server);
 
         // Check revision with HEAD request
         let head_response = client.head(&url)
+            .header(header::AUTHORIZATION, format!("Bearer {}", token))
             .send()
             .await
             .map_err(|e| anyhow!("Failed to fetch workspace revision: {}", e))?;
@@ -96,6 +97,7 @@ impl WorkspaceClient {
             .map_err(|e| anyhow!("Failed to create workspace dir: {}", e))?;
 
         let response = client.get(&url)
+            .header(header::AUTHORIZATION, format!("Bearer {}", token))
             .send()
             .await
             .map_err(|e| anyhow!("Failed to fetch workspace tar: {}", e))?;

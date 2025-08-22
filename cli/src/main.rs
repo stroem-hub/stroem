@@ -76,9 +76,9 @@ async fn main() {
                                          workspace, None,
                                          log_collector);
 
-            let success = runner.execute().await.unwrap_or_else(|e| {
+            let (success, output) = runner.execute().await.unwrap_or_else(|e| {
                 eprintln!("Execution failed: {}", e);
-                false
+                (false, None)
             });
 
             if !success {
@@ -86,6 +86,9 @@ async fn main() {
             }
 
             println!("Successfully executed");
+            if let Some(output) = output {
+                println!("OUTPUT:{:?}", serde_json::to_string(&output));
+            }
         }
     }
 

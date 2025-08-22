@@ -1,22 +1,18 @@
 
 use std::collections::HashMap;
-use std::convert::Infallible;
-use std::pin::Pin;
 use std::sync::{Arc, Mutex};
-use std::task::{Context, Poll};
 use axum::body::Body;
 use axum::extract::State;
 use axum::http::{StatusCode, Uri};
 use axum::response::{IntoResponse, Response};
-use axum::response::sse::Event;
+
 use axum::Router;
 use axum::routing::get;
-use futures::Stream;
+
 use mime_guess::from_path;
 use reqwest::Url;
 use rust_embed::RustEmbed;
-use serde::Serialize;
-use serde_json::{json, Value};
+
 use tokio::net::TcpListener;
 use tokio::sync::broadcast::Sender;
 use tracing::{debug, info};
@@ -129,7 +125,7 @@ async fn health_check() -> impl IntoResponse {
 }
 
 #[axum::debug_handler]
-async fn ready_check(State(api): State<WebState>) -> impl IntoResponse {
+async fn ready_check(State(_api): State<WebState>) -> impl IntoResponse {
     // TODO: Add checks for DB connection, workspace availability.
     StatusCode::OK
 }
