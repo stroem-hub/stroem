@@ -8,7 +8,7 @@ use tracing::log::debug;
 use anyhow::Error;
 use serde_json::Value;
 
-pub async fn start(job: &JobRequest, server: &str, worker_id: &str, log_collector: Arc<(dyn LogCollector + Send + Sync)>) -> Result<(bool, Option<Value>), Error> {
+pub async fn start(job: &JobRequest, server: &str, token: &str, worker_id: &str, log_collector: Arc<(dyn LogCollector + Send + Sync)>) -> Result<(bool, Option<Value>), Error> {
     let worker_path = match env::current_exe() {
         Ok(path) => path,
         Err(e) => {
@@ -43,6 +43,7 @@ pub async fn start(job: &JobRequest, server: &str, worker_id: &str, log_collecto
 
     let mut runner_args = vec![
         "--server".to_string(), server.to_string(),
+        "--token".to_string(), token.to_string(),
         "--job-id".to_string(), uuid.to_string(),
         "--worker-id".to_string(), worker_id.to_string(),
         "--verbose".to_string(),

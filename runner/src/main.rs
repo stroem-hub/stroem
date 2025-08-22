@@ -58,7 +58,7 @@ async fn main() {
         }));
 
     let mut workspace = WorkspaceClient::new(PathBuf::from(&workspace_path)).await;
-    let revision = workspace.sync(&args.server).await.unwrap_or_else(|e| {
+    let revision = workspace.sync(&args.server, &args.token).await.unwrap_or_else(|e| {
         error!("Failed to get workspace: {}", e);
         std::process::exit(1);
     });
