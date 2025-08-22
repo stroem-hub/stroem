@@ -78,12 +78,16 @@ async fn main() {
     ));
 
     let mut runner = Runner::new(Some(args.server), Some(args.job_id), Some(args.worker_id), args.task, args.action, input, workspace, Some(revision), log_collector);
-    let success = runner.execute().await.unwrap_or_else(|e| {
+    let (success, output) = runner.execute().await.unwrap_or_else(|e| {
         error!("Execution failed: {}", e);
-        false
+        (false, None)
     });
 
     if !success {
         std::process::exit(1);
+    }
+
+    if let Some(output) = output {
+        println!("OUTPUT:{}", serde_json::to_string(&output).unwrap().to_string());
     }
 }
