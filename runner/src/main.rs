@@ -47,7 +47,8 @@ async fn main() {
 
      */
 
-    let workspace_path = fs::canonicalize(args.workspace).unwrap();
+    fs::create_dir_all(&args.workspace).expect("Could not create workspace folder");
+    let workspace_path = fs::canonicalize(args.workspace).expect("Could not get real workspace folder");
 
     info!("Runner started for job_id: {}, worker_id: {}", args.job_id, args.worker_id);
 
