@@ -52,15 +52,15 @@
   - Update Sidebar if needed to remove any Flowbite dependencies
   - _Requirements: 1.3, 3.1, 3.2, 5.1, 5.2_
 
-- [ ] 4. Replace Flowbite components in main layout
-- [ ] 4.1 Update main layout file with custom navigation components
+- [x] 4. Replace Flowbite components in main layout
+- [x] 4.1 Update main layout file with custom navigation components
   - Replace Flowbite Sidebar, Navbar, and Dropdown imports in `ui/src/routes/+layout.svelte`
   - Update component usage to match new interfaces and Svelte 5 syntax
   - Ensure all navigation functionality works correctly
   - Test user authentication state handling
   - _Requirements: 1.1, 3.1, 3.2, 4.1_
 
-- [ ] 4.2 Verify dashboard layout and navigation functionality
+- [x] 4.2 Verify dashboard layout and navigation functionality
   - Test sidebar navigation and active state management
   - Verify user dropdown and logout functionality
   - Test responsive behavior on different screen sizes
