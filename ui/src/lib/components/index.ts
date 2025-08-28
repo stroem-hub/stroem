@@ -1,9 +1,11 @@
 // Atomic Design Component Exports
 
 // Atoms - Basic components
+export { default as Alert } from './atoms/Alert.svelte';
 export { default as Button } from './atoms/Button.svelte';
 export { default as Card } from './atoms/Card.svelte';
 export { default as Input } from './atoms/Input.svelte';
+export { default as Label } from './atoms/Label.svelte';
 export { default as Select } from './atoms/Select.svelte';
 export { default as FormField } from './atoms/FormField.svelte';
 export { default as Table } from './atoms/Table.svelte';

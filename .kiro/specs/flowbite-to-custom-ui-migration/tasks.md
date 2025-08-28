@@ -1,14 +1,14 @@
 # Implementation Plan
 
-- [ ] 1. Create missing components needed for login screen
-- [ ] 1.1 Create Alert component with Svelte 5 syntax
+- [x] 1. Create missing components needed for login screen
+- [x] 1.1 Create Alert component with Svelte 5 syntax
   - Implement Alert component with dismissible functionality in `ui/src/lib/components/atoms/Alert.svelte`
   - Add support for different alert variants (info, success, warning, error)
   - Include icon snippet support and proper accessibility
   - Add Alert export to `ui/src/lib/components/index.ts`
   - _Requirements: 1.3, 2.1, 5.1, 5.2_
 
-- [ ] 1.2 Create Label component with Svelte 5 syntax
+- [x] 1.2 Create Label component with Svelte 5 syntax
   - Implement Label component with required field indicator in `ui/src/lib/components/atoms/Label.svelte`
   - Add proper accessibility attributes and associations
   - Include TypeScript interface for all props
