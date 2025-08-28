@@ -15,15 +15,15 @@
   - Add Label export to `ui/src/lib/components/index.ts`
   - _Requirements: 1.3, 2.1, 5.1, 5.2_
 
-- [ ] 2. Replace Flowbite components in login page
-- [ ] 2.1 Update login page imports and component usage
+- [x] 2. Replace Flowbite components in login page
+- [x] 2.1 Update login page imports and component usage
   - Replace Flowbite Button, Input, Label, Alert imports with custom components from `ui/src/lib/components`
   - Update component usage to match new prop interfaces and Svelte 5 syntax
   - Ensure all authentication functionality remains intact
   - Test login flows with different authentication providers
   - _Requirements: 1.1, 2.1, 2.2, 4.1_
 
-- [ ] 2.2 Verify login page functionality and styling
+- [x] 2.2 Verify login page functionality and styling
   - Test all login scenarios (internal auth, OIDC, multiple providers)
   - Verify responsive design works correctly
   - Test error handling and display with new Alert component

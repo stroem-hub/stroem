@@ -1,17 +1,12 @@
 <script lang="ts">
   import type { PageProps } from './$types';
-  import { Button, Input, Label, Alert } from 'flowbite-svelte';
-  import { InfoCircleSolid } from 'flowbite-svelte-icons';
+  import { Button, Input, Alert } from '$lib/components';
+  import { ExclamationCircleIcon } from '$lib/components/icons';
   import { goto } from '$app/navigation';
   import { writable } from 'svelte/store';
   import { accessToken, authUser } from '$lib/stores';
 
-  interface Provider {
-    id: string;
-    type: string;
-    primary?: boolean;
-    name: string;
-  }
+
 
   let { data }: PageProps = $props();
   const providers = data.providers;
@@ -67,8 +62,10 @@
 
 </script>
 {#if showError}
-  <Alert color="red" class="mb-4 absolute w-full" onclose={() => showError = false} dismissable>
-    <InfoCircleSolid slot="icon" class="w-5 h-5" />
+  <Alert variant="error" class="mb-4 absolute w-full" onclose={() => showError = false} dismissible>
+    {#snippet icon()}
+      <ExclamationCircleIcon class="w-5 h-5" />
+    {/snippet}
     {errorMessage}
   </Alert>
 {/if}
@@ -83,19 +80,19 @@
         <h3 class="mb-6 font-bold text-center text-gray-800">Login with {provider.name} authentication</h3>
     {#if provider.type === 'internal'}
       <Input
-        class="block w-full mt-2 p-2 border rounded-md"
+        fullWidth
         type="email"
         placeholder="E-mail"
         bind:value={email}
       />
       <Input
-        class="block w-full mt-2 p-2 border rounded-md"
+        fullWidth
         type="password"
         placeholder="Password"
         bind:value={password}
       />
       <Button
-        color="blue"
+        variant="primary"
         class="w-full mb-4 transition-transform transform hover:scale-105"
         onclick={() => loginInternal(provider.id)}
       >
@@ -103,7 +100,7 @@
       </Button>
     {:else}
       <Button
-        color="blue"
+        variant="primary"
         class="w-full mb-4 transition-transform transform hover:scale-105"
         onclick={() => loginOIDC(provider.id)}
       >
@@ -115,6 +112,7 @@
     {/each}
     {#if providers.length > 1 && !$showAll}
       <Button
+        variant="ghost"
         class="text-blue-500 underline text-sm mt-4"
         onclick={() => showAll.set(true)}
         disabled={$showAll}
@@ -126,13 +124,3 @@
   </div>
 </div>
 
-<style>
-  .animate-fade-in {
-    animation: fadeIn 0.3s ease-in;
-  }
-
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-</style>

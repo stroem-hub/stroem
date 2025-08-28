@@ -1,12 +1,13 @@
 <script lang="ts">
 	import type { HTMLInputAttributes } from 'svelte/elements';
 
-	interface InputProps extends Omit<HTMLInputAttributes, 'class'> {
+	interface InputProps extends Omit<HTMLInputAttributes, 'class' | 'size'> {
 		variant?: 'default' | 'error' | 'success';
 		size?: 'sm' | 'md' | 'lg';
 		fullWidth?: boolean;
 		error?: string;
 		success?: string;
+		value?: string;
 		class?: string;
 	}
 
@@ -17,6 +18,7 @@
 		disabled = false,
 		error,
 		success,
+		value = $bindable(''),
 		class: className = '',
 		...restProps
 	}: InputProps = $props();
@@ -102,7 +104,7 @@
 </script>
 
 <div class={fullWidth ? 'w-full' : ''}>
-	<input class={inputClasses} {disabled} {...restProps} />
+	<input class={inputClasses} {disabled} bind:value {...restProps} />
 	
 	{#if error}
 		<p class="mt-1 text-sm text-error-600 dark:text-error-400" role="alert">
