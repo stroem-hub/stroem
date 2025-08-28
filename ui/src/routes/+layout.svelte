@@ -6,15 +6,13 @@
 	import { accessToken, authUser } from '$lib/stores';
 	import { refreshAccessToken } from '$lib/auth';
 	import { Sidebar } from '$lib/components';
-	import { 
-		DashboardIcon, 
-		TasksIcon, 
-		ActionsIcon, 
-		TriggersIcon
-	} from '$lib/components/icons';
+	import { DashboardIcon, TasksIcon, ActionsIcon, TriggersIcon } from '$lib/components/icons';
 	import '../app.css';
 
 	let { children } = $props();
+
+	// Sidebar collapse state
+	let sidebarCollapsed = $state(false);
 
 	// Navigation items for the sidebar
 	const navigationItems = [
@@ -45,11 +43,20 @@
 	];
 
 	// Convert authUser to Sidebar user format
-	const sidebarUser = $derived($authUser ? {
-		id: $authUser.user_id,
-		name: $authUser.name || 'User',
-		email: $authUser.email
-	} : undefined);
+	const sidebarUser = $derived(
+		$authUser
+			? {
+					id: $authUser.user_id,
+					name: $authUser.name || 'User',
+					email: $authUser.email
+				}
+			: undefined
+	);
+
+	// Handle sidebar toggle
+	function handleSidebarToggle(collapsed) {
+		sidebarCollapsed = collapsed;
+	}
 
 	// Handle user logout
 	function handleLogout() {
@@ -73,27 +80,29 @@
 			goto('/login');
 		}
 	});
-
 </script>
-{#if $authUser}
-<div class="h-screen">
-	<Sidebar 
-		user={sidebarUser}
-		items={navigationItems}
-		onLogout={handleLogout}
-	/>
 
-	<!-- Main content with responsive margin to account for sidebar -->
-	<main class="p-9 overflow-y-auto h-full ml-0 md:ml-64 transition-all duration-300">
-		{@render children()}
-	</main>
-</div>
+{#if $authUser}
+	<div class="h-screen">
+		<Sidebar
+			user={sidebarUser}
+			items={navigationItems}
+			collapsed={sidebarCollapsed}
+			onToggle={handleSidebarToggle}
+			onLogout={handleLogout}
+		/>
+
+		<!-- Main content with responsive margin to account for sidebar -->
+		<main
+			class="p-9 overflow-y-auto h-full ml-0 transition-all duration-300 {sidebarCollapsed
+				? 'md:ml-16'
+				: 'md:ml-64'}"
+		>
+			{@render children()}
+		</main>
+	</div>
 {:else}
 	<main>
 		{@render children()}
 	</main>
 {/if}
-
-
-
-
