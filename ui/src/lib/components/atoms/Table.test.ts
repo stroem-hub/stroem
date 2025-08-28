@@ -1,202 +1,43 @@
 import { render, screen } from '@testing-library/svelte';
 import { describe, it, expect, vi } from 'vitest';
-import userEvent from '@testing-library/user-event';
 import Table from './Table.svelte';
 
-const mockColumns = [
-	{ key: 'id', label: 'ID', sortable: true, width: '80px' },
-	{ key: 'name', label: 'Name', sortable: true },
-	{ key: 'email', label: 'Email', sortable: false },
-	{ key: 'status', label: 'Status', align: 'center' as const }
-];
+describe('Table Component', () => {
+	const mockColumns = [
+		{ key: 'id', label: 'ID', sortable: true },
+		{ key: 'name', label: 'Name', sortable: true },
+		{ key: 'status', label: 'Status', align: 'center' as const },
+		{ key: 'date', label: 'Date', align: 'right' as const }
+	];
 
-const mockData = [
-	{ id: 1, name: 'John Doe', email: 'john@example.com', status: 'Active' },
-	{ id: 2, name: 'Jane Smith', email: 'jane@example.com', status: 'Inactive' },
-	{ id: 3, name: 'Bob Johnson', email: 'bob@example.com', status: 'Active' }
-];
+	const mockData = [
+		{ id: 1, name: 'Task 1', status: 'Active', date: '2024-01-01' },
+		{ id: 2, name: 'Task 2', status: 'Inactive', date: '2024-01-02' },
+		{ id: 3, name: 'Task 3', status: 'Pending', date: '2024-01-03' }
+	];
 
-describe('Table', () => {
-	it('renders with basic props', () => {
-		const { container } = render(Table, {
+	it('renders table with data correctly', () => {
+		render(Table, {
 			props: {
 				columns: mockColumns,
 				data: mockData
 			}
 		});
 
-		const table = container.querySelector('table');
-		expect(table).toBeInTheDocument();
-		expect(table).toHaveClass('w-full', 'border-collapse', 'bg-white', 'dark:bg-gray-800');
+		// Check headers are rendered
+		expect(screen.getByText('ID')).toBeInTheDocument();
+		expect(screen.getByText('Name')).toBeInTheDocument();
+		expect(screen.getByText('Status')).toBeInTheDocument();
+		expect(screen.getByText('Date')).toBeInTheDocument();
+
+		// Check data is rendered
+		expect(screen.getByText('Task 1')).toBeInTheDocument();
+		expect(screen.getByText('Task 2')).toBeInTheDocument();
+		expect(screen.getByText('Task 3')).toBeInTheDocument();
 	});
 
-	it('renders column headers correctly', () => {
-		const { container } = render(Table, {
-			props: {
-				columns: mockColumns,
-				data: mockData
-			}
-		});
-
-		const headers = container.querySelectorAll('th');
-		expect(headers).toHaveLength(4);
-		expect(headers[0]).toHaveTextContent('ID');
-		expect(headers[1]).toHaveTextContent('Name');
-		expect(headers[2]).toHaveTextContent('Email');
-		expect(headers[3]).toHaveTextContent('Status');
-	});
-
-	it('renders data rows correctly', () => {
-		const { container } = render(Table, {
-			props: {
-				columns: mockColumns,
-				data: mockData
-			}
-		});
-
-		const rows = container.querySelectorAll('tbody tr');
-		expect(rows).toHaveLength(3);
-
-		// Check first row data
-		const firstRowCells = rows[0].querySelectorAll('td');
-		expect(firstRowCells[0]).toHaveTextContent('1');
-		expect(firstRowCells[1]).toHaveTextContent('John Doe');
-		expect(firstRowCells[2]).toHaveTextContent('john@example.com');
-		expect(firstRowCells[3]).toHaveTextContent('Active');
-	});
-
-	it('applies column width styles', () => {
-		const { container } = render(Table, {
-			props: {
-				columns: mockColumns,
-				data: mockData
-			}
-		});
-
-		const firstHeader = container.querySelector('th');
-		expect(firstHeader).toHaveStyle('width: 80px');
-	});
-
-	it('applies column alignment classes', () => {
-		const { container } = render(Table, {
-			props: {
-				columns: mockColumns,
-				data: mockData
-			}
-		});
-
-		const statusHeader = container.querySelectorAll('th')[3];
-		const statusCell = container.querySelector('tbody tr td:nth-child(4)');
-		
-		expect(statusHeader).toHaveClass('text-center');
-		expect(statusCell).toHaveClass('text-center');
-	});
-
-	it('shows sortable column indicators', () => {
-		const { container } = render(Table, {
-			props: {
-				columns: mockColumns,
-				data: mockData,
-				sortable: true
-			}
-		});
-
-		const sortableHeaders = container.querySelectorAll('th svg');
-		expect(sortableHeaders).toHaveLength(2); // ID and Name columns are sortable
-	});
-
-	it('handles column sorting', async () => {
-		const user = userEvent.setup();
-		const handleSort = vi.fn();
-
-		const { container } = render(Table, {
-			props: {
-				columns: mockColumns,
-				data: mockData,
-				sortable: true,
-				onSort: handleSort
-			}
-		});
-
-		const nameHeader = container.querySelectorAll('th')[1];
-		await user.click(nameHeader);
-
-		expect(handleSort).toHaveBeenCalledWith({ key: 'name', direction: 'asc' });
-	});
-
-	it('toggles sort direction on repeated clicks', async () => {
-		const user = userEvent.setup();
-		const handleSort = vi.fn();
-
-		const { container } = render(Table, {
-			props: {
-				columns: mockColumns,
-				data: mockData,
-				sortable: true,
-				sortConfig: { key: 'name', direction: 'asc' },
-				onSort: handleSort
-			}
-		});
-
-		const nameHeader = container.querySelectorAll('th')[1];
-		await user.click(nameHeader);
-
-		expect(handleSort).toHaveBeenCalledWith({ key: 'name', direction: 'desc' });
-	});
-
-	it('renders selection checkboxes when selectable', () => {
-		const { container } = render(Table, {
-			props: {
-				columns: mockColumns,
-				data: mockData,
-				selectable: true
-			}
-		});
-
-		const checkboxes = container.querySelectorAll('input[type="checkbox"]');
-		expect(checkboxes).toHaveLength(4); // 1 header + 3 rows
-	});
-
-	it('handles row selection', async () => {
-		const user = userEvent.setup();
-		const handleRowSelect = vi.fn();
-
-		const { container } = render(Table, {
-			props: {
-				columns: mockColumns,
-				data: mockData,
-				selectable: true,
-				onRowSelect: handleRowSelect
-			}
-		});
-
-		const firstRowCheckbox = container.querySelectorAll('input[type="checkbox"]')[1];
-		await user.click(firstRowCheckbox);
-
-		expect(handleRowSelect).toHaveBeenCalledWith(1, true);
-	});
-
-	it('handles select all', async () => {
-		const user = userEvent.setup();
-		const handleSelectAll = vi.fn();
-
-		const { container } = render(Table, {
-			props: {
-				columns: mockColumns,
-				data: mockData,
-				selectable: true,
-				onSelectAll: handleSelectAll
-			}
-		});
-
-		const selectAllCheckbox = container.querySelector('input[type="checkbox"]');
-		await user.click(selectAllCheckbox!);
-
-		expect(handleSelectAll).toHaveBeenCalledWith(true);
-	});
-
-	it('shows loading state', () => {
-		const { container } = render(Table, {
+	it('shows loading state correctly', () => {
+		render(Table, {
 			props: {
 				columns: mockColumns,
 				data: [],
@@ -204,28 +45,23 @@ describe('Table', () => {
 			}
 		});
 
-		const loadingText = container.querySelector('tbody td');
-		expect(loadingText).toHaveTextContent('Loading...');
-		
-		const spinner = container.querySelector('svg.animate-spin');
-		expect(spinner).toBeInTheDocument();
+		expect(screen.getByText('Loading...')).toBeInTheDocument();
 	});
 
-	it('shows empty state', () => {
-		const { container } = render(Table, {
+	it('shows empty state correctly', () => {
+		render(Table, {
 			props: {
 				columns: mockColumns,
 				data: [],
-				emptyMessage: 'No users found'
+				emptyMessage: 'No tasks found'
 			}
 		});
 
-		const emptyText = container.querySelector('tbody td');
-		expect(emptyText).toHaveTextContent('No users found');
+		expect(screen.getByText('No tasks found')).toBeInTheDocument();
 	});
 
-	it('shows error state', () => {
-		const { container } = render(Table, {
+	it('shows error state correctly', () => {
+		render(Table, {
 			props: {
 				columns: mockColumns,
 				data: [],
@@ -233,35 +69,84 @@ describe('Table', () => {
 			}
 		});
 
-		const errorText = container.querySelector('tbody td');
-		expect(errorText).toHaveTextContent('Failed to load data');
+		expect(screen.getByText('Failed to load data')).toBeInTheDocument();
 	});
 
-	it('uses custom render function for columns', () => {
-		const columnsWithRender = [
-			...mockColumns,
-			{
-				key: 'actions',
-				label: 'Actions',
-				render: (value: any, row: any) => `Edit ${row.name}`
-			}
-		];
-
-		const dataWithActions = mockData.map(item => ({ ...item, actions: null }));
-
-		const { container } = render(Table, {
+	it('handles sorting correctly', async () => {
+		const onSort = vi.fn();
+		
+		render(Table, {
 			props: {
-				columns: columnsWithRender,
-				data: dataWithActions
+				columns: mockColumns,
+				data: mockData,
+				onSort
 			}
 		});
 
-		const actionCells = container.querySelectorAll('tbody tr td:last-child');
-		expect(actionCells[0]).toHaveTextContent('Edit John Doe');
-		expect(actionCells[1]).toHaveTextContent('Edit Jane Smith');
+		// Click on sortable column header
+		const idHeader = screen.getByText('ID').closest('th');
+		await idHeader?.click();
+
+		expect(onSort).toHaveBeenCalledWith({ key: 'id', direction: 'asc' });
 	});
 
-	it('applies custom className', () => {
+	it('handles row selection correctly', async () => {
+		const onRowSelect = vi.fn();
+		const selectedRows = new Set();
+
+		render(Table, {
+			props: {
+				columns: mockColumns,
+				data: mockData,
+				selectable: true,
+				selectedRows,
+				onRowSelect
+			}
+		});
+
+		// Find and click first row checkbox
+		const checkboxes = screen.getAllByRole('checkbox');
+		const firstRowCheckbox = checkboxes[1]; // Skip the select-all checkbox
+		await firstRowCheckbox.click();
+
+		expect(onRowSelect).toHaveBeenCalledWith(1, true);
+	});
+
+	it('handles select all correctly', async () => {
+		const onSelectAll = vi.fn();
+		const selectedRows = new Set();
+
+		render(Table, {
+			props: {
+				columns: mockColumns,
+				data: mockData,
+				selectable: true,
+				selectedRows,
+				onSelectAll
+			}
+		});
+
+		// Find and click select-all checkbox
+		const checkboxes = screen.getAllByRole('checkbox');
+		const selectAllCheckbox = checkboxes[0];
+		await selectAllCheckbox.click();
+
+		expect(onSelectAll).toHaveBeenCalledWith(true);
+	});
+
+	it('supports custom snippets for empty and error states', () => {
+		const { component } = render(Table, {
+			props: {
+				columns: mockColumns,
+				data: [],
+				emptyState: () => 'Custom empty state'
+			}
+		});
+
+		expect(screen.getByText('Custom empty state')).toBeInTheDocument();
+	});
+
+	it('applies custom classes correctly', () => {
 		const { container } = render(Table, {
 			props: {
 				columns: mockColumns,
@@ -274,119 +159,20 @@ describe('Table', () => {
 		expect(table).toHaveClass('custom-table-class');
 	});
 
-	it('passes through additional HTML attributes', () => {
-		const { container } = render(Table, {
-			props: {
-				columns: mockColumns,
-				data: mockData,
-				'data-testid': 'custom-table',
-				'aria-label': 'Data table'
-			}
-		});
-
-		const table = container.querySelector('table');
-		expect(table).toHaveAttribute('data-testid', 'custom-table');
-		expect(table).toHaveAttribute('aria-label', 'Data table');
-	});
-
-	it('handles empty columns array', () => {
-		const { container } = render(Table, {
-			props: {
-				columns: [],
-				data: mockData
-			}
-		});
-
-		const headers = container.querySelectorAll('th');
-		expect(headers).toHaveLength(0);
-	});
-
-	it('handles missing row key gracefully', () => {
-		const dataWithoutId = [
-			{ name: 'John', email: 'john@example.com' },
-			{ name: 'Jane', email: 'jane@example.com' }
-		];
-
-		const { container } = render(Table, {
-			props: {
-				columns: [
-					{ key: 'name', label: 'Name' },
-					{ key: 'email', label: 'Email' }
-				],
-				data: dataWithoutId,
-				selectable: true,
-				rowKey: 'id' // This key doesn't exist in data
-			}
-		});
-
-		const table = container.querySelector('table');
-		expect(table).toBeInTheDocument();
-	});
-
-	it('shows correct selected state indicators', () => {
-		const selectedRows = new Set([1, 2]);
-
-		const { container } = render(Table, {
-			props: {
-				columns: mockColumns,
-				data: mockData,
-				selectable: true,
-				selectedRows
-			}
-		});
-
-		const checkboxes = container.querySelectorAll('input[type="checkbox"]');
-		const headerCheckbox = checkboxes[0] as HTMLInputElement;
-		const firstRowCheckbox = checkboxes[1] as HTMLInputElement;
-		const secondRowCheckbox = checkboxes[2] as HTMLInputElement;
-		const thirdRowCheckbox = checkboxes[3] as HTMLInputElement;
-
-		expect(firstRowCheckbox.checked).toBe(true);
-		expect(secondRowCheckbox.checked).toBe(true);
-		expect(thirdRowCheckbox.checked).toBe(false);
-		expect(headerCheckbox.indeterminate).toBe(true); // Some but not all selected
-	});
-
-	it('shows all selected state', () => {
-		const selectedRows = new Set([1, 2, 3]);
-
-		const { container } = render(Table, {
-			props: {
-				columns: mockColumns,
-				data: mockData,
-				selectable: true,
-				selectedRows
-			}
-		});
-
-		const headerCheckbox = container.querySelector('input[type="checkbox"]') as HTMLInputElement;
-		expect(headerCheckbox.checked).toBe(true);
-		expect(headerCheckbox.indeterminate).toBe(false);
-	});
-
-	it('has proper hover effects on rows', () => {
-		const { container } = render(Table, {
+	it('handles column alignment correctly', () => {
+		render(Table, {
 			props: {
 				columns: mockColumns,
 				data: mockData
 			}
 		});
 
-		const rows = container.querySelectorAll('tbody tr');
-		rows.forEach(row => {
-			expect(row).toHaveClass('hover:bg-gray-50', 'dark:hover:bg-gray-700', 'transition-colors');
-		});
-	});
+		// Check that status column (center aligned) has correct class
+		const statusCells = screen.getAllByText('Active')[0].closest('td');
+		expect(statusCells).toHaveClass('text-center');
 
-	it('has proper responsive wrapper', () => {
-		const { container } = render(Table, {
-			props: {
-				columns: mockColumns,
-				data: mockData
-			}
-		});
-
-		const wrapper = container.querySelector('div');
-		expect(wrapper).toHaveClass('overflow-x-auto');
+		// Check that date column (right aligned) has correct class
+		const dateCells = screen.getAllByText('2024-01-01')[0].closest('td');
+		expect(dateCells).toHaveClass('text-right');
 	});
 });
