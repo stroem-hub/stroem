@@ -1,0 +1,20 @@
+// Icon exports (only existing ones)
+export { default as DashboardIcon } from './DashboardIcon.svelte';
+export { default as TasksIcon } from './TasksIcon.svelte';
+export { default as ActionsIcon } from './ActionsIcon.svelte';
+export { default as TriggersIcon } from './TriggersIcon.svelte';
+export { default as JobsIcon } from './JobsIcon.svelte';
+export { default as UserIcon } from './UserIcon.svelte';
+export { default as LogoutIcon } from './LogoutIcon.svelte';
+export { default as MenuIcon } from './MenuIcon.svelte';
+export { default as ChevronLeftIcon } from './ChevronLeftIcon.svelte';
+export { default as ChevronDownIcon } from './ChevronDownIcon.svelte';
+export { default as ChevronRightIcon } from './ChevronRightIcon.svelte';
+export { default as HomeIcon } from './HomeIcon.svelte';
+export { default as XIcon } from './XIcon.svelte';
+export { default as SettingsIcon } from './SettingsIcon.svelte';
+export { default as TrendingUpIcon } from './TrendingUpIcon.svelte';
+export { default as TrendingDownIcon } from './TrendingDownIcon.svelte';
+export { default as ClockIcon } from './ClockIcon.svelte';
+export { default as CheckCircleIcon } from './CheckCircleIcon.svelte';
+export { default as ExclamationCircleIcon } from './ExclamationCircleIcon.svelte';
