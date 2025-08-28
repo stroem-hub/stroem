@@ -1,6 +1,7 @@
 <script lang="ts">
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { onMount } from 'svelte';
+  import type { Snippet } from 'svelte';
   import { 
     DashboardIcon, 
     TasksIcon, 
@@ -14,8 +15,24 @@
     XIcon,
     SettingsIcon
   } from '../icons';
-  import type { NavigationItem, User } from '$lib/types';
   import ThemeToggle from '../atoms/ThemeToggle.svelte';
+
+  // Define types inline since $lib/types doesn't exist
+  interface NavigationItem {
+    id: string;
+    label: string;
+    href?: string;
+    icon?: any; // Icon component
+    badge?: string | number;
+    children?: NavigationItem[];
+  }
+
+  interface User {
+    id: string;
+    name: string;
+    email: string;
+    avatar?: string;
+  }
 
   interface Props {
     user?: User;
@@ -85,9 +102,9 @@
 
   function isActive(href: string): boolean {
     if (href === '/') {
-      return $page.url.pathname === '/';
+      return page.url.pathname === '/';
     }
-    return $page.url.pathname.startsWith(href);
+    return page.url.pathname.startsWith(href);
   }
 
   function handleToggle() {

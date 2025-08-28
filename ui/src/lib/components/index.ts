@@ -19,9 +19,11 @@ export { default as Breadcrumb } from './molecules/Breadcrumb.svelte';
 export { default as MetricCard } from './molecules/MetricCard.svelte';
 export { default as LineChart } from './molecules/LineChart.svelte';
 export { default as ActivityFeed } from './molecules/ActivityFeed.svelte';
+export { default as Dropdown } from './molecules/Dropdown.svelte';
 
 // Organisms - Complex components
 export { default as Sidebar } from './organisms/Sidebar.svelte';
+export { default as Navbar } from './organisms/Navbar.svelte';
 export { default as ErrorBoundary } from './organisms/ErrorBoundary.svelte';
 export { default as ToastContainer } from './organisms/ToastContainer.svelte';
 export { default as LoadingOverlay } from './organisms/LoadingOverlay.svelte';

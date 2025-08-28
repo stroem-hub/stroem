@@ -30,22 +30,22 @@
   - Ensure theme switching works properly
   - _Requirements: 2.1, 2.2, 2.3, 4.1_
 
-- [ ] 3. Create missing navigation components for dashboard
-- [ ] 3.1 Create Dropdown component with Svelte 5 syntax
+- [x] 3. Create missing navigation components for dashboard
+- [x] 3.1 Create Dropdown component with Svelte 5 syntax
   - Implement dropdown with proper positioning and accessibility in `ui/src/lib/components/molecules/Dropdown.svelte`
   - Add keyboard navigation support and click-outside handling for closing
   - Include TypeScript interface for dropdown items and props
   - Add Dropdown export to `ui/src/lib/components/index.ts`
   - _Requirements: 1.3, 3.1, 3.2, 5.1, 5.2_
 
-- [ ] 3.2 Create Navbar component with Svelte 5 syntax
+- [x] 3.2 Create Navbar component with Svelte 5 syntax
   - Implement responsive navbar with mobile hamburger menu in `ui/src/lib/components/organisms/Navbar.svelte`
   - Add support for brand logo and navigation items
   - Include user dropdown integration
   - Add Navbar export to `ui/src/lib/components/index.ts`
   - _Requirements: 1.3, 3.1, 3.2, 5.1, 5.2_
 
-- [ ] 3.3 Verify existing Sidebar component compatibility
+- [x] 3.3 Verify existing Sidebar component compatibility
   - Check if existing Sidebar component needs updates for Flowbite replacement
   - Ensure Sidebar uses proper navigation item handling and active states
   - Test sidebar interactions and responsive behavior
