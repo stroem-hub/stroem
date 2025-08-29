@@ -1,23 +1,20 @@
 <script lang="ts">
-	import { Card, Button } from 'flowbite-svelte';
-	import { Input, Label, Helper } from 'flowbite-svelte';
-	import { Tabs, TabItem } from 'flowbite-svelte';
-	import {
-		Table,
-		TableBody,
-		TableBodyCell,
-		TableBodyRow,
-		TableHead,
-		TableHeadCell,
+	import { 
+		Card, 
+		Button, 
+		Input, 
+		FormField, 
+		Tabs, 
+		Table, 
+		Alert,
 		Tooltip
-	} from 'flowbite-svelte';
+	} from '$lib/components';
 	import {
-		CloseCircleSolid,
-		CheckCircleSolid,
-		QuestionCircleSolid,
-		InfoCircleSolid
-	} from 'flowbite-svelte-icons';
-	import { Alert } from 'flowbite-svelte';
+		CloseCircleIcon,
+		CheckCircleIcon,
+		QuestionCircleIcon,
+		InfoCircleIcon
+	} from '$lib/components/icons';
 	import { goto } from '$app/navigation';
 	import type { PageProps } from './$types';
 	import { callApi } from '$lib/auth';
@@ -63,7 +60,7 @@
 		return entries;
 	}
 
-	let runResponse = $state({ success: true, data: null, error: null });
+	let runResponse = $state<{ success: boolean; data: any; error: string | null }>({ success: true, data: null, error: null });
 
 	async function runTask(event: SubmitEvent & { currentTarget: EventTarget & HTMLFormElement }) {
 		event.preventDefault();
@@ -91,7 +88,7 @@
 
 			runResponse = await res?.json();
 		} catch (err) {
-			runResponse = { success: false, data: null, meta: null, error: 'Failed to run task' };
+			runResponse = { success: false, data: null, error: 'Failed to run task' };
 			console.error(err);
 		}
 
@@ -107,117 +104,150 @@
 	function openJob(job_id: string) {
 		goto(`/jobs/${job_id}`);
 	}
+
+	// Define tabs data with snippets
+	const tabsData = [
+		{
+			id: 'activity',
+			title: 'Activity',
+			content: activityTabContent
+		},
+		{
+			id: 'run',
+			title: 'Run',
+			content: runTabContent
+		}
+	];
 </script>
 
+{#snippet activityTabContent()}
+	{#await data.jobs}
+		Loading...
+	{:then jobs}
+		{#if !jobs.success}
+			<Card class="max-w-none mb-6 bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800">
+				{#snippet children()}
+					<h3 class="text-lg font-semibold text-red-900 dark:text-red-300">Error</h3>
+					<p class="text-red-700 dark:text-red-400">{jobs.error}</p>
+				{/snippet}
+			</Card>
+		{:else if jobs.data}
+			<div class="overflow-x-auto">
+				<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+					<thead class="bg-gray-50 dark:bg-gray-800">
+						<tr>
+							<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+							<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Started</th>
+							<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Output</th>
+							<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Triggered by</th>
+						</tr>
+					</thead>
+					<tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+						{#each jobs.data as job}
+							<tr class="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700" onclick={() => openJob(job.job_id)}>
+								<td class="px-4 py-4 whitespace-nowrap">
+									<Tooltip text={job.status} placement="right">
+										{#snippet children()}
+											{#if job.success === null}
+												<QuestionCircleIcon class="text-yellow-400 dark:text-yellow-400 shrink-0 h-5 w-5" />
+											{:else if job.success}
+												<CheckCircleIcon class="text-green-400 dark:text-green-400 shrink-0 h-5 w-5" />
+											{:else}
+												<CloseCircleIcon class="text-red-500 dark:text-red-500 shrink-0 h-5 w-5" />
+											{/if}
+										{/snippet}
+									</Tooltip>
+								</td>
+								<td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">{job.start_datetime}</td>
+								<td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">{job.output || '(No output)'}</td>
+								<td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">{job.source_type}:{job.source_id || 'unknown'}</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
+		{:else}
+			<Card class="max-w-none mb-6">
+				{#snippet children()}
+					<p class="text-gray-600 dark:text-gray-400">No jobs yet</p>
+				{/snippet}
+			</Card>
+		{/if}
+	{:catch error}
+		<p>error loading comments: {error.message}</p>
+	{/await}
+{/snippet}
+
+{#snippet runTabContent()}
+	<form onsubmit={runTask} class="space-y-4">
+		{#each getSortedInputs(task.input) as field}
+			<FormField 
+				label="{field.name || field.id} ({field.type}) {field.required ? '*' : ''} {field.order !== undefined ? `[Order: ${field.order}]` : ''}"
+				required={field.required}
+			>
+				{#snippet children()}
+					{#if field.type === 'string'}
+						<Input
+							id={field.id}
+							name={field.id}
+							type="text"
+							value={field.default?.toString() || ''}
+							required={field.required}
+							class="w-full"
+						/>
+					{:else if field.type === 'number'}
+						<Input
+							id={field.id}
+							name={field.id}
+							type="number"
+							value={field.default?.toString() || ''}
+							required={field.required}
+							class="w-full"
+						/>
+					{/if}
+				{/snippet}
+			</FormField>
+		{/each}
+		<Button type="submit" variant="primary" class="w-full">Run</Button>
+	</form>
+{/snippet}
+
 {#if !runResponse.success}
-	<Alert border color="red">
-		<InfoCircleSolid slot="icon" class="w-5 h-5" />
-		<span class="font-medium">Could not run the task.</span>
-		{runResponse.error}
+	<Alert variant="error">
+		{#snippet icon()}
+			<InfoCircleIcon class="w-5 h-5" />
+		{/snippet}
+		{#snippet children()}
+			<span class="font-medium">Could not run the task.</span>
+			{runResponse.error}
+		{/snippet}
 	</Alert>
 {/if}
 
 <div class="p-6">
 	{#if !data.task.success}
-		<Card class="max-w-none mb-6 bg-red-50 border-red-200">
-			<h3 class="text-lg font-semibold text-red-900">Error</h3>
-			<p class="text-red-700">{data.task.error}</p>
-			<button
-				class="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-				onclick={goBack}
-			>
-				Back to Tasks
-			</button>
+		<Card class="max-w-none mb-6 bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800">
+			{#snippet children()}
+				<h3 class="text-lg font-semibold text-red-900 dark:text-red-300">Error</h3>
+				<p class="text-red-700 dark:text-red-400">{data.task.error}</p>
+				<Button
+					class="mt-4"
+					onclick={goBack}
+				>
+					Back to Tasks
+				</Button>
+			{/snippet}
 		</Card>
 	{:else if data.task.data}
 		<h1>TASK: {task.name || task.id}</h1>
 
-		<Tabs tabStyle="underline">
-			<TabItem open>
-				<div slot="title" class="flex items-center gap-2">Activity</div>
-				{#await data.jobs}
-					Loading...
-				{:then jobs}
-					{#if !jobs.success}
-						<Card class="max-w-none mb-6 bg-red-50 border-red-200">
-							<h3 class="text-lg font-semibold text-red-900">Error</h3>
-							<p class="text-red-700">{jobs.error}</p>
-						</Card>
-					{:else if jobs.data}
-						<Table hoverable={true}>
-							<TableHead>
-								<TableHeadCell class="p-4!"></TableHeadCell>
-								<TableHeadCell>Started</TableHeadCell>
-								<TableHeadCell>Output</TableHeadCell>
-								<TableHeadCell>Triggered by</TableHeadCell>
-							</TableHead>
-							<TableBody tableBodyClass="divide-y cursor-pointer">
-								{#each jobs.data as job}
-									<TableBodyRow
-										onclick={() => {
-											openJob(job.job_id);
-										}}
-									>
-										<TableBodyCell class="p-4!">
-											{#if job.success === null}
-												<QuestionCircleSolid
-													class="text-yellow-400 dark:text-yellow-400 shrink-0 h-5 w-5"
-												/>
-											{:else if job.success}
-												<CheckCircleSolid
-													class="text-green-400 dark:text-green-400 shrink-0 h-5 w-5"
-												/>
-											{:else}
-												<CloseCircleSolid class="text-red-500 dark:text-red-500 shrink-0 h-5 w-5" />
-											{/if}
-											<Tooltip placement="left">{job.status}</Tooltip>
-										</TableBodyCell>
-										<TableBodyCell>{job.start_datetime}</TableBodyCell>
-										<TableBodyCell>{job.output || '(No output)'}</TableBodyCell>
-										<TableBodyCell>{job.source_type}:{job.source_id || 'unknown'}</TableBodyCell>
-									</TableBodyRow>
-								{/each}
-							</TableBody>
-						</Table>
-					{:else}
-						<Card class="max-w-none mb-6">
-							<p class="text-gray-600">No jobs yet</p>
-						</Card>
-					{/if}
-				{:catch error}
-					<p>error loading comments: {error.message}</p>
-				{/await}
-			</TabItem>
-			<TabItem>
-				<div slot="title" class="flex items-center gap-2">Run</div>
-
-				<form onsubmit={runTask} class="space-y-4">
-					{#each getSortedInputs(task.input) as field}
-						<div>
-							<Label for={field.id} class="block mb-2 text-sm font-medium text-gray-700">
-								{field.name || field.id} ({field.type}) {field.required ? '*' : ''}
-								{field.order !== undefined ? `[Order: ${field.order}]` : ''}
-							</Label>
-							{#if field.type === 'string'}
-								<Input
-									id={field.id}
-									name={field.id}
-									type="text"
-									value={field.default}
-									required={field.required}
-									class="w-full"
-								/>
-							{:else if field.type === 'number'}{/if}
-						</div>
-					{/each}
-					<Button type="submit" color="blue" class="w-full">Run</Button>
-				</form>
-			</TabItem>
-		</Tabs>
+		<Tabs tabs={tabsData} />
 	{:else}
 		<Card class="max-w-none mb-6">
-			<h3 class="text-lg font-semibold text-gray-900">Loading...</h3>
-			<p class="text-gray-600">Fetching task details...</p>
+			{#snippet children()}
+				<h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Loading...</h3>
+				<p class="text-gray-600 dark:text-gray-400">Fetching task details...</p>
+			{/snippet}
 		</Card>
 	{/if}
 </div>

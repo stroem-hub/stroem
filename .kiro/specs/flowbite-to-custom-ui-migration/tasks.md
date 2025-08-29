@@ -89,15 +89,15 @@
   - Test accordion functionality with current Flowbite usage patterns
   - _Requirements: 1.3, 6.1, 6.2, 5.1, 5.2_
 
-- [ ] 6. Replace Flowbite components in task management pages
-- [ ] 6.1 Update task list page with custom components
+- [x] 6. Replace Flowbite components in task management pages
+- [x] 6.1 Update task list page with custom components
   - Replace Flowbite Card imports with custom Card component in `ui/src/routes/tasks/+page.svelte`
   - Update component usage to match new interfaces and Svelte 5 syntax
   - Test task list display and interactions
   - Verify navigation to individual tasks works
   - _Requirements: 1.1, 6.1, 6.2, 4.1_
 
-- [ ] 6.2 Update individual task page with custom components
+- [x] 6.2 Update individual task page with custom components
   - Replace all Flowbite imports (Card, Button, Input, Label, Helper, Tabs, Table, Alert) in `ui/src/routes/tasks/[taskId]/+page.svelte`
   - Update component usage throughout the task detail page to use Svelte 5 syntax
   - Create Helper component if needed or use existing FormField component

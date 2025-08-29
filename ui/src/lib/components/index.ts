@@ -13,6 +13,7 @@ export { default as Badge } from './atoms/Badge.svelte';
 export { default as Accordion } from './atoms/Accordion.svelte';
 export { default as Tabs } from './atoms/Tabs.svelte';
 export { default as ThemeToggle } from './atoms/ThemeToggle.svelte';
+export { default as Tooltip } from './atoms/Tooltip.svelte';
 
 // Molecules - Component combinations
 export { default as Breadcrumb } from './molecules/Breadcrumb.svelte';
