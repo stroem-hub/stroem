@@ -184,7 +184,7 @@
   aria-label="Main navigation"
 >
   <!-- Brand -->
-  <div class="flex items-center border-b border-gray-200 dark:border-gray-700 {collapsed && !isMobile ? 'justify-center p-2' : 'justify-between p-4'}">
+  <div class="flex items-center border-b border-gray-200 dark:border-gray-700 {collapsed && !isMobile ? 'justify-start p-4' : 'justify-between p-4'}">
     <a href="/" class="flex items-center {collapsed && !isMobile ? 'justify-center' : 'space-x-3'} min-w-0">
       <img 
         src="https://cdn-icons-png.freepik.com/128/12707/12707916.png" 
@@ -226,7 +226,7 @@
   </div>
 
   <!-- Navigation -->
-  <nav class="flex-1 overflow-y-auto {collapsed && !isMobile ? 'p-2' : 'p-4'}">
+  <nav class="flex-1 overflow-y-auto {collapsed && !isMobile ? 'p-2' : 'p-2'}">
     <ul class="space-y-2">
       {#each navigationItems as item}
         <li>
@@ -235,7 +235,7 @@
             <div class="space-y-1">
               <button
                 class="w-full flex items-center py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800 transition-colors duration-200
-                  {collapsed && !isMobile ? 'justify-center px-2' : 'justify-between px-3'}"
+                  {collapsed && !isMobile ? 'justify-start px-2' : 'justify-between px-2'}"
               >
                 <div class="flex items-center space-x-3">
                   {#if item.icon}
@@ -257,7 +257,7 @@
               href={item.href}
               onclick={isMobile ? closeMobileMenu : undefined}
               class="flex items-center py-2 rounded-lg text-sm font-medium transition-colors duration-200 group relative
-                {collapsed && !isMobile ? 'justify-center px-2' : 'px-3'}
+                {collapsed && !isMobile ? 'justify-start px-3' : 'px-3'}
                 {isActive(item.href || '') 
                   ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400' 
                   : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'}"
