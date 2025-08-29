@@ -27,22 +27,22 @@
   - Add proper error handling for invalid pagination parameters
   - _Requirements: 2.6, 2.7, 2.8, 4.4, 5.1, 5.2_
 
-- [ ] 2. Create enhanced task card component
-- [ ] 2.1 Implement TaskCard component with statistics display
+- [x] 2. Create enhanced task card component
+- [x] 2.1 Implement TaskCard component with statistics display
   - Create `ui/src/lib/components/molecules/TaskCard.svelte` with enhanced task information
   - Display task name, description, execution statistics, and last execution details
   - Add visual status indicators using existing icon components
   - Include hover states and click handling for navigation
   - _Requirements: 1.1, 1.2, 1.3, 5.1, 5.2_
 
-- [ ] 2.2 Create TaskStatusBadge component for status indicators
+- [x] 2.2 Create TaskStatusBadge component for status indicators
   - Implement `ui/src/lib/components/atoms/TaskStatusBadge.svelte` for execution status display
   - Support different status types (success, failed, running, never executed)
   - Use consistent color coding and iconography
   - Ensure accessibility with proper ARIA labels
   - _Requirements: 1.2, 5.2, 5.6_
 
-- [ ] 2.3 Create Pagination component for list navigation
+- [x] 2.3 Create Pagination component for list navigation
   - Implement `ui/src/lib/components/molecules/Pagination.svelte` for paginated list navigation
   - Support page navigation controls (first, previous, next, last, direct page input)
   - Include page size selector with configurable options (10, 25, 50, 100)
@@ -51,7 +51,7 @@
   - Add loading states for page transitions
   - _Requirements: 5.1, 5.3, 5.4, 5.6, 6.6_
 
-- [ ] 2.4 Add TaskCard and Pagination components to component exports
+- [x] 2.4 Add TaskCard and Pagination components to component exports
   - Update `ui/src/lib/components/index.ts` to export TaskCard, TaskStatusBadge, and Pagination
   - Ensure proper TypeScript interfaces are exported
   - Add component documentation comments
