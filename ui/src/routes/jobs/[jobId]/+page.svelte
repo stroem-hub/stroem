@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { callApi } from '$lib/auth';
 	import type { PageProps } from './$types';
-	import { Card, Badge, Accordion, AccordionItem } from 'flowbite-svelte';
+	import { Card, Badge } from '$lib/components';
 	import { onMount } from 'svelte';
 
 	// Define the JobStep type
@@ -92,17 +92,21 @@
 		});
 		eventSource.addEventListener('result', (event) => {
 			const update = JSON.parse(event.data);
-			job.data.success = update.result.success;
-			job.data.end_datetime = update.result.end_datetime;
-			job.data.output = update.result.output;
+			if (job.data) {
+				job.data.success = update.result.success;
+				job.data.end_datetime = update.result.end_datetime;
+				job.data.output = update.result.output;
+			}
 		});
 		eventSource.addEventListener('step_result', (event) => {
 			const update = JSON.parse(event.data);
-			for (const step of job.data.steps) {
-				if (step.name == update.step_name) {
-					step.output = update.result.output;
-					step.success = update.result.success;
-					break;
+			if (job.data) {
+				for (const step of job.data.steps) {
+					if (step.name == update.step_name) {
+						step.output = update.result.output;
+						step.success = update.result.success;
+						break;
+					}
 				}
 			}
 
@@ -112,8 +116,11 @@
 			let step = {
 				"name": update.step_name,
 				"input": update.input,
+				"success": false,
+				"start_datetime": new Date().toISOString(),
+				"end_datetime": new Date().toISOString()
 			}
-			job.data.steps.push(step);
+			job.data?.steps.push(step);
 		});
 		eventSource.addEventListener('start', (event) => {
 			const update = JSON.parse(event.data);
@@ -141,8 +148,10 @@
 <div class="p-6">
 	{#if !job.success}
 		<Card class="max-w-none mb-6 bg-red-50 border-red-200">
-			<h3 class="text-lg font-semibold text-red-900">Error</h3>
-			<p class="text-red-700">{job.error}</p>
+			{#snippet children()}
+				<h3 class="text-lg font-semibold text-red-900">Error</h3>
+				<p class="text-red-700">{job.error}</p>
+			{/snippet}
 		</Card>
 	{:else if job.data}
 		<div class="space-y-6">
@@ -151,174 +160,198 @@
 
 			<!-- Job Status Badge -->
 			<div>
-				<Badge color={job.data.success == null ? 'yellow' : job.data.success ? 'green' : 'red'} large>
-					{job.data.status}
+				<Badge variant={job.data?.success == null ? 'warning' : job.data?.success ? 'success' : 'error'} size="lg">
+					{#snippet children()}
+						{job.data?.status}
+					{/snippet}
 				</Badge>
 			</div>
 
 			<!-- Job Details Card -->
 			<Card class="max-w-none">
-				<h3 class="text-lg font-semibold text-gray-900 mb-4">Details</h3>
-				<dl class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-					<div>
-						<dt class="text-sm font-medium text-gray-500">Worker ID</dt>
-						<dd class="mt-1 text-gray-900">{job.data.worker_id || 'N/A'}</dd>
-					</div>
-					<div>
-						<dt class="text-sm font-medium text-gray-500">Status</dt>
-						<dd class="mt-1 text-gray-900">{job.data.status || 'N/A'}</dd>
-					</div>
-					<div>
-						<dt class="text-sm font-medium text-gray-500">Task</dt>
-						<dd class="mt-1 text-gray-900">{job.data.task || 'N/A'}</dd>
-					</div>
-					<div>
-						<dt class="text-sm font-medium text-gray-500">Action</dt>
-						<dd class="mt-1 text-gray-900">{job.data.action || 'N/A'}</dd>
-					</div>
-					<div>
-						<dt class="text-sm font-medium text-gray-500">Start Time</dt>
-						<dd class="mt-1 text-gray-900">{job.data.start_datetime ? formatDate(job.data.start_datetime) : 'N/A'}</dd>
-					</div>
-					<div>
-						<dt class="text-sm font-medium text-gray-500">End Time</dt>
-						<dd class="mt-1 text-gray-900">{job.data.end_datetime ? formatDate(job.data.end_datetime) : 'N/A'}</dd>
-					</div>
-					<div>
-						<dt class="text-sm font-medium text-gray-500">Source Type</dt>
-						<dd class="mt-1 text-gray-900">{job.data.source_type || 'N/A'}</dd>
-					</div>
-					<div>
-						<dt class="text-sm font-medium text-gray-500">Source ID</dt>
-						<dd class="mt-1 text-gray-900">{job.data.source_id || 'N/A'}</dd>
-					</div>
-					<div>
-						<dt class="text-sm font-medium text-gray-500">Revision</dt>
-						<dd class="mt-1 text-gray-900">{job.data.revision || 'N/A'}</dd>
-					</div>
-				</dl>
+				{#snippet children()}
+					<h3 class="text-lg font-semibold text-gray-900 mb-4">Details</h3>
+					<dl class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+						<div>
+							<dt class="text-sm font-medium text-gray-500">Worker ID</dt>
+							<dd class="mt-1 text-gray-900">{job.data?.worker_id || 'N/A'}</dd>
+						</div>
+						<div>
+							<dt class="text-sm font-medium text-gray-500">Status</dt>
+							<dd class="mt-1 text-gray-900">{job.data?.status || 'N/A'}</dd>
+						</div>
+						<div>
+							<dt class="text-sm font-medium text-gray-500">Task</dt>
+							<dd class="mt-1 text-gray-900">{job.data?.task || 'N/A'}</dd>
+						</div>
+						<div>
+							<dt class="text-sm font-medium text-gray-500">Action</dt>
+							<dd class="mt-1 text-gray-900">{job.data?.action || 'N/A'}</dd>
+						</div>
+						<div>
+							<dt class="text-sm font-medium text-gray-500">Start Time</dt>
+							<dd class="mt-1 text-gray-900">{job.data?.start_datetime ? formatDate(job.data.start_datetime) : 'N/A'}</dd>
+						</div>
+						<div>
+							<dt class="text-sm font-medium text-gray-500">End Time</dt>
+							<dd class="mt-1 text-gray-900">{job.data?.end_datetime ? formatDate(job.data.end_datetime) : 'N/A'}</dd>
+						</div>
+						<div>
+							<dt class="text-sm font-medium text-gray-500">Source Type</dt>
+							<dd class="mt-1 text-gray-900">{job.data?.source_type || 'N/A'}</dd>
+						</div>
+						<div>
+							<dt class="text-sm font-medium text-gray-500">Source ID</dt>
+							<dd class="mt-1 text-gray-900">{job.data?.source_id || 'N/A'}</dd>
+						</div>
+						<div>
+							<dt class="text-sm font-medium text-gray-500">Revision</dt>
+							<dd class="mt-1 text-gray-900">{job.data?.revision || 'N/A'}</dd>
+						</div>
+					</dl>
+				{/snippet}
 			</Card>
 
 			<!-- Input/Output Card -->
 			<Card class="max-w-none">
-				<h3 class="text-lg font-semibold text-gray-900 mb-4">Input & Output</h3>
-				<div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
-					<div>
-						<dt class="text-sm font-medium text-gray-500">Input</dt>
-						<dd class="mt-1 text-gray-900">
-							{#if job.data.input}
-								<pre class="bg-gray-100 p-2 rounded">{formatJson(job.data.input)}</pre>
-							{:else}
-								N/A
-							{/if}
-						</dd>
+				{#snippet children()}
+					<h3 class="text-lg font-semibold text-gray-900 mb-4">Input & Output</h3>
+					<div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+						<div>
+							<dt class="text-sm font-medium text-gray-500">Input</dt>
+							<dd class="mt-1 text-gray-900">
+								{#if job.data?.input}
+									<pre class="bg-gray-100 p-2 rounded">{formatJson(job.data.input)}</pre>
+								{:else}
+									N/A
+								{/if}
+							</dd>
+						</div>
+						<div>
+							<dt class="text-sm font-medium text-gray-500">Output</dt>
+							<dd class="mt-1 text-gray-900">
+								{#if job.data?.output}
+									<pre class="bg-gray-100 p-2 rounded">{formatJson(job.data.output)}</pre>
+								{:else}
+									N/A
+								{/if}
+							</dd>
+						</div>
 					</div>
-					<div>
-						<dt class="text-sm font-medium text-gray-500">Output</dt>
-						<dd class="mt-1 text-gray-900">
-							{#if job.data.output}
-								<pre class="bg-gray-100 p-2 rounded">{formatJson(job.data.output)}</pre>
-							{:else}
-								N/A
-							{/if}
-						</dd>
-					</div>
-				</div>
+				{/snippet}
 			</Card>
 
 			<!-- Steps Accordion -->
 			<Card class="max-w-none">
-				<h3 class="text-lg font-semibold text-gray-900 mb-4">Steps</h3>
-				{#if job.data.steps.length > 0}
-					<Accordion>
-						{#each job.data.steps as step}
-							<AccordionItem>
-								<span slot="header" class="flex items-center space-x-2">
-									<Badge color={step.success ? 'green' : 'red'}>{step.success ? 'Success' : 'Failed'}</Badge>
-									<span>{step.name}</span>
-								</span>
-								<div class="space-y-4">
-									<!-- Input/Output Section -->
-									<div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
-										<div>
-											<dt class="text-sm font-medium text-gray-500">Input</dt>
-											<dd class="mt-1 text-gray-900">
-												{#if step.input}
-													<pre class="bg-gray-100 p-2 rounded">{formatJson(step.input)}</pre>
-												{:else}
-													N/A
-												{/if}
-											</dd>
+				{#snippet children()}
+					<h3 class="text-lg font-semibold text-gray-900 mb-4">Steps</h3>
+					{#if job.data?.steps && job.data.steps.length > 0}
+						<!-- Steps accordion -->
+						<div class="divide-y divide-gray-200 dark:divide-gray-700 border border-gray-200 dark:border-gray-700 rounded-lg">
+							{#each job.data.steps as step, index}
+								<details class="group">
+									<summary class="w-full px-4 py-3 text-left flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
+										<div class="flex items-center space-x-2">
+											<Badge variant={step.success ? 'success' : 'error'}>
+												{#snippet children()}
+													{step.success ? 'Success' : 'Failed'}
+												{/snippet}
+											</Badge>
+											<span>{step.name}</span>
 										</div>
-										<div>
-											<dt class="text-sm font-medium text-gray-500">Output</dt>
-											<dd class="mt-1 text-gray-900">
-												{#if step.output}
-													<pre class="bg-gray-100 p-2 rounded">{formatJson(step.output)}</pre>
-												{:else}
-													N/A
-												{/if}
-											</dd>
+										<svg class="w-5 h-5 text-gray-500 transition-transform duration-200 group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+										</svg>
+									</summary>
+									<div class="px-4 pb-4 border-t border-gray-200 dark:border-gray-700">
+										<div class="pt-4 space-y-4">
+											<!-- Input/Output Section -->
+											<div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+												<div>
+													<dt class="text-sm font-medium text-gray-500">Input</dt>
+													<dd class="mt-1 text-gray-900">
+														{#if step.input}
+															<pre class="bg-gray-100 p-2 rounded">{formatJson(step.input)}</pre>
+														{:else}
+															N/A
+														{/if}
+													</dd>
+												</div>
+												<div>
+													<dt class="text-sm font-medium text-gray-500">Output</dt>
+													<dd class="mt-1 text-gray-900">
+														{#if step.output}
+															<pre class="bg-gray-100 p-2 rounded">{formatJson(step.output)}</pre>
+														{:else}
+															N/A
+														{/if}
+													</dd>
+												</div>
+											</div>
+
+											<!-- Log Section -->
+											<div>
+												<dt class="text-sm font-medium text-gray-500">Log</dt>
+												<dd class="mt-1 text-gray-900">
+													{#if logs[step.name] === undefined}
+														<p class="text-gray-600 italic">Loading logs...</p>
+													{:else if logs[step.name].length > 0}
+														<ul class="space-y-2">
+															{#each logs[step.name] as log}
+																<li class="flex items-start space-x-2">
+																	<span class="text-xs text-gray-500">{formatDate(log.timestamp)}</span>
+																	<span class:text-red-600={log.is_stderr} class="font-mono">{log.message}</span>
+																</li>
+															{/each}
+														</ul>
+													{:else}
+														<p class="text-gray-600 italic">No logs available</p>
+													{/if}
+												</dd>
+											</div>
 										</div>
 									</div>
-
-									<!-- Log Section -->
-									<div>
-										<dt class="text-sm font-medium text-gray-500">Log</dt>
-										<dd class="mt-1 text-gray-900">
-											{#if logs[step.name] === undefined}
-												<p class="text-gray-600 italic">Loading logs...</p>
-											{:else if logs[step.name].length > 0}
-												<ul class="space-y-2">
-													{#each logs[step.name] as log}
-														<li class="flex items-start space-x-2">
-															<span class="text-xs text-gray-500">{formatDate(log.timestamp)}</span>
-															<span class:text-red-600={log.is_stderr} class="font-mono">{log.message}</span>
-														</li>
-													{/each}
-												</ul>
-											{:else}
-												<p class="text-gray-600 italic">No logs available</p>
-											{/if}
-										</dd>
-									</div>
-
-							</AccordionItem>
-						{/each}
-					</Accordion>
-				{:else}
-					<p class="text-gray-600">No steps available for this job.</p>
-				{/if}
+								</details>
+							{/each}
+						</div>
+					{:else}
+						<p class="text-gray-600">No steps available for this job.</p>
+					{/if}
+				{/snippet}
 			</Card>
 
-			<!-- Runner logs Accordion -->
-					<Accordion>
-							<AccordionItem>
-								<span slot="header" class="flex items-center space-x-2">
-									<span>Runner logs</span>
-								</span>
-
-								<div>
-									<dt class="text-sm font-medium text-gray-500">Log</dt>
-									<dd class="mt-1 text-gray-900">
-										{#if logs["-"] === undefined}
-											<p class="text-gray-600 italic">Loading logs...</p>
-										{:else if logs["-"].length > 0}
-											<ul class="space-y-2">
-												{#each logs["-"] as log}
-													<li class="flex items-start space-x-2">
-														<span class="text-xs text-gray-500">{formatDate(log.timestamp)}</span>
-														<span class:text-red-600={log.is_stderr} class="font-mono">{log.message}</span>
-													</li>
-												{/each}
-											</ul>
-										{:else}
-											<p class="text-gray-600 italic">No logs available</p>
-										{/if}
-									</dd>
-								</div>
-							</AccordionItem>
-					</Accordion>
+			<!-- Runner logs -->
+			<div class="divide-y divide-gray-200 dark:divide-gray-700 border border-gray-200 dark:border-gray-700 rounded-lg">
+				<details class="group">
+					<summary class="w-full px-4 py-3 text-left flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
+						<span>Runner logs</span>
+						<svg class="w-5 h-5 text-gray-500 transition-transform duration-200 group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+						</svg>
+					</summary>
+					<div class="px-4 pb-4 border-t border-gray-200 dark:border-gray-700">
+						<div class="pt-4">
+							<dt class="text-sm font-medium text-gray-500">Log</dt>
+							<dd class="mt-1 text-gray-900">
+								{#if logs["-"] === undefined}
+									<p class="text-gray-600 italic">Loading logs...</p>
+								{:else if logs["-"].length > 0}
+									<ul class="space-y-2">
+										{#each logs["-"] as log}
+											<li class="flex items-start space-x-2">
+												<span class="text-xs text-gray-500">{formatDate(log.timestamp)}</span>
+												<span class:text-red-600={log.is_stderr} class="font-mono">{log.message}</span>
+											</li>
+										{/each}
+									</ul>
+								{:else}
+									<p class="text-gray-600 italic">No logs available</p>
+								{/if}
+							</dd>
+						</div>
+					</div>
+				</details>
+			</div>
 
 		</div>
 
@@ -326,8 +359,10 @@
 
 	{:else}
 		<Card class="max-w-none mb-6">
-			<h3 class="text-lg font-semibold text-gray-900">Loading...</h3>
-			<p class="text-gray-600">Fetching job details...</p>
+			{#snippet children()}
+				<h3 class="text-lg font-semibold text-gray-900">Loading...</h3>
+				<p class="text-gray-600">Fetching job details...</p>
+			{/snippet}
 		</Card>
 	{/if}
 </div>
