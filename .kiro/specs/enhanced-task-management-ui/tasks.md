@@ -1,14 +1,14 @@
 # Implementation Plan
 
 - [ ] 1. Enhance backend API to provide task statistics
-- [ ] 1.1 Add task statistics query methods to JobRepository
+- [x] 1.1 Add task statistics query methods to JobRepository
   - Implement `get_task_statistics` method in `server/src/repository/job.rs`
   - Add SQL queries to aggregate job data by task_name (total executions, success rate, last execution)
   - Include error handling for database connection issues
   - Write unit tests for the new repository methods
   - _Requirements: 1.1, 1.2, 3.1, 3.2_
 
-- [ ] 1.2 Create enhanced tasks API endpoint with pagination
+- [x] 1.2 Create enhanced tasks API endpoint with pagination
   - Modify `get_tasks` function in `server/src/web/api.rs` to include statistics and pagination
   - Add query parameter parsing for page, limit, sort, order, and search
   - Integrate JobRepository statistics with workflow task data
@@ -18,7 +18,7 @@
   - Add proper error handling and logging
   - _Requirements: 1.1, 1.2, 1.3, 1.5, 1.6, 2.1, 5.1, 5.6_
 
-- [ ] 1.3 Add task-specific jobs API endpoint with pagination
+- [x] 1.3 Add task-specific jobs API endpoint with pagination
   - Implement `get_task_jobs` function in `server/src/web/api.rs`
   - Add route `/api/tasks/{task_id}/jobs` to get jobs filtered by task with pagination
   - Include query parameters for page, limit, status filtering, and sorting

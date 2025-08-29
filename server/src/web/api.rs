@@ -22,11 +22,81 @@ use tokio_stream::StreamExt;
 use std::{pin::Pin, task::{Context, Poll}};
 use crate::auth::User;
 use crate::web::WebState;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Deserialize)]
+pub struct TaskListQuery {
+    #[serde(default = "default_page")]
+    pub page: u32,
+    #[serde(default = "default_limit")]
+    pub limit: u32,
+    pub sort: Option<String>,
+    #[serde(default = "default_order")]
+    pub order: String,
+    pub search: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TaskJobsQuery {
+    #[serde(default = "default_page")]
+    pub page: u32,
+    #[serde(default = "default_job_limit")]
+    pub limit: u32,
+    pub status: Option<String>,
+    pub sort: Option<String>,
+    #[serde(default = "default_order")]
+    pub order: String,
+}
+
+fn default_job_limit() -> u32 { 20 }
+
+fn default_page() -> u32 { 1 }
+fn default_limit() -> u32 { 25 }
+fn default_order() -> String { "asc".to_string() }
+
+#[derive(Debug, Serialize)]
+pub struct PaginationInfo {
+    pub page: u32,
+    pub limit: u32,
+    pub total: u32,
+    pub total_pages: u32,
+    pub has_next: bool,
+    pub has_prev: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub struct PaginatedTasksResponse {
+    pub data: Vec<Value>,
+    pub pagination: PaginationInfo,
+}
+
+#[derive(Debug, Serialize)]
+pub struct PaginatedJobsResponse {
+    pub data: Vec<Value>,
+    pub pagination: PaginationInfo,
+}
+
+#[derive(Debug, Serialize)]
+pub struct EnhancedTaskStatistics {
+    pub total_executions: i64,
+    pub success_rate: f64,
+    pub last_execution: Option<LastExecutionInfo>,
+    pub average_duration: Option<f64>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct LastExecutionInfo {
+    pub timestamp: String,
+    pub status: String,
+    pub triggered_by: String,
+    pub duration: Option<f64>,
+}
 
 pub fn get_routes() -> Router<WebState> {
     Router::new()
         .route("/api/tasks", get(get_tasks))
         .route("/api/tasks/{:task_id}", get(get_task))
+        .route("/api/tasks/{:task_id}/jobs", get(get_task_jobs))
         .route("/api/jobs", get(get_jobs))
         .route("/api/jobs/{:job_id}", get(get_job))
         .route("/api/jobs/{:job_id}/logs", get(get_job_logs))
@@ -76,25 +146,177 @@ impl<S> Drop for JobChannel<S> {
 #[axum::debug_handler]
 async fn get_tasks(
     State(api): State<WebState>,
+    Query(params): Query<TaskListQuery>,
     _user: User,
 ) -> Result<ApiResponse, ApiError> {
-    let workflows_guard = api.workspace.workflows.read().map_err(|_| anyhow!("Could not read workspace"))?;
-    let workflows = workflows_guard.as_ref().unwrap();
-    let _tasks = workflows.tasks.as_ref();
+    debug!("Getting tasks with params: {:?}", params);
 
-    let mut _total = 0;
+    // Validate pagination parameters
+    if params.page == 0 {
+        return Err(ApiError::from(anyhow!("Page number must be greater than 0")));
+    }
+    if params.limit == 0 || params.limit > 100 {
+        return Err(ApiError::from(anyhow!("Limit must be between 1 and 100")));
+    }
 
-    let tasks_json = match &workflows.tasks {
-        Some(tasks) => {
-            let task_array: Vec<Value> = tasks.iter().map(|(_name, task)| serde_json::to_value(task).unwrap()).collect();
-            _total = task_array.len();
-            // task_array.sort_by(|a, b| a.get("name").unwrap().as_str().cmp(&b.get("name").unwrap().as_str()));
-            serde_json::to_value(task_array)?
+    // Validate sort and order parameters
+    let valid_sort_fields = ["name", "lastExecution", "successRate"];
+    if let Some(ref sort_field) = params.sort {
+        if !valid_sort_fields.contains(&sort_field.as_str()) {
+            return Err(ApiError::from(anyhow!("Invalid sort field. Valid options: name, lastExecution, successRate")));
         }
-        None => Value::Array(vec![]), // Empty array if no tasks
-    };
+    }
+    if params.order != "asc" && params.order != "desc" {
+        return Err(ApiError::from(anyhow!("Order must be 'asc' or 'desc'")));
+    }
+
+    // Get all task statistics first (before acquiring the lock)
+    let all_statistics = api.job_repository.get_all_task_statistics().await
+        .map_err(|e| {
+            error!("Failed to get task statistics: {}", e);
+            anyhow!("Failed to retrieve task statistics")
+        })?;
+
+    // Create a map for quick lookup of statistics by task name
+    let stats_map: HashMap<String, crate::repository::TaskStatistics> = all_statistics
+        .into_iter()
+        .map(|stats| (stats.task_name.clone(), stats))
+        .collect();
+
+    let mut enhanced_tasks = Vec::new();
+
+    // Now acquire the lock and process tasks
+    {
+        let workflows_guard = api.workspace.workflows.read()
+            .map_err(|_| anyhow!("Could not read workspace"))?;
+        let workflows = workflows_guard.as_ref()
+            .ok_or_else(|| anyhow!("Workflows not initialized"))?;
+
+        if let Some(tasks) = &workflows.tasks {
+            for (task_name, task) in tasks.iter() {
+                let mut task_value = serde_json::to_value(task)
+                    .map_err(|e| anyhow!("Failed to serialize task: {}", e))?;
+
+                // Add statistics to the task
+                if let Some(stats) = stats_map.get(task_name) {
+                    let enhanced_stats = EnhancedTaskStatistics {
+                        total_executions: stats.total_executions,
+                        success_rate: stats.success_rate,
+                        last_execution: stats.last_execution.as_ref().map(|le| LastExecutionInfo {
+                            timestamp: le.timestamp.to_rfc3339(),
+                            status: le.status.clone(),
+                            triggered_by: le.triggered_by.clone(),
+                            duration: le.duration,
+                        }),
+                        average_duration: stats.average_duration,
+                    };
+                    task_value["statistics"] = serde_json::to_value(enhanced_stats)?;
+                } else {
+                    // Task has no execution history
+                    let empty_stats = EnhancedTaskStatistics {
+                        total_executions: 0,
+                        success_rate: 0.0,
+                        last_execution: None,
+                        average_duration: None,
+                    };
+                    task_value["statistics"] = serde_json::to_value(empty_stats)?;
+                }
+
+                enhanced_tasks.push(task_value);
+            }
+        }
+    } // Lock is released here
+
+    // Apply search filter if provided
+    if let Some(ref search_term) = params.search {
+        let search_lower = search_term.to_lowercase();
+        enhanced_tasks.retain(|task| {
+            let name_matches = task.get("name")
+                .and_then(|n| n.as_str())
+                .map(|n| n.to_lowercase().contains(&search_lower))
+                .unwrap_or(false);
+            
+            let desc_matches = task.get("description")
+                .and_then(|d| d.as_str())
+                .map(|d| d.to_lowercase().contains(&search_lower))
+                .unwrap_or(false);
+            
+            name_matches || desc_matches
+        });
+    }
+
+    // Apply sorting
+    if let Some(ref sort_field) = params.sort {
+        enhanced_tasks.sort_by(|a, b| {
+            let ordering = match sort_field.as_str() {
+                "name" => {
+                    let a_name = a.get("name").and_then(|n| n.as_str()).unwrap_or("");
+                    let b_name = b.get("name").and_then(|n| n.as_str()).unwrap_or("");
+                    a_name.cmp(b_name)
+                }
+                "lastExecution" => {
+                    let a_timestamp = a.get("statistics")
+                        .and_then(|s| s.get("last_execution"))
+                        .and_then(|le| le.get("timestamp"))
+                        .and_then(|t| t.as_str())
+                        .unwrap_or("");
+                    let b_timestamp = b.get("statistics")
+                        .and_then(|s| s.get("last_execution"))
+                        .and_then(|le| le.get("timestamp"))
+                        .and_then(|t| t.as_str())
+                        .unwrap_or("");
+                    a_timestamp.cmp(b_timestamp)
+                }
+                "successRate" => {
+                    let a_rate = a.get("statistics")
+                        .and_then(|s| s.get("success_rate"))
+                        .and_then(|r| r.as_f64())
+                        .unwrap_or(0.0);
+                    let b_rate = b.get("statistics")
+                        .and_then(|s| s.get("success_rate"))
+                        .and_then(|r| r.as_f64())
+                        .unwrap_or(0.0);
+                    a_rate.partial_cmp(&b_rate).unwrap_or(std::cmp::Ordering::Equal)
+                }
+                _ => std::cmp::Ordering::Equal,
+            };
+
+            if params.order == "desc" {
+                ordering.reverse()
+            } else {
+                ordering
+            }
+        });
+    }
+
+    // Calculate pagination
+    let total = enhanced_tasks.len() as u32;
+    let total_pages = if total == 0 { 1 } else { (total + params.limit - 1) / params.limit };
+    let offset = (params.page - 1) * params.limit;
     
-    Ok(ApiResponse::data(tasks_json))
+    // Apply pagination
+    let paginated_tasks: Vec<Value> = enhanced_tasks
+        .into_iter()
+        .skip(offset as usize)
+        .take(params.limit as usize)
+        .collect();
+
+    let pagination = PaginationInfo {
+        page: params.page,
+        limit: params.limit,
+        total,
+        total_pages,
+        has_next: params.page < total_pages,
+        has_prev: params.page > 1,
+    };
+
+    let response = PaginatedTasksResponse {
+        data: paginated_tasks,
+        pagination,
+    };
+
+    debug!("Returning {} tasks (page {} of {})", response.data.len(), params.page, total_pages);
+    Ok(ApiResponse::data(serde_json::to_value(response)?))
 }
 
 #[axum::debug_handler]
@@ -108,6 +330,109 @@ async fn get_task(
     let task = serde_json::to_value(workflows.get_task(task_id.as_str()))?;
     
     Ok(ApiResponse::data(task))
+}
+
+#[axum::debug_handler]
+async fn get_task_jobs(
+    State(api): State<WebState>,
+    Path(task_id): Path<String>,
+    Query(params): Query<TaskJobsQuery>,
+    _user: User,
+) -> Result<ApiResponse, ApiError> {
+    debug!("Getting jobs for task {} with params: {:?}", task_id, params);
+
+    // Validate pagination parameters
+    if params.page == 0 {
+        return Err(ApiError::from(anyhow!("Page number must be greater than 0")));
+    }
+    if params.limit == 0 || params.limit > 100 {
+        return Err(ApiError::from(anyhow!("Limit must be between 1 and 100")));
+    }
+
+    // Validate sort and order parameters
+    let valid_sort_fields = ["start_datetime", "end_datetime", "duration", "status"];
+    if let Some(ref sort_field) = params.sort {
+        if !valid_sort_fields.contains(&sort_field.as_str()) {
+            return Err(ApiError::from(anyhow!("Invalid sort field. Valid options: start_datetime, end_datetime, duration, status")));
+        }
+    }
+    if params.order != "asc" && params.order != "desc" {
+        return Err(ApiError::from(anyhow!("Order must be 'asc' or 'desc'")));
+    }
+
+    // Validate status filter if provided
+    if let Some(ref status) = params.status {
+        let valid_statuses = ["queued", "running", "completed", "failed"];
+        if !valid_statuses.contains(&status.as_str()) {
+            return Err(ApiError::from(anyhow!("Invalid status filter. Valid options: queued, running, completed, failed")));
+        }
+    }
+
+    // Verify that the task exists
+    {
+        let workflows_guard = api.workspace.workflows.read()
+            .map_err(|_| anyhow!("Could not read workspace"))?;
+        let workflows = workflows_guard.as_ref()
+            .ok_or_else(|| anyhow!("Workflows not initialized"))?;
+        
+        if let Some(tasks) = &workflows.tasks {
+            if !tasks.contains_key(&task_id) {
+                return Err(ApiError::from(anyhow!("Task '{}' not found", task_id)));
+            }
+        } else {
+            return Err(ApiError::from(anyhow!("No tasks configured")));
+        }
+    }
+
+    // Get jobs for the task with pagination
+    let (jobs, total_count) = api.job_repository.get_task_jobs(
+        &task_id,
+        params.page,
+        params.limit,
+        params.status.as_deref(),
+        params.sort.as_deref(),
+        &params.order,
+    ).await
+    .map_err(|e| {
+        error!("Failed to get jobs for task {}: {}", task_id, e);
+        anyhow!("Failed to retrieve jobs for task")
+    })?;
+
+    // Convert jobs to JSON values
+    let job_values: Result<Vec<Value>, _> = jobs
+        .into_iter()
+        .map(|job| serde_json::to_value(job))
+        .collect();
+
+    let job_data = job_values
+        .map_err(|e| anyhow!("Failed to serialize job data: {}", e))?;
+
+    // Calculate pagination metadata
+    let total_pages = if total_count == 0 { 1 } else { (total_count + params.limit - 1) / params.limit };
+    
+    let pagination = PaginationInfo {
+        page: params.page,
+        limit: params.limit,
+        total: total_count,
+        total_pages,
+        has_next: params.page < total_pages,
+        has_prev: params.page > 1,
+    };
+
+    let response = PaginatedJobsResponse {
+        data: job_data,
+        pagination,
+    };
+
+    debug!(
+        "Returning {} jobs for task {} (page {} of {})",
+        response.data.len(),
+        task_id,
+        params.page,
+        total_pages
+    );
+
+    Ok(ApiResponse::data(serde_json::to_value(response)?))
 }
 
 #[axum::debug_handler]
@@ -230,4 +555,146 @@ pub async fn send_sse_event(api: &WebState, job_id: &str, name: &str, data: Valu
         let _ = tx.send(event);
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_task_list_query_defaults() {
+        let query = TaskListQuery {
+            page: default_page(),
+            limit: default_limit(),
+            sort: None,
+            order: default_order(),
+            search: None,
+        };
+
+        assert_eq!(query.page, 1);
+        assert_eq!(query.limit, 25);
+        assert_eq!(query.order, "asc");
+        assert!(query.sort.is_none());
+        assert!(query.search.is_none());
+    }
+
+    #[test]
+    fn test_pagination_info_creation() {
+        let pagination = PaginationInfo {
+            page: 2,
+            limit: 10,
+            total: 45,
+            total_pages: 5,
+            has_next: true,
+            has_prev: true,
+        };
+
+        assert_eq!(pagination.page, 2);
+        assert_eq!(pagination.total_pages, 5);
+        assert!(pagination.has_next);
+        assert!(pagination.has_prev);
+    }
+
+    #[test]
+    fn test_enhanced_task_statistics_serialization() {
+        let stats = EnhancedTaskStatistics {
+            total_executions: 100,
+            success_rate: 95.5,
+            last_execution: Some(LastExecutionInfo {
+                timestamp: "2024-01-15T10:30:00Z".to_string(),
+                status: "completed".to_string(),
+                triggered_by: "scheduler:daily".to_string(),
+                duration: Some(45.2),
+            }),
+            average_duration: Some(42.8),
+        };
+
+        let json_result = serde_json::to_string(&stats);
+        assert!(json_result.is_ok());
+        
+        let json_str = json_result.unwrap();
+        assert!(json_str.contains("100"));
+        assert!(json_str.contains("95.5"));
+        assert!(json_str.contains("scheduler:daily"));
+    }
+
+    #[test]
+    fn test_paginated_tasks_response_serialization() {
+        let response = PaginatedTasksResponse {
+            data: vec![
+                serde_json::json!({"name": "task1", "description": "Test task 1"}),
+                serde_json::json!({"name": "task2", "description": "Test task 2"}),
+            ],
+            pagination: PaginationInfo {
+                page: 1,
+                limit: 25,
+                total: 2,
+                total_pages: 1,
+                has_next: false,
+                has_prev: false,
+            },
+        };
+
+        let json_result = serde_json::to_string(&response);
+        assert!(json_result.is_ok());
+        
+        let json_str = json_result.unwrap();
+        assert!(json_str.contains("task1"));
+        assert!(json_str.contains("task2"));
+        assert!(json_str.contains("\"total\":2"));
+    }
+
+    #[test]
+    fn test_task_jobs_query_defaults() {
+        let query = TaskJobsQuery {
+            page: default_page(),
+            limit: default_job_limit(),
+            status: None,
+            sort: None,
+            order: default_order(),
+        };
+
+        assert_eq!(query.page, 1);
+        assert_eq!(query.limit, 20);
+        assert_eq!(query.order, "asc");
+        assert!(query.status.is_none());
+        assert!(query.sort.is_none());
+    }
+
+    #[test]
+    fn test_paginated_jobs_response_serialization() {
+        let response = PaginatedJobsResponse {
+            data: vec![
+                serde_json::json!({
+                    "job_id": "123e4567-e89b-12d3-a456-426614174000",
+                    "task_name": "test-task",
+                    "status": "completed",
+                    "success": true
+                }),
+                serde_json::json!({
+                    "job_id": "987fcdeb-51a2-43d1-9f12-345678901234",
+                    "task_name": "test-task",
+                    "status": "failed",
+                    "success": false
+                }),
+            ],
+            pagination: PaginationInfo {
+                page: 1,
+                limit: 20,
+                total: 2,
+                total_pages: 1,
+                has_next: false,
+                has_prev: false,
+            },
+        };
+
+        let json_result = serde_json::to_string(&response);
+        assert!(json_result.is_ok());
+        
+        let json_str = json_result.unwrap();
+        assert!(json_str.contains("test-task"));
+        assert!(json_str.contains("completed"));
+        assert!(json_str.contains("failed"));
+        assert!(json_str.contains("\"total\":2"));
+    }
 }

@@ -22,6 +22,7 @@ use crate::workspace_server::WorkspaceServer;
 mod api;
 use api::get_routes as api_get_routes;
 use api::JobEvent;
+pub use api::{EnhancedTaskStatistics, LastExecutionInfo};
 
 mod worker;
 mod auth;
