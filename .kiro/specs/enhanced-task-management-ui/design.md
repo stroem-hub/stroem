@@ -49,9 +49,27 @@ graph TD
 
 #### Enhanced Tasks API Endpoint
 - **Endpoint**: `GET /api/tasks`
-- **Enhancement**: Aggregate job statistics for each task
+- **Enhancement**: Aggregate job statistics for each task with pagination support
+- **Query Parameters**:
+  - `page`: Page number (default: 1)
+  - `limit`: Items per page (default: 25, max: 100)
+  - `sort`: Sort field (name, lastExecution, successRate)
+  - `order`: Sort order (asc, desc)
+  - `search`: Search term for task names/descriptions
 - **Response Structure**:
 ```typescript
+interface PaginatedTasksResponse {
+  data: EnhancedTask[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
+}
+
 interface EnhancedTask {
   id: string;
   name?: string;
@@ -75,8 +93,27 @@ interface EnhancedTask {
 
 #### Task Jobs API Endpoint
 - **Endpoint**: `GET /api/tasks/{task_id}/jobs`
-- **Purpose**: Get recent job executions for a specific task
-- **Response**: Paginated list of jobs filtered by task_name
+- **Purpose**: Get recent job executions for a specific task with pagination
+- **Query Parameters**:
+  - `page`: Page number (default: 1)
+  - `limit`: Items per page (default: 20, max: 100)
+  - `status`: Filter by job status (success, failed, running, queued)
+  - `sort`: Sort field (startDateTime, duration, status)
+  - `order`: Sort order (asc, desc)
+- **Response Structure**:
+```typescript
+interface PaginatedJobsResponse {
+  data: TaskJobSummary[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
+}
+```
 
 ### Frontend Component Enhancements
 
@@ -155,6 +192,29 @@ interface TaskConfigurationProps {
 - Provide expandable sections for complex configuration
 - Include parameter documentation
 
+#### Pagination Component
+**Location**: `ui/src/lib/components/molecules/Pagination.svelte`
+
+**Props Interface**:
+```typescript
+interface PaginationProps {
+  currentPage: number;
+  totalPages: number;
+  totalItems: number;
+  itemsPerPage: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
+  pageSizeOptions?: number[];
+}
+```
+
+**Features**:
+- Display current page, total pages, and item counts
+- Provide page navigation controls (first, previous, next, last)
+- Include page size selector with configurable options
+- Support keyboard navigation and accessibility
+- Show loading states during page transitions
+
 ### Enhanced Page Components
 
 #### Enhanced Task List Page
@@ -205,6 +265,42 @@ interface TaskJobSummary {
   duration?: number;
   triggeredBy: string;
   success?: boolean;
+}
+```
+
+### Pagination Metadata
+```typescript
+interface PaginationInfo {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+}
+
+interface PaginatedResponse<T> {
+  data: T[];
+  pagination: PaginationInfo;
+}
+```
+
+### API Query Parameters
+```typescript
+interface TaskListQuery {
+  page?: number;
+  limit?: number;
+  sort?: 'name' | 'lastExecution' | 'successRate';
+  order?: 'asc' | 'desc';
+  search?: string;
+}
+
+interface JobListQuery {
+  page?: number;
+  limit?: number;
+  status?: 'success' | 'failed' | 'running' | 'queued';
+  sort?: 'startDateTime' | 'duration' | 'status';
+  order?: 'asc' | 'desc';
 }
 ```
 

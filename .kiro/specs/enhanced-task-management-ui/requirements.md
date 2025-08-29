@@ -16,6 +16,8 @@ This feature enhances the task list and individual task view pages in the Strøm
 2. WHEN a task has recent job executions THEN the system SHALL display the most recent execution timestamp and status indicator
 3. WHEN a task has no execution history THEN the system SHALL display "Never executed" status
 4. WHEN viewing the task list THEN the system SHALL support sorting by name, last execution timestamp, and status
+5. WHEN viewing the task list THEN the system SHALL support server-side pagination with configurable page sizes
+6. WHEN navigating through task pages THEN the system SHALL maintain sort order and provide page navigation controls
 
 ### Requirement 2: Comprehensive Task Detail View
 
@@ -29,6 +31,8 @@ This feature enhances the task list and individual task view pages in the Strøm
 4. WHEN a task has input parameters THEN the system SHALL display parameter documentation, validation rules, and example values
 5. WHEN viewing task dependencies THEN the system SHALL show which other tasks or resources this task depends on
 6. WHEN viewing recent executions THEN the system SHALL provide quick access to job details and logs
+7. WHEN viewing task execution history THEN the system SHALL support server-side pagination for job lists
+8. WHEN navigating through job history pages THEN the system SHALL maintain filtering and sorting preferences
 
 ### Requirement 3: Task Performance Analytics
 
@@ -55,7 +59,20 @@ This feature enhances the task list and individual task view pages in the Strøm
 5. WHEN navigating between tasks THEN the system SHALL maintain context and provide back/forward navigation
 6. WHEN viewing task details THEN the system SHALL provide shortcuts to related jobs, logs, and configuration
 
-### Requirement 5: Enhanced Visual Design and Usability
+### Requirement 5: Server-Side Pagination and Performance
+
+**User Story:** As a user working with large datasets, I want efficient pagination for task and job lists, so that I can navigate through large amounts of data without performance degradation.
+
+#### Acceptance Criteria
+
+1. WHEN viewing task lists with many tasks THEN the system SHALL implement server-side pagination with configurable page sizes (10, 25, 50, 100 items)
+2. WHEN viewing job history with many executions THEN the system SHALL implement server-side pagination for job lists
+3. WHEN navigating between pages THEN the system SHALL maintain current sort order, filters, and search criteria
+4. WHEN loading paginated data THEN the system SHALL display total count, current page, and total pages
+5. WHEN changing page size THEN the system SHALL remember the preference for the user session
+6. WHEN paginating large datasets THEN the system SHALL maintain fast response times under 2 seconds
+
+### Requirement 6: Enhanced Visual Design and Usability
 
 **User Story:** As any user of the system, I want a visually appealing and intuitive task management interface, so that I can work efficiently without confusion or visual strain.
 

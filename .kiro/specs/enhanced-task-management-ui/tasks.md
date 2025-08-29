@@ -8,19 +8,24 @@
   - Write unit tests for the new repository methods
   - _Requirements: 1.1, 1.2, 3.1, 3.2_
 
-- [ ] 1.2 Create enhanced tasks API endpoint
-  - Modify `get_tasks` function in `server/src/web/api.rs` to include statistics
+- [ ] 1.2 Create enhanced tasks API endpoint with pagination
+  - Modify `get_tasks` function in `server/src/web/api.rs` to include statistics and pagination
+  - Add query parameter parsing for page, limit, sort, order, and search
   - Integrate JobRepository statistics with workflow task data
+  - Implement server-side sorting and filtering logic
+  - Return paginated response with metadata (total count, page info)
   - Ensure backward compatibility with existing API consumers
   - Add proper error handling and logging
-  - _Requirements: 1.1, 1.2, 1.3, 2.1_
+  - _Requirements: 1.1, 1.2, 1.3, 1.5, 1.6, 2.1, 5.1, 5.6_
 
-- [ ] 1.3 Add task-specific jobs API endpoint
+- [ ] 1.3 Add task-specific jobs API endpoint with pagination
   - Implement `get_task_jobs` function in `server/src/web/api.rs`
-  - Add route `/api/tasks/{task_id}/jobs` to get jobs filtered by task
-  - Include pagination support for large job lists
-  - Add query parameters for filtering and sorting
-  - _Requirements: 2.6, 4.4_
+  - Add route `/api/tasks/{task_id}/jobs` to get jobs filtered by task with pagination
+  - Include query parameters for page, limit, status filtering, and sorting
+  - Implement server-side pagination logic for job queries
+  - Return paginated response with job metadata and pagination info
+  - Add proper error handling for invalid pagination parameters
+  - _Requirements: 2.6, 2.7, 2.8, 4.4, 5.1, 5.2_
 
 - [ ] 2. Create enhanced task card component
 - [ ] 2.1 Implement TaskCard component with statistics display
@@ -37,11 +42,20 @@
   - Ensure accessibility with proper ARIA labels
   - _Requirements: 1.2, 5.2, 5.6_
 
-- [ ] 2.3 Add TaskCard component to component exports
-  - Update `ui/src/lib/components/index.ts` to export TaskCard and TaskStatusBadge
+- [ ] 2.3 Create Pagination component for list navigation
+  - Implement `ui/src/lib/components/molecules/Pagination.svelte` for paginated list navigation
+  - Support page navigation controls (first, previous, next, last, direct page input)
+  - Include page size selector with configurable options (10, 25, 50, 100)
+  - Display current page info and total counts
+  - Ensure accessibility with proper ARIA labels and keyboard navigation
+  - Add loading states for page transitions
+  - _Requirements: 5.1, 5.3, 5.4, 5.6, 6.6_
+
+- [ ] 2.4 Add TaskCard and Pagination components to component exports
+  - Update `ui/src/lib/components/index.ts` to export TaskCard, TaskStatusBadge, and Pagination
   - Ensure proper TypeScript interfaces are exported
   - Add component documentation comments
-  - _Requirements: 1.1_
+  - _Requirements: 1.1, 5.1_
 
 - [ ] 3. Create task statistics and configuration components
 - [ ] 3.1 Implement TaskStatistics component for metrics display
@@ -66,26 +80,29 @@
   - _Requirements: 2.1, 2.4, 2.5, 5.3_
 
 - [ ] 4. Enhance task list page with new components
-- [ ] 4.1 Update task list page to use enhanced TaskCard components
-  - Modify `ui/src/routes/tasks/+page.svelte` to use new TaskCard component
+- [ ] 4.1 Update task list page to use enhanced TaskCard components with pagination
+  - Modify `ui/src/routes/tasks/+page.svelte` to use new TaskCard and Pagination components
   - Replace simple card layout with responsive grid using TaskCard
+  - Integrate Pagination component for server-side pagination
+  - Add URL state management for page, sort, and search parameters
   - Add loading states and error handling for enhanced data
-  - Ensure proper TypeScript types for enhanced task data
-  - _Requirements: 1.1, 1.2, 1.3, 5.1, 5.5_
+  - Ensure proper TypeScript types for enhanced task data and pagination
+  - _Requirements: 1.1, 1.2, 1.3, 1.5, 1.6, 5.1, 5.3, 5.5, 6.1_
 
-- [ ] 4.2 Add sorting functionality to task list
+- [ ] 4.2 Add sorting and search functionality to task list
   - Implement sorting controls for name, last execution, and success rate
-  - Add sort state management and UI controls
-  - Ensure sorting works with enhanced task data structure
-  - Include proper accessibility for sorting controls
-  - _Requirements: 1.4, 4.3, 5.6_
-
-- [ ] 4.3 Add search functionality to task list
-  - Implement client-side search filtering for task names and descriptions
   - Add search input component with proper debouncing
-  - Ensure search works with sorted and filtered data
-  - Include clear search and empty state handling
-  - _Requirements: 4.4, 5.1_
+  - Integrate sorting and search with pagination state management
+  - Ensure URL parameters reflect current sort, search, and page state
+  - Include proper accessibility for sorting and search controls
+  - _Requirements: 1.4, 4.3, 4.4, 5.6_
+
+- [ ] 4.3 Add URL state management for task list navigation
+  - Implement URL parameter synchronization for page, sort, search, and page size
+  - Add browser back/forward navigation support
+  - Ensure deep linking works for specific task list states
+  - Add state persistence across page refreshes
+  - _Requirements: 4.5, 5.3, 5.5_
 
 - [ ] 5. Enhance task detail page with new components
 - [ ] 5.1 Update task detail page with TaskHeader component
@@ -102,27 +119,32 @@
   - Ensure proper loading states for statistics data
   - _Requirements: 2.1, 2.4, 2.5, 3.1, 3.2_
 
-- [ ] 5.3 Improve Activity tab with enhanced job history display
-  - Update job history table to show more detailed information
-  - Add quick filters for job status and time ranges
-  - Include pagination for large job histories
+- [ ] 5.3 Improve Activity tab with paginated job history display
+  - Update job history table to show more detailed information with pagination
+  - Integrate Pagination component for job history navigation
+  - Add quick filters for job status and time ranges with URL state management
+  - Include server-side pagination for large job histories
   - Add direct links to job detail pages
-  - _Requirements: 2.6, 4.4, 4.6_
+  - Ensure pagination state is maintained when switching between tabs
+  - _Requirements: 2.6, 2.7, 2.8, 4.4, 4.6, 5.2_
 
 - [ ] 6. Add TypeScript interfaces and API integration
-- [ ] 6.1 Create TypeScript interfaces for enhanced task data
-  - Define interfaces in `ui/src/lib/types.ts` for EnhancedTask, TaskStatistics, and related types
+- [ ] 6.1 Create TypeScript interfaces for enhanced task data and pagination
+  - Define interfaces in `ui/src/lib/types.ts` for EnhancedTask, TaskStatistics, PaginationInfo, and related types
+  - Add interfaces for API query parameters and paginated responses
   - Ensure type safety for all new components and API responses
   - Add proper JSDoc comments for interface documentation
   - Export interfaces for use across components
-  - _Requirements: 1.1, 2.1, 3.1_
+  - _Requirements: 1.1, 2.1, 3.1, 5.1_
 
-- [ ] 6.2 Update API integration for enhanced task endpoints
-  - Modify task data fetching in `ui/src/routes/tasks/+page.ts` to use enhanced API
-  - Update task detail data fetching in `ui/src/routes/tasks/[taskId]/+page.ts`
-  - Add error handling for new API endpoints
+- [ ] 6.2 Update API integration for enhanced task endpoints with pagination
+  - Modify task data fetching in `ui/src/routes/tasks/+page.ts` to use enhanced paginated API
+  - Update task detail data fetching in `ui/src/routes/tasks/[taskId]/+page.ts` for paginated job history
+  - Add URL parameter parsing and API query construction
+  - Implement proper error handling for pagination edge cases
+  - Add loading states for pagination transitions
   - Ensure backward compatibility during API transition
-  - _Requirements: 1.1, 2.1, 2.6_
+  - _Requirements: 1.1, 1.5, 1.6, 2.1, 2.6, 2.7, 2.8, 5.3_
 
 - [ ] 6.3 Add loading states and error handling
   - Implement skeleton loaders for TaskCard components during data loading
@@ -132,23 +154,28 @@
   - _Requirements: 5.1, 5.4_
 
 - [ ] 7. Testing and quality assurance
-- [ ] 7.1 Write component tests for new task components
-  - Create unit tests for TaskCard, TaskHeader, TaskStatistics, and TaskConfiguration components
+- [ ] 7.1 Write component tests for new task and pagination components
+  - Create unit tests for TaskCard, TaskHeader, TaskStatistics, TaskConfiguration, and Pagination components
   - Test component props, events, and rendering with various data scenarios
+  - Test pagination component with different page states and edge cases
   - Include accessibility testing for keyboard navigation and screen readers
   - Add visual regression tests for component styling
-  - _Requirements: 5.6_
+  - _Requirements: 5.6, 6.6_
 
-- [ ] 7.2 Write integration tests for enhanced pages
-  - Test enhanced task list page with sorting, searching, and navigation
-  - Test enhanced task detail page with all tabs and functionality
-  - Include API integration testing with mock data
-  - Test error scenarios and loading states
-  - _Requirements: 1.1, 2.1, 4.1_
+- [ ] 7.2 Write integration tests for enhanced pages with pagination
+  - Test enhanced task list page with sorting, searching, pagination, and navigation
+  - Test enhanced task detail page with paginated job history and all tabs
+  - Test URL state management and browser navigation
+  - Include API integration testing with mock paginated data
+  - Test pagination edge cases (empty results, single page, large datasets)
+  - Test error scenarios and loading states for pagination
+  - _Requirements: 1.1, 1.5, 1.6, 2.1, 2.7, 2.8, 4.1, 5.3_
 
-- [ ] 7.3 Perform end-to-end testing of task management workflows
-  - Test complete user journeys from task list to task execution
-  - Verify data consistency between task statistics and job history
-  - Test responsive design on various screen sizes
-  - Validate performance with large datasets
-  - _Requirements: 1.1, 2.1, 4.1, 5.5_
+- [ ] 7.3 Perform end-to-end testing of task management workflows with pagination
+  - Test complete user journeys from paginated task list to task execution
+  - Verify data consistency between task statistics and paginated job history
+  - Test pagination performance with large datasets (1000+ tasks, 10000+ jobs)
+  - Test responsive design on various screen sizes with pagination controls
+  - Validate server-side pagination performance and response times
+  - Test deep linking and URL state management across different scenarios
+  - _Requirements: 1.1, 1.5, 1.6, 2.1, 2.7, 2.8, 4.1, 5.3, 5.5, 5.6_
