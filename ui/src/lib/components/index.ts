@@ -24,6 +24,9 @@ export { default as ActivityFeed } from './molecules/ActivityFeed.svelte';
 export { default as Dropdown } from './molecules/Dropdown.svelte';
 export { default as TaskCard } from './molecules/TaskCard.svelte';
 export { default as Pagination } from './molecules/Pagination.svelte';
+export { default as TaskStatistics } from './molecules/TaskStatistics.svelte';
+export { default as TaskHeader } from './molecules/TaskHeader.svelte';
+export { default as TaskConfiguration } from './molecules/TaskConfiguration.svelte';
 
 // Organisms - Complex components
 export { default as Sidebar } from './organisms/Sidebar.svelte';
