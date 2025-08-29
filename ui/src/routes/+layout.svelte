@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
 	import { goto } from '$app/navigation';
 	import { get } from 'svelte/store';
 	import { page } from '$app/state';
@@ -54,7 +54,7 @@
 	);
 
 	// Handle sidebar toggle
-	function handleSidebarToggle(collapsed) {
+	function handleSidebarToggle(collapsed: boolean) {
 		sidebarCollapsed = collapsed;
 	}
 

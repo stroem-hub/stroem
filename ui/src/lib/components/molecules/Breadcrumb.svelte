@@ -15,12 +15,11 @@
   }: Props = $props();
 
   // Add home breadcrumb if showHome is true and items don't start with home
-  const breadcrumbs = $derived(() => {
-    if (showHome && (items.length === 0 || items[0].href !== '/')) {
-      return [{ label: 'Home', href: '/' }, ...items];
-    }
-    return items;
-  });
+  const breadcrumbs = $derived(
+    showHome && (items.length === 0 || items[0].href !== '/') 
+      ? [{ label: 'Home', href: '/' }, ...items]
+      : items
+  );
 </script>
 
 <nav 

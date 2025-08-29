@@ -1,7 +1,5 @@
 @import 'tailwindcss';
 
-@plugin 'flowbite/plugin';
-
 @custom-variant dark (&:where(.dark, .dark *));
 @theme {
     --color-primary-50: #fff5f2;
@@ -37,5 +35,3 @@
     --color-success-800: #166534;
     --color-success-900: #14532d;
 }
-
-@source "../node_modules/flowbite-svelte/dist";

@@ -120,15 +120,15 @@
   - Ensure all interactive elements work properly
   - _Requirements: 6.1, 6.2, 6.3, 4.1_
 
-- [ ] 8. Remove Flowbite dependencies and finalize migration
-- [ ] 8.1 Remove all Flowbite imports from codebase
+- [x] 8. Remove Flowbite dependencies and finalize migration
+- [x] 8.1 Remove all Flowbite imports from codebase
   - Search for and remove any remaining Flowbite component imports across all UI files
   - Remove Flowbite icon imports and replace with custom icons from `ui/src/lib/components/icons`
   - Verify no Flowbite components are still being used anywhere in the application
   - Test entire application for any missing functionality
   - _Requirements: 1.4, 4.1, 4.2, 4.3_
 
-- [ ] 8.2 Remove Flowbite packages from dependencies
+- [x] 8.2 Remove Flowbite packages from dependencies
   - Remove flowbite, flowbite-svelte, and flowbite-svelte-icons from `ui/package.json`
   - Run `npm install` to update package-lock.json and clean node_modules
   - Verify application builds and runs without Flowbite dependencies

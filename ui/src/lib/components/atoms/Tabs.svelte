@@ -70,7 +70,7 @@
 <div class="w-full {className}">
 	<!-- Tab Headers -->
 	<div class="border-b border-gray-200 dark:border-gray-700">
-		<nav class="-mb-px flex space-x-8" aria-label="Tabs" role="tablist">
+		<div class="-mb-px flex space-x-8" aria-label="Tabs" role="tablist">
 			{#each tabs as tab, index}
 				<button
 					data-tab-id={tab.id}
@@ -91,7 +91,7 @@
 					{tab.title}
 				</button>
 			{/each}
-		</nav>
+		</div>
 	</div>
 
 	<!-- Tab Content -->

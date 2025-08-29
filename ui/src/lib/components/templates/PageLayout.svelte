@@ -66,9 +66,9 @@
 		return classes.join(' ');
 	});
 
-	const shouldShowHeader = $derived(() => {
-		return title || subtitle || (showBreadcrumbs && breadcrumbs.length > 0) || actions;
-	});
+	const shouldShowHeader = $derived(
+		title || subtitle || (showBreadcrumbs && breadcrumbs.length > 0) || actions
+	);
 </script>
 
 <div class="min-h-full bg-gray-50 dark:bg-gray-900 {className}">
