@@ -197,16 +197,30 @@ async fn get_tasks(
                 let mut task_value = serde_json::to_value(task)
                     .map_err(|e| anyhow!("Failed to serialize task: {}", e))?;
 
+                // Add the task name as the id field
+                task_value["id"] = serde_json::Value::String(task_name.clone());
+
                 // Add statistics to the task
                 if let Some(stats) = stats_map.get(task_name) {
                     let enhanced_stats = EnhancedTaskStatistics {
                         total_executions: stats.total_executions,
                         success_rate: stats.success_rate,
-                        last_execution: stats.last_execution.as_ref().map(|le| LastExecutionInfo {
-                            timestamp: le.timestamp.to_rfc3339(),
-                            status: le.status.clone(),
-                            triggered_by: le.triggered_by.clone(),
-                            duration: le.duration,
+                        last_execution: stats.last_execution.as_ref().map(|le| {
+                            // Map API status values to frontend expected values
+                            let frontend_status = match le.status.as_str() {
+                                "completed" => "success",
+                                "failed" => "failed",
+                                "running" => "running",
+                                "queued" => "queued",
+                                _ => &le.status, // fallback to original value
+                            };
+                            
+                            LastExecutionInfo {
+                                timestamp: le.timestamp.to_rfc3339(),
+                                status: frontend_status.to_string(),
+                                triggered_by: le.triggered_by.clone(),
+                                duration: le.duration,
+                            }
                         }),
                         average_duration: stats.average_duration,
                     };
@@ -310,13 +324,12 @@ async fn get_tasks(
         has_prev: params.page > 1,
     };
 
-    let response = PaginatedTasksResponse {
-        data: paginated_tasks,
-        pagination,
-    };
-
-    debug!("Returning {} tasks (page {} of {})", response.data.len(), params.page, total_pages);
-    Ok(ApiResponse::data(serde_json::to_value(response)?))
+    debug!("Returning {} tasks (page {} of {})", paginated_tasks.len(), params.page, total_pages);
+    
+    Ok(ApiResponse::with_pagination(
+        serde_json::to_value(paginated_tasks)?,
+        serde_json::to_value(pagination)?
+    ))
 }
 
 #[axum::debug_handler]

@@ -6,6 +6,7 @@ pub struct ApiResponse {
     pub status: StatusCode,
     pub success: bool,
     pub data: Option<Value>,
+    pub pagination: Option<Value>,
     pub error: Option<anyhow::Error>,
     pub headers: HeaderMap,
 }
@@ -16,6 +17,7 @@ impl Default for ApiResponse {
             status: StatusCode::OK,
             success: true,
             data: None,
+            pagination: None,
             error: None,
             headers: HeaderMap::new(),
         }
@@ -25,10 +27,19 @@ impl Default for ApiResponse {
 impl IntoResponse for ApiResponse {
     fn into_response(mut self) -> Response {
         let msg = match self.success {
-            true => json!({
-                "success": true,
-                "data": self.data,
-            }),
+            true => {
+                let mut response = json!({
+                    "success": true,
+                    "data": self.data,
+                });
+                
+                // Add pagination if present
+                if let Some(pagination) = self.pagination {
+                    response["pagination"] = pagination;
+                }
+                
+                response
+            },
             false => json!({
                 "success": false,
                 "error": self.error.map(|e| e.to_string()),
@@ -55,6 +66,13 @@ impl ApiResponse {
     pub fn data(data: Value) -> Self {
         Self {
             data: Some(data),
+            ..Default::default()
+        }
+    }
+    pub fn with_pagination(data: Value, pagination: Value) -> Self {
+        Self {
+            data: Some(data),
+            pagination: Some(pagination),
             ..Default::default()
         }
     }

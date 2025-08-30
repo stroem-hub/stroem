@@ -73,8 +73,8 @@
 		}
 	}
 
-	let successRateColor = $derived(getSuccessRateColor(statistics.successRate));
-	let statusDisplay = $derived(getStatusDisplay(statistics.lastExecution?.status));
+	let successRateColor = $derived(getSuccessRateColor(statistics.success_rate));
+	let statusDisplay = $derived(getStatusDisplay(statistics.last_execution?.status));
 </script>
 
 <div class="space-y-4">
@@ -106,7 +106,7 @@
 				</div>
 				<div class="mt-4">
 					<p class="text-3xl font-bold text-gray-900 dark:text-white">
-						{statistics.totalExecutions.toLocaleString()}
+						{statistics.total_executions.toLocaleString()}
 					</p>
 				</div>
 			</div>
@@ -127,11 +127,11 @@
 						{successRateColor === 'green' ? 'text-green-600 dark:text-green-400' : 
 						 successRateColor === 'yellow' ? 'text-yellow-600 dark:text-yellow-400' : 
 						 'text-red-600 dark:text-red-400'}">
-						{formatSuccessRate(statistics.successRate)}
+						{formatSuccessRate(statistics.success_rate)}
 					</p>
-					{#if statistics.totalExecutions > 0}
+					{#if statistics.total_executions > 0}
 						<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-							{Math.round((statistics.successRate / 100) * statistics.totalExecutions)} of {statistics.totalExecutions} successful
+							{Math.round((statistics.success_rate / 100) * statistics.total_executions)} of {statistics.total_executions} successful
 						</p>
 					{/if}
 				</div>
@@ -147,14 +147,14 @@
 				</div>
 				<div class="mt-4">
 					<p class="text-3xl font-bold text-gray-900 dark:text-white">
-						{formatDuration(statistics.averageDuration)}
+						{formatDuration(statistics.average_duration)}
 					</p>
 				</div>
 			</div>
 		</div>
 
 		<!-- Last Execution Info -->
-		{#if statistics.lastExecution}
+		{#if statistics.last_execution}
 			<div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
 				<h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Last Execution</h3>
 				<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -166,7 +166,7 @@
 						<div>
 							<p class="text-sm font-medium text-gray-600 dark:text-gray-400">Status</p>
 							<p class="text-sm font-semibold capitalize {statusDisplay.color}">
-								{statistics.lastExecution.status}
+								{statistics.last_execution.status}
 							</p>
 						</div>
 					</div>
@@ -179,13 +179,13 @@
 						<div>
 							<p class="text-sm font-medium text-gray-600 dark:text-gray-400">When</p>
 							<p class="text-sm font-semibold text-gray-900 dark:text-white">
-								{formatLastExecution(statistics.lastExecution.timestamp)}
+								{formatLastExecution(statistics.last_execution.timestamp)}
 							</p>
 						</div>
 					</div>
 
 					<!-- Duration -->
-					{#if statistics.lastExecution.duration}
+					{#if statistics.last_execution.duration}
 						<div class="flex items-center space-x-3">
 							<div class="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700">
 								<ClockIcon class="h-4 w-4 text-gray-600 dark:text-gray-400" />
@@ -193,7 +193,7 @@
 							<div>
 								<p class="text-sm font-medium text-gray-600 dark:text-gray-400">Duration</p>
 								<p class="text-sm font-semibold text-gray-900 dark:text-white">
-									{formatDuration(statistics.lastExecution.duration)}
+									{formatDuration(statistics.last_execution.duration)}
 								</p>
 							</div>
 						</div>
@@ -207,7 +207,7 @@
 						<div>
 							<p class="text-sm font-medium text-gray-600 dark:text-gray-400">Triggered By</p>
 							<p class="text-sm font-semibold text-gray-900 dark:text-white">
-								{statistics.lastExecution.triggeredBy}
+								{statistics.last_execution.triggered_by}
 							</p>
 						</div>
 					</div>

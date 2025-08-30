@@ -93,8 +93,8 @@
 		{ label: task.name || task.id }
 	];
 
-	let statusDisplay = $derived(getStatusDisplay(task.statistics.lastExecution?.status));
-	let successRateColor = $derived(getSuccessRateColor(task.statistics.successRate));
+	let statusDisplay = $derived(getStatusDisplay(task.statistics.last_execution?.status));
+	let successRateColor = $derived(getSuccessRateColor(task.statistics.success_rate));
 </script>
 
 <div class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
@@ -171,7 +171,7 @@
 						<div>
 							<p class="text-sm font-medium text-gray-600 dark:text-gray-400">Total Runs</p>
 							<p class="text-2xl font-bold text-gray-900 dark:text-white">
-								{task.statistics.totalExecutions.toLocaleString()}
+								{task.statistics.total_executions.toLocaleString()}
 							</p>
 						</div>
 						<div class="flex h-8 w-8 items-center justify-center rounded-md bg-blue-50 dark:bg-blue-900/20">
@@ -186,7 +186,7 @@
 						<div>
 							<p class="text-sm font-medium text-gray-600 dark:text-gray-400">Success Rate</p>
 							<p class="text-2xl font-bold {successRateColor}">
-								{formatSuccessRate(task.statistics.successRate)}
+								{formatSuccessRate(task.statistics.success_rate)}
 							</p>
 						</div>
 						<div class="flex h-8 w-8 items-center justify-center rounded-md {statusDisplay.bgColor}">
@@ -201,7 +201,7 @@
 						<div>
 							<p class="text-sm font-medium text-gray-600 dark:text-gray-400">Last Run</p>
 							<p class="text-sm font-semibold text-gray-900 dark:text-white">
-								{formatLastExecution(task.statistics.lastExecution?.timestamp)}
+								{formatLastExecution(task.statistics.last_execution?.timestamp)}
 							</p>
 							{#if task.statistics.lastExecution?.status}
 								<p class="text-xs capitalize {statusDisplay.color}">

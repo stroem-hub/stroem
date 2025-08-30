@@ -39,15 +39,15 @@ export interface ChartDataPoint {
 
 // Task Management Types
 export interface TaskStatistics {
-	totalExecutions: number;
-	successRate: number;
-	lastExecution?: {
+	total_executions: number;
+	success_rate: number;
+	last_execution?: {
 		timestamp: string;
 		status: 'success' | 'failed' | 'running' | 'queued';
-		triggeredBy: string;
+		triggered_by: string;
 		duration?: number;
 	};
-	averageDuration?: number;
+	average_duration?: number;
 }
 
 export interface EnhancedTask {
@@ -63,9 +63,9 @@ export interface PaginationInfo {
 	page: number;
 	limit: number;
 	total: number;
-	totalPages: number;
-	hasNext: boolean;
-	hasPrev: boolean;
+	total_pages: number;
+	has_next: boolean;
+	has_prev: boolean;
 }
 
 export interface PaginatedResponse<T> {

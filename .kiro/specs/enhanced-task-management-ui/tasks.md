@@ -80,7 +80,7 @@
   - _Requirements: 2.1, 2.4, 2.5, 5.3_
 
 - [ ] 4. Enhance task list page with new components
-- [ ] 4.1 Update task list page to use enhanced TaskCard components with pagination
+- [x] 4.1 Update task list page to use enhanced TaskCard components with pagination
   - Modify `ui/src/routes/tasks/+page.svelte` to use new TaskCard and Pagination components
   - Replace simple card layout with responsive grid using TaskCard
   - Integrate Pagination component for server-side pagination

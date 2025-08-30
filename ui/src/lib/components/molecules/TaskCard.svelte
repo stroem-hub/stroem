@@ -71,10 +71,10 @@
 	}
 
 	// Determine status for badge
-	const lastExecutionStatus = task.statistics.lastExecution?.status || 'never_executed';
+	const lastExecutionStatus = task.statistics.last_execution?.status || 'never_executed';
 	
 	// Calculate success rate percentage
-	const successRatePercent = Math.round(task.statistics.successRate);
+	const successRatePercent = Math.round(task.statistics.success_rate);
 </script>
 
 <Card 
@@ -119,7 +119,7 @@
 						Executions
 					</span>
 					<span class="font-medium text-gray-900 dark:text-gray-100">
-						{task.statistics.totalExecutions}
+						{task.statistics.total_executions}
 					</span>
 				</div>
 
@@ -129,7 +129,7 @@
 						Success Rate
 					</span>
 					<span class="font-medium text-gray-900 dark:text-gray-100">
-						{task.statistics.totalExecutions > 0 ? `${successRatePercent}%` : 'N/A'}
+						{task.statistics.total_executions > 0 ? `${successRatePercent}%` : 'N/A'}
 					</span>
 				</div>
 
@@ -139,23 +139,23 @@
 						Avg Duration
 					</span>
 					<span class="font-medium text-gray-900 dark:text-gray-100">
-						{formatDuration(task.statistics.averageDuration)}
+						{formatDuration(task.statistics.average_duration)}
 					</span>
 				</div>
 			</div>
 
 			<!-- Last execution info -->
-			{#if task.statistics.lastExecution}
+			{#if task.statistics.last_execution}
 				<div class="pt-3 border-t border-gray-200 dark:border-gray-700">
 					<div class="flex items-center justify-between text-sm">
 						<div class="flex items-center gap-2 text-gray-600 dark:text-gray-400">
 							<ClockIcon class="w-4 h-4" />
-							<span>Last run: {formatTimestamp(task.statistics.lastExecution.timestamp)}</span>
+							<span>Last run: {formatTimestamp(task.statistics.last_execution.timestamp)}</span>
 						</div>
 						<div class="flex items-center gap-2 text-gray-600 dark:text-gray-400">
 							<UserIcon class="w-4 h-4" />
 							<span class="truncate max-w-24">
-								{formatTriggeredBy(task.statistics.lastExecution.triggeredBy)}
+								{formatTriggeredBy(task.statistics.last_execution.triggered_by)}
 							</span>
 						</div>
 					</div>
