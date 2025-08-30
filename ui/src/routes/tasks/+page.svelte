@@ -1,18 +1,56 @@
+<!--
+	Enhanced Task List Page with URL State Management
+	
+	This page implements comprehensive URL state management for task list navigation:
+	
+	Features:
+	- URL parameter synchronization for page, sort, search, and page size
+	- Browser back/forward navigation support
+	- Deep linking to specific task list states
+	- State persistence across page refreshes
+	- Clean URLs (only non-default parameters are included)
+	- Keyboard shortcuts (/ to focus search, Ctrl/Cmd+R to reset filters)
+	- Share current view functionality
+	- Automatic URL validation and cleanup
+	
+	URL Parameters:
+	- page: Current page number (default: 1)
+	- limit: Items per page (default: 25, valid: 10, 25, 50, 100)
+	- sort: Sort field (default: 'name', valid: 'name', 'lastExecution', 'successRate')
+	- order: Sort order (default: 'asc', valid: 'asc', 'desc')
+	- search: Search term (default: empty string)
+	
+	Examples:
+	- /tasks (default view)
+	- /tasks?page=2 (page 2 with defaults)
+	- /tasks?search=test&sort=lastExecution&order=desc (filtered and sorted)
+	- /tasks?page=3&limit=50&search=workflow (custom page size and search)
+-->
 <script lang="ts">
 	import type { PageProps } from './$types';
 	import { TaskCard, Pagination, Alert, Input, Select, Button } from '$lib/components';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { debounce } from '$lib/utils';
+	import { debounce, buildCleanUrl, createShareableUrl } from '$lib/utils';
 	import type { EnhancedTask } from '$lib/types';
+	import { browser } from '$app/environment';
 
 	let { data }: PageProps = $props();
 
 	// Loading state
 	let loading = $state(false);
 
-	// Search input state
-	let searchInput = $state(data.queryParams.search);
+	// Search input state - sync with URL parameters
+	let searchInput = $state(data.queryParams.search || '');
+
+	// Current URL state - track all parameters
+	let currentParams = $state({
+		page: data.queryParams.page,
+		limit: data.queryParams.limit,
+		sort: data.queryParams.sort,
+		order: data.queryParams.order,
+		search: data.queryParams.search || ''
+	});
 
 	// Sort options
 	const sortOptions = [
@@ -26,9 +64,49 @@
 		{ value: 'desc', label: 'Descending' }
 	];
 
+	// Default parameters for clean URLs
+	const defaultParams = {
+		page: 1,
+		limit: 25,
+		sort: 'name',
+		order: 'asc',
+		search: ''
+	};
+
+	// Update current params when data changes (for browser navigation)
+	$effect(() => {
+		const newParams = {
+			page: data.queryParams.page,
+			limit: data.queryParams.limit,
+			sort: data.queryParams.sort,
+			order: data.queryParams.order,
+			search: data.queryParams.search || ''
+		};
+		
+		// Only update if params actually changed to avoid infinite loops
+		if (JSON.stringify(currentParams) !== JSON.stringify(newParams)) {
+			currentParams = newParams;
+			searchInput = data.queryParams.search || '';
+		}
+	});
+
+	// Validate URL state on mount and redirect if invalid
+	$effect(() => {
+		if (!browser) return;
+		
+		// Check if current URL matches the expected clean URL
+		const expectedUrl = buildCleanUrl('/tasks', currentParams, defaultParams);
+		const currentUrl = page.url.pathname + page.url.search;
+		
+		// If URLs don't match, redirect to clean URL (this handles invalid parameters)
+		if (currentUrl !== expectedUrl && currentUrl !== '/tasks') {
+			goto(expectedUrl, { replaceState: true });
+		}
+	});
+
 	// Debounced search function
 	const debouncedSearch = debounce((searchTerm: string) => {
-		updateUrl({ search: searchTerm, page: 1 });
+		updateUrlState({ search: searchTerm, page: 1 });
 	}, 300);
 
 	// Handle search input changes
@@ -41,44 +119,75 @@
 	// Handle sort changes
 	function handleSortChange(event: Event) {
 		const target = event.target as HTMLSelectElement;
-		updateUrl({ sort: target.value, page: 1 });
+		updateUrlState({ sort: target.value, page: 1 });
 	}
 
 	// Handle order changes
 	function handleOrderChange(event: Event) {
 		const target = event.target as HTMLSelectElement;
-		updateUrl({ order: target.value, page: 1 });
+		updateUrlState({ order: target.value, page: 1 });
 	}
 
 	// Handle pagination changes
 	function handlePageChange(newPage: number) {
-		updateUrl({ page: newPage });
+		updateUrlState({ page: newPage });
 	}
 
 	function handlePageSizeChange(newSize: number) {
-		updateUrl({ limit: newSize, page: 1 });
+		updateUrlState({ limit: newSize, page: 1 });
 	}
 
-	// Update URL with new parameters
-	function updateUrl(params: Record<string, string | number>) {
+	// Enhanced URL state management
+	function updateUrlState(newParams: Partial<typeof currentParams>) {
+		if (!browser) return;
+		
 		loading = true;
 		
-		const url = new URL(page.url);
+		// Merge new parameters with current state
+		const updatedParams = { ...currentParams, ...newParams };
 		
-		// Update search params
-		Object.entries(params).forEach(([key, value]) => {
-			if (value === '' || value === null || value === undefined) {
-				url.searchParams.delete(key);
-			} else {
-				url.searchParams.set(key, value.toString());
-			}
-		});
+		// Build clean URL using utility function
+		const newUrl = buildCleanUrl('/tasks', updatedParams, defaultParams);
 
-		// Navigate to new URL
-		goto(url.pathname + url.search, { replaceState: false, noScroll: true })
-			.finally(() => {
-				loading = false;
-			});
+		// Update current params state
+		currentParams = updatedParams;
+
+		// Determine if we should replace or push state
+		// Replace state for search changes to avoid cluttering history
+		const replaceState = 'search' in newParams;
+
+		// Navigate to new URL with proper state management
+		goto(newUrl, { 
+			replaceState, 
+			noScroll: true,
+			keepFocus: true
+		}).finally(() => {
+			loading = false;
+		});
+	}
+
+	// Build URL for deep linking
+	function buildTaskListUrl(params: Partial<typeof currentParams> = {}) {
+		const mergedParams = { ...currentParams, ...params };
+		return buildCleanUrl('/tasks', mergedParams, defaultParams);
+	}
+
+	// Get current state for sharing/bookmarking
+	function getCurrentStateUrl() {
+		return createShareableUrl('/tasks', currentParams, defaultParams);
+	}
+
+	// Copy current URL to clipboard for sharing
+	async function copyCurrentUrl() {
+		if (!browser) return;
+		
+		try {
+			const url = window.location.origin + getCurrentStateUrl();
+			await navigator.clipboard.writeText(url);
+			// Could show a toast notification here
+		} catch (error) {
+			console.error('Failed to copy URL:', error);
+		}
 	}
 
 	// Navigate to task detail
@@ -89,20 +198,52 @@
 	// Clear search
 	function clearSearch() {
 		searchInput = '';
-		updateUrl({ search: '', page: 1 });
+		updateUrlState({ search: '', page: 1 });
 	}
 
-	// Reset all filters
+	// Reset all filters to defaults
 	function resetFilters() {
 		searchInput = '';
-		updateUrl({ 
-			search: '', 
-			sort: 'name', 
-			order: 'asc', 
-			page: 1, 
-			limit: 25 
-		});
+		updateUrlState(defaultParams);
 	}
+
+	// Handle keyboard shortcuts for navigation
+	function handleKeydown(event: KeyboardEvent) {
+		if (!browser) return;
+		
+		// Don't handle shortcuts when typing in inputs
+		if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) {
+			return;
+		}
+		
+		// Handle keyboard shortcuts
+		switch (event.key) {
+			case '/':
+				// Focus search input
+				event.preventDefault();
+				const searchInput = document.querySelector('input[type="text"]') as HTMLInputElement;
+				searchInput?.focus();
+				break;
+			case 'r':
+				// Reset filters
+				if (event.ctrlKey || event.metaKey) {
+					event.preventDefault();
+					resetFilters();
+				}
+				break;
+		}
+	}
+
+	// Set up keyboard event listener
+	$effect(() => {
+		if (browser) {
+			document.addEventListener('keydown', handleKeydown);
+			
+			return () => {
+				document.removeEventListener('keydown', handleKeydown);
+			};
+		}
+	});
 </script>
 
 <svelte:head>
@@ -119,12 +260,33 @@
 			</p>
 		</div>
 		
-		<!-- Quick stats -->
-		{#if data.pagination.total > 0}
-			<div class="text-sm text-gray-600 dark:text-gray-400">
-				{data.pagination.total} task{data.pagination.total === 1 ? '' : 's'} total
-			</div>
-		{/if}
+		<div class="flex items-center gap-4">
+			<!-- Quick stats -->
+			{#if data.pagination.total > 0}
+				<div class="text-sm text-gray-600 dark:text-gray-400">
+					{data.pagination.total} task{data.pagination.total === 1 ? '' : 's'} total
+				</div>
+			{/if}
+			
+			<!-- Share current view -->
+			{#if browser && (currentParams.search || currentParams.sort !== 'name' || currentParams.order !== 'asc' || currentParams.page !== 1 || currentParams.limit !== 25)}
+				<Button
+					variant="outline"
+					size="sm"
+					onclick={copyCurrentUrl}
+					disabled={loading}
+					class="whitespace-nowrap"
+					title="Copy link to current view"
+				>
+					{#snippet children()}
+						<svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
+						</svg>
+						Share View
+					{/snippet}
+				</Button>
+			{/if}
+		</div>
 	</div>
 
 	<!-- Error Alert -->
@@ -149,7 +311,7 @@
 				<div class="relative">
 					<Input
 						type="text"
-						placeholder="Search tasks by name or description..."
+						placeholder="Search tasks by name or description... (Press / to focus)"
 						value={searchInput}
 						oninput={handleSearchInput}
 						disabled={loading}
@@ -174,14 +336,14 @@
 			<!-- Sort Controls -->
 			<div class="flex gap-2">
 				<Select
-					value={data.queryParams.sort}
+					value={currentParams.sort}
 					options={sortOptions}
 					onchange={handleSortChange}
 					disabled={loading}
 					aria-label="Sort by"
 				/>
 				<Select
-					value={data.queryParams.order}
+					value={currentParams.order}
 					options={orderOptions}
 					onchange={handleOrderChange}
 					disabled={loading}
@@ -239,15 +401,15 @@
 				</svg>
 			</div>
 			<h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-				{data.queryParams.search ? 'No tasks found' : 'No tasks available'}
+				{currentParams.search ? 'No tasks found' : 'No tasks available'}
 			</h3>
 			<p class="text-gray-600 dark:text-gray-400 mb-4">
-				{data.queryParams.search 
-					? `No tasks match your search for "${data.queryParams.search}"`
+				{currentParams.search 
+					? `No tasks match your search for "${currentParams.search}"`
 					: 'There are no workflow tasks configured yet.'
 				}
 			</p>
-			{#if data.queryParams.search}
+			{#if currentParams.search}
 				<Button variant="outline" onclick={clearSearch}>
 					{#snippet children()}
 						Clear Search

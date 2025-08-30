@@ -203,9 +203,9 @@
 							<p class="text-sm font-semibold text-gray-900 dark:text-white">
 								{formatLastExecution(task.statistics.last_execution?.timestamp)}
 							</p>
-							{#if task.statistics.lastExecution?.status}
+							{#if task.statistics.last_execution?.status}
 								<p class="text-xs capitalize {statusDisplay.color}">
-									{task.statistics.lastExecution.status}
+									{task.statistics.last_execution.status}
 								</p>
 							{/if}
 						</div>
@@ -221,13 +221,13 @@
 						<div>
 							<p class="text-sm font-medium text-gray-600 dark:text-gray-400">Avg Duration</p>
 							<p class="text-sm font-semibold text-gray-900 dark:text-white">
-								{#if task.statistics.averageDuration}
-									{#if task.statistics.averageDuration < 60}
-										{Math.round(task.statistics.averageDuration)}s
-									{:else if task.statistics.averageDuration < 3600}
-										{Math.floor(task.statistics.averageDuration / 60)}m {Math.round(task.statistics.averageDuration % 60)}s
+								{#if task.statistics.average_duration}
+									{#if task.statistics.average_duration < 60}
+										{Math.round(task.statistics.average_duration)}s
+									{:else if task.statistics.average_duration < 3600}
+										{Math.floor(task.statistics.average_duration / 60)}m {Math.round(task.statistics.average_duration % 60)}s
 									{:else}
-										{Math.floor(task.statistics.averageDuration / 3600)}h {Math.floor((task.statistics.averageDuration % 3600) / 60)}m
+										{Math.floor(task.statistics.average_duration / 3600)}h {Math.floor((task.statistics.average_duration % 3600) / 60)}m
 									{/if}
 								{:else}
 									N/A

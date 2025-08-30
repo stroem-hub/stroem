@@ -111,3 +111,85 @@ export function generateId(length: number = 8): string {
 	}
 	return result;
 }
+
+/**
+ * Build a clean URL with only non-default parameters
+ * @param baseUrl Base URL path
+ * @param params Parameters to include
+ * @param defaults Default parameter values
+ * @returns Clean URL string
+ */
+export function buildCleanUrl(
+	baseUrl: string,
+	params: Record<string, any>,
+	defaults: Record<string, any>
+): string {
+	const url = new URL(baseUrl, window.location.origin);
+	
+	Object.entries(params).forEach(([key, value]) => {
+		const defaultValue = defaults[key];
+		
+		// Only add parameter if it's different from default and not empty
+		if (value !== defaultValue && value !== '' && value !== null && value !== undefined) {
+			url.searchParams.set(key, value.toString());
+		}
+	});
+	
+	return url.pathname + url.search;
+}
+
+/**
+ * Parse and validate URL search parameters
+ * @param searchParams URLSearchParams object
+ * @param schema Validation schema with defaults and valid values
+ * @returns Validated parameters object
+ */
+export function parseUrlParams<T extends Record<string, any>>(
+	searchParams: URLSearchParams,
+	schema: {
+		[K in keyof T]: {
+			default: T[K];
+			parse?: (value: string) => T[K];
+			validate?: (value: T[K]) => boolean;
+		};
+	}
+): T {
+	const result = {} as T;
+	
+	Object.entries(schema).forEach(([key, config]) => {
+		const rawValue = searchParams.get(key);
+		let parsedValue = config.default;
+		
+		if (rawValue !== null) {
+			try {
+				parsedValue = config.parse ? config.parse(rawValue) : rawValue as T[keyof T];
+				
+				// Validate the parsed value
+				if (config.validate && !config.validate(parsedValue)) {
+					parsedValue = config.default;
+				}
+			} catch {
+				parsedValue = config.default;
+			}
+		}
+		
+		result[key as keyof T] = parsedValue;
+	});
+	
+	return result;
+}
+
+/**
+ * Create a shareable URL for the current page state
+ * @param baseUrl Base URL path
+ * @param params Current parameters
+ * @param defaults Default parameter values
+ * @returns Shareable URL string
+ */
+export function createShareableUrl(
+	baseUrl: string,
+	params: Record<string, any>,
+	defaults: Record<string, any>
+): string {
+	return buildCleanUrl(baseUrl, params, defaults);
+}

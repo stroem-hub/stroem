@@ -79,7 +79,7 @@
   - Include proper TypeScript interfaces for task configuration data
   - _Requirements: 2.1, 2.4, 2.5, 5.3_
 
-- [ ] 4. Enhance task list page with new components
+- [x] 4. Enhance task list page with new components
 - [x] 4.1 Update task list page to use enhanced TaskCard components with pagination
   - Modify `ui/src/routes/tasks/+page.svelte` to use new TaskCard and Pagination components
   - Replace simple card layout with responsive grid using TaskCard
@@ -89,7 +89,7 @@
   - Ensure proper TypeScript types for enhanced task data and pagination
   - _Requirements: 1.1, 1.2, 1.3, 1.5, 1.6, 5.1, 5.3, 5.5, 6.1_
 
-- [ ] 4.2 Add sorting and search functionality to task list
+- [x] 4.2 Add sorting and search functionality to task list
   - Implement sorting controls for name, last execution, and success rate
   - Add search input component with proper debouncing
   - Integrate sorting and search with pagination state management
@@ -97,7 +97,7 @@
   - Include proper accessibility for sorting and search controls
   - _Requirements: 1.4, 4.3, 4.4, 5.6_
 
-- [ ] 4.3 Add URL state management for task list navigation
+- [x] 4.3 Add URL state management for task list navigation
   - Implement URL parameter synchronization for page, sort, search, and page size
   - Add browser back/forward navigation support
   - Ensure deep linking works for specific task list states
