@@ -1,16 +1,26 @@
 <script lang="ts">
-	import { Card } from '$lib/components';
+	import { Card, TaskCardSkeleton, ErrorBoundary } from '$lib/components';
 	import TaskStatusBadge from '../atoms/TaskStatusBadge.svelte';
 	import { ClockIcon, UserIcon } from '$lib/components/icons';
 	import type { EnhancedTask } from '$lib/types';
 
 	interface Props {
-		task: EnhancedTask;
+		task?: EnhancedTask;
 		onclick?: () => void;
 		class?: string;
+		loading?: boolean;
+		error?: string | Error | null;
+		onRetry?: () => void;
 	}
 
-	let { task, onclick, class: className = '' }: Props = $props();
+	let { 
+		task, 
+		onclick, 
+		class: className = '',
+		loading = false,
+		error = null,
+		onRetry
+	}: Props = $props();
 
 	// Format duration helper
 	function formatDuration(seconds?: number): string {
@@ -71,12 +81,23 @@
 	}
 
 	// Determine status for badge
-	const lastExecutionStatus = task.statistics.last_execution?.status || 'never_executed';
+	const lastExecutionStatus = $derived(task?.statistics.last_execution?.status || 'never_executed');
 	
 	// Calculate success rate percentage
-	const successRatePercent = Math.round(task.statistics.success_rate);
+	const successRatePercent = $derived(task ? Math.round(task.statistics.success_rate) : 0);
 </script>
 
+{#if loading}
+	<TaskCardSkeleton class={className} />
+{:else if error}
+	<ErrorBoundary 
+		{error}
+		title="Failed to load task"
+		description="There was an error loading this task's information."
+		{onRetry}
+		class={className}
+	/>
+{:else if task}
 <Card 
 	variant="elevated" 
 	padding="md"
@@ -171,3 +192,17 @@
 		</div>
 	{/snippet}
 </Card>
+{:else}
+	<!-- Fallback for missing task data -->
+	<Card 
+		variant="elevated" 
+		padding="md"
+		class="opacity-50 {className}"
+	>
+		{#snippet children()}
+			<div class="text-center py-4">
+				<p class="text-gray-500 dark:text-gray-400">Task data unavailable</p>
+			</div>
+		{/snippet}
+	</Card>
+{/if}

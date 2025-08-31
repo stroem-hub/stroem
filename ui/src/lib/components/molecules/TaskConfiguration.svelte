@@ -1,38 +1,21 @@
 <script lang="ts">
 	import { ChevronDownIcon, ChevronRightIcon, InfoCircleIcon, ExclamationCircleIcon } from '$lib/components/icons';
-
-	interface InputField {
-		type: string;
-		default?: string | number | boolean | null;
-		required?: boolean;
-		description?: string;
-		order?: number;
-		name?: string;
-		id: string;
-	}
-
-	interface FlowStep {
-		action: string;
-		input?: Record<string, any>;
-		depends_on?: string[];
-		continue_on_fail?: boolean;
-		on_error?: string;
-	}
-
-	interface Task {
-		id: string;
-		name?: string;
-		description?: string;
-		input?: Record<string, InputField>;
-		flow: Record<string, FlowStep>;
-	}
+	import { TaskConfigurationSkeleton, ErrorBoundary, StatisticsFallback } from '$lib/components';
+	import type { Task, InputField } from '$lib/types';
 
 	interface TaskConfigurationProps {
-		task: Task;
+		task?: Task;
 		loading?: boolean;
+		error?: string | Error | null;
+		onRetry?: () => void;
 	}
 
-	let { task, loading = false }: TaskConfigurationProps = $props();
+	let { 
+		task, 
+		loading = false,
+		error = null,
+		onRetry
+	}: TaskConfigurationProps = $props();
 
 	// State for expandable sections
 	let expandedSections = $state<Record<string, boolean>>({
@@ -102,29 +85,27 @@
 		}
 	}
 
-	let sortedInputs = $derived(getSortedInputs(task.input));
-	let flowSteps = $derived(Object.entries(task.flow || {}));
+	let sortedInputs = $derived(task ? getSortedInputs(task.input) : []);
+	let flowSteps = $derived(task ? Object.entries(task.flow || {}) : []);
 </script>
 
-<div class="space-y-6">
-	{#if loading}
-		<!-- Loading skeleton -->
-		<div class="animate-pulse space-y-6">
-			{#each Array(2) as _}
-				<div class="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
-					<div class="mb-4 flex items-center space-x-2">
-						<div class="h-5 w-5 rounded bg-gray-200 dark:bg-gray-700"></div>
-						<div class="h-6 w-32 rounded bg-gray-200 dark:bg-gray-700"></div>
-					</div>
-					<div class="space-y-3">
-						{#each Array(3) as _}
-							<div class="h-16 rounded bg-gray-100 dark:bg-gray-900"></div>
-						{/each}
-					</div>
-				</div>
-			{/each}
-		</div>
-	{:else}
+{#if loading}
+	<TaskConfigurationSkeleton />
+{:else if error}
+	<ErrorBoundary 
+		{error}
+		title="Failed to load configuration"
+		description="Unable to load task configuration details at this time."
+		{onRetry}
+	/>
+{:else if !task}
+	<StatisticsFallback 
+		title="Configuration Unavailable"
+		message="Task configuration data is not available."
+		variant="info"
+	/>
+{:else}
+	<div class="space-y-6">
 		<!-- Input Parameters Section -->
 		<div class="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
 			<button
@@ -356,5 +337,5 @@
 				</div>
 			{/if}
 		</div>
-	{/if}
-</div>
+	</div>
+{/if}

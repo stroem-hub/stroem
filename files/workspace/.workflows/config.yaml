@@ -133,6 +133,33 @@ tasks:
           vvv: "{{ step1.output.result }}"
         depends_on:
           - step1
+  task2:
+    input:
+      field1:
+        name: "Field 1"
+        description: "Here goes the description"
+        required: true
+        type: string
+        default: "111"
+      field2:
+        name: "Field 2"
+        description: "Here goes the description"
+        required: false
+        type: string
+
+    flow:
+      step1:
+        action: allunite.action1
+        input:
+          vvv: "test - {{ input.field1 }}"
+
+      step2:
+        action: allunite.action2
+        input:
+          vvv: "{{ step1.output.result }}"
+        depends_on:
+          - step1
+
 
 
 triggers:

@@ -11,6 +11,9 @@ export { default as FormField } from './atoms/FormField.svelte';
 export { default as Table } from './atoms/Table.svelte';
 export { default as Badge } from './atoms/Badge.svelte';
 export { default as TaskStatusBadge } from './atoms/TaskStatusBadge.svelte';
+export { default as TaskCardSkeleton } from './atoms/TaskCardSkeleton.svelte';
+export { default as TaskStatisticsSkeleton } from './atoms/TaskStatisticsSkeleton.svelte';
+export { default as TaskConfigurationSkeleton } from './atoms/TaskConfigurationSkeleton.svelte';
 export { default as Accordion } from './atoms/Accordion.svelte';
 export { default as Tabs } from './atoms/Tabs.svelte';
 export { default as ThemeToggle } from './atoms/ThemeToggle.svelte';
@@ -27,11 +30,13 @@ export { default as Pagination } from './molecules/Pagination.svelte';
 export { default as TaskStatistics } from './molecules/TaskStatistics.svelte';
 export { default as TaskHeader } from './molecules/TaskHeader.svelte';
 export { default as TaskConfiguration } from './molecules/TaskConfiguration.svelte';
+export { default as JobFilters } from './molecules/JobFilters.svelte';
+export { default as ErrorBoundary } from './molecules/ErrorBoundary.svelte';
+export { default as StatisticsFallback } from './molecules/StatisticsFallback.svelte';
 
 // Organisms - Complex components
 export { default as Sidebar } from './organisms/Sidebar.svelte';
 export { default as Navbar } from './organisms/Navbar.svelte';
-export { default as ErrorBoundary } from './organisms/ErrorBoundary.svelte';
 export { default as ToastContainer } from './organisms/ToastContainer.svelte';
 export { default as LoadingOverlay } from './organisms/LoadingOverlay.svelte';
 
@@ -52,5 +57,10 @@ export {
   TrendingDownIcon,
   ClockIcon,
   CheckCircleIcon,
-  ExclamationCircleIcon
+  ExclamationCircleIcon,
+  ExclamationTriangleIcon,
+  ArrowPathIcon,
+  InformationCircleIcon,
+  FilterIcon,
+  XIcon
 } from './icons';

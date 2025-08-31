@@ -21,3 +21,7 @@ export { default as CloseCircleIcon } from './CloseCircleIcon.svelte';
 export { default as QuestionCircleIcon } from './QuestionCircleIcon.svelte';
 export { default as InfoCircleIcon } from './InfoCircleIcon.svelte';
 export { default as ExclamationCircleIcon } from './ExclamationCircleIcon.svelte';
+export { default as ExclamationTriangleIcon } from './ExclamationTriangleIcon.svelte';
+export { default as ArrowPathIcon } from './ArrowPathIcon.svelte';
+export { default as InformationCircleIcon } from './InformationCircleIcon.svelte';
+export { default as FilterIcon } from './FilterIcon.svelte';

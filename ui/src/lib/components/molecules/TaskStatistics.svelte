@@ -1,13 +1,21 @@
 <script lang="ts">
 	import type { TaskStatistics } from '$lib/types';
 	import { CheckCircleIcon, ExclamationCircleIcon, ClockIcon, TrendingUpIcon, TrendingDownIcon, TasksIcon, UserIcon } from '$lib/components/icons';
+	import { TaskStatisticsSkeleton, ErrorBoundary, StatisticsFallback } from '$lib/components';
 
 	interface TaskStatisticsProps {
-		statistics: TaskStatistics;
+		statistics?: TaskStatistics;
 		loading?: boolean;
+		error?: string | Error | null;
+		onRetry?: () => void;
 	}
 
-	let { statistics, loading = false }: TaskStatisticsProps = $props();
+	let { 
+		statistics, 
+		loading = false,
+		error = null,
+		onRetry
+	}: TaskStatisticsProps = $props();
 
 	// Helper function to format duration
 	function formatDuration(seconds?: number): string {
@@ -73,27 +81,27 @@
 		}
 	}
 
-	let successRateColor = $derived(getSuccessRateColor(statistics.success_rate));
-	let statusDisplay = $derived(getStatusDisplay(statistics.last_execution?.status));
+	let successRateColor = $derived(statistics ? getSuccessRateColor(statistics.success_rate) : 'gray');
+	let statusDisplay = $derived(getStatusDisplay(statistics?.last_execution?.status));
 </script>
 
-<div class="space-y-4">
-	{#if loading}
-		<!-- Loading skeleton -->
-		<div class="animate-pulse space-y-4">
-			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-				{#each Array(3) as _}
-					<div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-						<div class="flex items-center justify-between">
-							<div class="h-4 w-24 rounded bg-gray-200 dark:bg-gray-700"></div>
-							<div class="h-8 w-8 rounded bg-gray-200 dark:bg-gray-700"></div>
-						</div>
-						<div class="mt-4 h-8 w-32 rounded bg-gray-200 dark:bg-gray-700"></div>
-					</div>
-				{/each}
-			</div>
-		</div>
-	{:else}
+{#if loading}
+	<TaskStatisticsSkeleton />
+{:else if error}
+	<ErrorBoundary 
+		{error}
+		title="Failed to load statistics"
+		description="Unable to load task execution statistics at this time."
+		{onRetry}
+	/>
+{:else if !statistics}
+	<StatisticsFallback 
+		title="Statistics Unavailable"
+		message="Task execution statistics are not available. This may be because the task has never been executed or there was an error loading the data."
+		variant="info"
+	/>
+{:else}
+	<div class="space-y-4">
 		<!-- Statistics cards grid -->
 		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
 			<!-- Total Executions Card -->
@@ -161,7 +169,13 @@
 					<!-- Status -->
 					<div class="flex items-center space-x-3">
 						<div class="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700">
-							<svelte:component this={statusDisplay.icon} class="h-4 w-4 {statusDisplay.color}" />
+							{#if statusDisplay.icon === CheckCircleIcon}
+								<CheckCircleIcon class="h-4 w-4 {statusDisplay.color}" />
+							{:else if statusDisplay.icon === ExclamationCircleIcon}
+								<ExclamationCircleIcon class="h-4 w-4 {statusDisplay.color}" />
+							{:else}
+								<ClockIcon class="h-4 w-4 {statusDisplay.color}" />
+							{/if}
 						</div>
 						<div>
 							<p class="text-sm font-medium text-gray-600 dark:text-gray-400">Status</p>
@@ -225,5 +239,5 @@
 				</p>
 			</div>
 		{/if}
-	{/if}
-</div>
+	</div>
+{/if}

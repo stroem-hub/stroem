@@ -2,8 +2,8 @@
 	import { onMount } from 'svelte';
 	import { callApi } from '$lib/auth';
 
-	let apiResponse = $state(null);
-	let error = $state(null);
+	let apiResponse = $state<any>(null);
+	let error = $state<string | null>(null);
 	let loading = $state(true);
 
 	onMount(async () => {
@@ -15,7 +15,7 @@
 				error = `HTTP ${response?.status}: ${response?.statusText}`;
 			}
 		} catch (e) {
-			error = e.message;
+			error = e instanceof Error ? e.message : 'Unknown error occurred';
 		} finally {
 			loading = false;
 		}

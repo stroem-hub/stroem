@@ -28,7 +28,7 @@
 -->
 <script lang="ts">
 	import type { PageProps } from './$types';
-	import { TaskCard, Pagination, Alert, Input, Select, Button } from '$lib/components';
+	import { TaskCard, TaskCardSkeleton, Pagination, Alert, Input, Select, Button, ErrorBoundary } from '$lib/components';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { debounce, buildCleanUrl, createShareableUrl } from '$lib/utils';
@@ -47,8 +47,8 @@
 	let currentParams = $state({
 		page: data.queryParams.page,
 		limit: data.queryParams.limit,
-		sort: data.queryParams.sort,
-		order: data.queryParams.order,
+		sort: data.queryParams.sort as 'name' | 'lastExecution' | 'successRate',
+		order: data.queryParams.order as 'asc' | 'desc',
 		search: data.queryParams.search || ''
 	});
 
@@ -68,8 +68,8 @@
 	const defaultParams = {
 		page: 1,
 		limit: 25,
-		sort: 'name',
-		order: 'asc',
+		sort: 'name' as const,
+		order: 'asc' as const,
 		search: ''
 	};
 
@@ -119,13 +119,13 @@
 	// Handle sort changes
 	function handleSortChange(event: Event) {
 		const target = event.target as HTMLSelectElement;
-		updateUrlState({ sort: target.value, page: 1 });
+		updateUrlState({ sort: target.value as 'name' | 'lastExecution' | 'successRate', page: 1 });
 	}
 
 	// Handle order changes
 	function handleOrderChange(event: Event) {
 		const target = event.target as HTMLSelectElement;
-		updateUrlState({ order: target.value, page: 1 });
+		updateUrlState({ order: target.value as 'asc' | 'desc', page: 1 });
 	}
 
 	// Handle pagination changes
@@ -366,13 +366,23 @@
 	</div>
 
 	<!-- Task Grid -->
-	{#if data.tasks.length > 0}
+	{#if loading}
+		<!-- Loading skeleton grid -->
+		<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+			{#each Array(6) as _}
+				<TaskCardSkeleton class="h-full" />
+			{/each}
+		</div>
+	{:else if data.error}
+		<!-- Error state handled above -->
+	{:else if data.tasks.length > 0}
 		<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
 			{#each data.tasks as task (task.id)}
 				<TaskCard
 					{task}
 					onclick={() => viewTask(task.id)}
 					class="h-full"
+					onRetry={() => window.location.reload()}
 				/>
 			{/each}
 		</div>

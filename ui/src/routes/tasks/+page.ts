@@ -1,6 +1,6 @@
 import type { PageLoad } from './$types';
 import { callApi } from '$lib/auth';
-import type { PaginatedResponse, EnhancedTask } from '$lib/types';
+import type { PaginatedTasksResponse, EnhancedTask, TaskListQuery, ApiResponse } from '$lib/types';
 import { parseUrlParams } from '$lib/utils';
 
 export const load: PageLoad = async ({ fetch, url }) => {
@@ -31,80 +31,69 @@ export const load: PageLoad = async ({ fetch, url }) => {
 	};
 
 	// Parse and validate URL parameters
-	const { page, limit, sort, order, search } = parseUrlParams(url.searchParams, paramSchema);
+	const queryParams = parseUrlParams(url.searchParams, paramSchema);
 
 	// Build query string for API call
-	const queryParams = new URLSearchParams({
-		page: page.toString(),
-		limit: limit.toString(),
-		sort,
-		order,
-		...(search && { search })
-	});
+	const apiQueryParams = new URLSearchParams();
+	apiQueryParams.set('page', queryParams.page.toString());
+	apiQueryParams.set('limit', queryParams.limit.toString());
+	apiQueryParams.set('sort', queryParams.sort);
+	apiQueryParams.set('order', queryParams.order);
+	
+	// Only add search if it's not empty
+	if (queryParams.search.trim()) {
+		apiQueryParams.set('search', queryParams.search.trim());
+	}
 
 	try {
-		const response = await callApi(`/api/tasks?${queryParams.toString()}`, undefined, fetch);
+		const response = await callApi(`/api/tasks?${apiQueryParams.toString()}`, undefined, fetch);
 		
 		if (!response?.ok) {
-			throw new Error(`Failed to fetch tasks: ${response?.status}`);
+			throw new Error(`Failed to fetch tasks: ${response?.status} ${response?.statusText}`);
 		}
 
-		const apiResponse = await response.json();
-		
-		// Debug logging
-		console.log('API Response:', apiResponse);
+		const apiResponse: ApiResponse<PaginatedTasksResponse> = await response.json();
 		
 		// Handle the ApiResponse wrapper structure
-		if (!apiResponse.success) {
-			throw new Error(apiResponse.error || 'API request failed');
+		if (!apiResponse.success || !apiResponse.data) {
+			throw new Error(apiResponse.error?.message || 'API request failed');
 		}
 		
-		// Now pagination is at the top level alongside data
-		const tasks = apiResponse.data || [];
-		const pagination = apiResponse.pagination || {
-			page: 1,
-			limit: 25,
-			total: 0,
-			total_pages: 0,
-			has_next: false,
-			has_prev: false
+		const { data: tasks, pagination } = apiResponse.data;
+		
+		// Validate pagination structure
+		const validatedPagination = {
+			page: pagination?.page || queryParams.page,
+			limit: pagination?.limit || queryParams.limit,
+			total: pagination?.total || 0,
+			total_pages: pagination?.total_pages || 0,
+			has_next: pagination?.has_next || false,
+			has_prev: pagination?.has_prev || false
 		};
 		
-		console.log('Tasks:', tasks);
-		console.log('Pagination:', pagination);
-		
 		return {
-			tasks,
-			pagination,
-			queryParams: {
-				page,
-				limit,
-				sort,
-				order,
-				search
-			}
+			tasks: tasks || [],
+			pagination: validatedPagination,
+			queryParams,
+			loading: false,
+			error: null
 		};
 	} catch (error) {
 		console.error('Error loading tasks:', error);
 		
-		// Return empty state on error
+		// Return error state with fallback data
 		return {
 			tasks: [],
 			pagination: {
-				page: 1,
-				limit: 25,
+				page: queryParams.page,
+				limit: queryParams.limit,
 				total: 0,
 				total_pages: 0,
 				has_next: false,
 				has_prev: false
 			},
-			queryParams: {
-				page: 1,
-				limit: 25,
-				sort: 'name',
-				order: 'asc',
-				search: ''
-			},
+			queryParams,
+			loading: false,
 			error: error instanceof Error ? error.message : 'Failed to load tasks'
 		};
 	}

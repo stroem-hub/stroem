@@ -71,12 +71,6 @@ pub struct PaginatedTasksResponse {
 }
 
 #[derive(Debug, Serialize)]
-pub struct PaginatedJobsResponse {
-    pub data: Vec<Value>,
-    pub pagination: PaginationInfo,
-}
-
-#[derive(Debug, Serialize)]
 pub struct EnhancedTaskStatistics {
     pub total_executions: i64,
     pub success_rate: f64,
@@ -432,20 +426,18 @@ async fn get_task_jobs(
         has_prev: params.page > 1,
     };
 
-    let response = PaginatedJobsResponse {
-        data: job_data,
-        pagination,
-    };
-
     debug!(
         "Returning {} jobs for task {} (page {} of {})",
-        response.data.len(),
+        job_data.len(),
         task_id,
         params.page,
         total_pages
     );
 
-    Ok(ApiResponse::data(serde_json::to_value(response)?))
+    Ok(ApiResponse::with_pagination(
+        serde_json::to_value(job_data)?,
+        serde_json::to_value(pagination)?
+    ))
 }
 
 #[axum::debug_handler]

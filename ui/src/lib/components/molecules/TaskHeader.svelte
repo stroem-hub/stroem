@@ -1,19 +1,23 @@
 <script lang="ts">
 	import type { EnhancedTask } from '$lib/types';
-	import { Button, Breadcrumb } from '$lib/components';
+	import { Button, Breadcrumb, ErrorBoundary } from '$lib/components';
 	import { TasksIcon, ClockIcon, CheckCircleIcon, ExclamationCircleIcon } from '$lib/components/icons';
 	interface TaskHeaderProps {
-		task: EnhancedTask;
+		task?: EnhancedTask;
 		loading?: boolean;
 		runDisabled?: boolean;
+		error?: string | Error | null;
 		onRunTask?: () => void;
+		onRetry?: () => void;
 	}
 
 	let { 
 		task, 
 		loading = false,
 		runDisabled = false,
-		onRunTask
+		error = null,
+		onRunTask,
+		onRetry
 	}: TaskHeaderProps = $props();
 
 	function handleRunTask() {
@@ -88,18 +92,33 @@
 	}
 
 	// Breadcrumb items
-	const breadcrumbItems = [
+	const breadcrumbItems = $derived(task ? [
 		{ label: 'Tasks', href: '/tasks' },
 		{ label: task.name || task.id }
-	];
+	] : [
+		{ label: 'Tasks', href: '/tasks' },
+		{ label: 'Loading...' }
+	]);
 
-	let statusDisplay = $derived(getStatusDisplay(task.statistics.last_execution?.status));
-	let successRateColor = $derived(getSuccessRateColor(task.statistics.success_rate));
+	let statusDisplay = $derived(getStatusDisplay(task?.statistics.last_execution?.status));
+	let successRateColor = $derived(task ? getSuccessRateColor(task.statistics.success_rate) : 'text-gray-400');
 </script>
 
-<div class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-	<div class="px-6 py-6">
-		{#if loading}
+{#if error}
+	<div class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+		<div class="px-6 py-6">
+			<ErrorBoundary 
+				{error}
+				title="Failed to load task header"
+				description="Unable to load task information at this time."
+				{onRetry}
+			/>
+		</div>
+	</div>
+{:else}
+	<div class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+		<div class="px-6 py-6">
+			{#if loading}
 			<!-- Loading skeleton -->
 			<div class="animate-pulse">
 				<!-- Breadcrumb skeleton -->
@@ -139,9 +158,9 @@
 						</div>
 						<div>
 							<h1 class="text-2xl font-bold text-gray-900 dark:text-white lg:text-3xl">
-								{task.name || task.id}
+								{task?.name || task?.id || 'Unknown Task'}
 							</h1>
-							{#if task.description}
+							{#if task?.description}
 								<p class="mt-1 text-gray-600 dark:text-gray-400">
 									{task.description}
 								</p>
@@ -171,7 +190,7 @@
 						<div>
 							<p class="text-sm font-medium text-gray-600 dark:text-gray-400">Total Runs</p>
 							<p class="text-2xl font-bold text-gray-900 dark:text-white">
-								{task.statistics.total_executions.toLocaleString()}
+								{task?.statistics.total_executions.toLocaleString() || '0'}
 							</p>
 						</div>
 						<div class="flex h-8 w-8 items-center justify-center rounded-md bg-blue-50 dark:bg-blue-900/20">
@@ -186,7 +205,7 @@
 						<div>
 							<p class="text-sm font-medium text-gray-600 dark:text-gray-400">Success Rate</p>
 							<p class="text-2xl font-bold {successRateColor}">
-								{formatSuccessRate(task.statistics.success_rate)}
+								{task ? formatSuccessRate(task.statistics.success_rate) : 'N/A'}
 							</p>
 						</div>
 						<div class="flex h-8 w-8 items-center justify-center rounded-md {statusDisplay.bgColor}">
@@ -201,16 +220,22 @@
 						<div>
 							<p class="text-sm font-medium text-gray-600 dark:text-gray-400">Last Run</p>
 							<p class="text-sm font-semibold text-gray-900 dark:text-white">
-								{formatLastExecution(task.statistics.last_execution?.timestamp)}
+								{task ? formatLastExecution(task.statistics.last_execution?.timestamp) : 'N/A'}
 							</p>
-							{#if task.statistics.last_execution?.status}
+							{#if task?.statistics.last_execution?.status}
 								<p class="text-xs capitalize {statusDisplay.color}">
 									{task.statistics.last_execution.status}
 								</p>
 							{/if}
 						</div>
 						<div class="flex h-8 w-8 items-center justify-center rounded-md {statusDisplay.bgColor}">
-							<svelte:component this={statusDisplay.icon} class="h-4 w-4 {statusDisplay.color}" />
+							{#if statusDisplay.icon === CheckCircleIcon}
+								<CheckCircleIcon class="h-4 w-4 {statusDisplay.color}" />
+							{:else if statusDisplay.icon === ExclamationCircleIcon}
+								<ExclamationCircleIcon class="h-4 w-4 {statusDisplay.color}" />
+							{:else}
+								<ClockIcon class="h-4 w-4 {statusDisplay.color}" />
+							{/if}
 						</div>
 					</div>
 				</div>
@@ -221,7 +246,7 @@
 						<div>
 							<p class="text-sm font-medium text-gray-600 dark:text-gray-400">Avg Duration</p>
 							<p class="text-sm font-semibold text-gray-900 dark:text-white">
-								{#if task.statistics.average_duration}
+								{#if task?.statistics.average_duration}
 									{#if task.statistics.average_duration < 60}
 										{Math.round(task.statistics.average_duration)}s
 									{:else if task.statistics.average_duration < 3600}
@@ -240,6 +265,7 @@
 					</div>
 				</div>
 			</div>
-		{/if}
+			{/if}
+		</div>
 	</div>
-</div>
+{/if}
