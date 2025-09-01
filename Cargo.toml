@@ -15,10 +15,10 @@ serde_json = "1.0.143"
 tar = "0.4.44"
 flate2 = { version = "1.1.2" }
 tracing = "0.1.41"
-tracing-subscriber = { version = "0.3.19", features = ["fmt"] }
-config = "0.15.14"
+tracing-subscriber = { version = "0.3.20", features = ["fmt"] }
+config = "0.15.15"
 uuid = { version = "1.18.0", features = ["v4", "serde"] }
-clap = { version = "4.5.45", features = ["derive"] }
+clap = { version = "4.5.46", features = ["derive"] }
 globwalker = "0.9.0"
 anyhow = "1.0.99"
 tera = "1.20.0"
@@ -33,7 +33,7 @@ sqlx = { version = "0.8.6", features = ["runtime-tokio", "tls-rustls", "postgres
 sqlx-paginated = { version = "0.2.32", features = ["postgres"] }
 futures = "0.3.31"
 tokio-stream = { version = "0.1.17", features = ["io-util", "sync"] }
-regex = "1.11.1"
+regex = "1.11.2"
 lazy_static = "1.5.0"
 upon = "0.10.0"
 git2 = "0.20.2"
@@ -43,16 +43,16 @@ mime_guess = "2.0.5"
 futures-util = "0.3.31"
 strum = { version = "0.27.2", features = ["derive"] }
 # object_store = "0.12.0"
-async-compression = { version = "0.4.27", features = ["tokio", "gzip"] }
+async-compression = { version = "0.4.30", features = ["tokio", "gzip"] }
 async-tar = "0.5.0"
 tokio-util = { version = "0.7.16", features = ["compat"]  }
 tokio-tar = "0.3.1"
-aws-sdk-s3 = "1.103.0"
-aws-config = "1.8.5"
+aws-sdk-s3 = "1.104.0"
+aws-config = "1.8.6"
 argon2 = "0.5.3"
 jsonwebtoken = "9.3.1"
 sha3 = "0.10.8"
 hmac = "0.12.1"
 duration-str = "0.17.0"
 # time = {version = "0.3.41", features = ["serde", "serde-human-readable"]}
-openid = { version = "0.18.1", default-features = false, features = ["rustls"]}
+openid = { version = "0.18.2", default-features = false, features = ["rustls"]}
