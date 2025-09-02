@@ -667,25 +667,23 @@ mod tests {
     }
 
     #[test]
-    fn test_paginated_jobs_response_serialization() {
-        let response = PaginatedJobsResponse {
+    fn test_paginated_tasks_response_usage() {
+        let response = PaginatedTasksResponse {
             data: vec![
                 serde_json::json!({
-                    "job_id": "123e4567-e89b-12d3-a456-426614174000",
-                    "task_name": "test-task",
-                    "status": "completed",
-                    "success": true
+                    "id": "task1",
+                    "name": "Test Task 1",
+                    "description": "A test task"
                 }),
                 serde_json::json!({
-                    "job_id": "987fcdeb-51a2-43d1-9f12-345678901234",
-                    "task_name": "test-task",
-                    "status": "failed",
-                    "success": false
+                    "id": "task2", 
+                    "name": "Test Task 2",
+                    "description": "Another test task"
                 }),
             ],
             pagination: PaginationInfo {
                 page: 1,
-                limit: 20,
+                limit: 25,
                 total: 2,
                 total_pages: 1,
                 has_next: false,
@@ -697,9 +695,8 @@ mod tests {
         assert!(json_result.is_ok());
         
         let json_str = json_result.unwrap();
-        assert!(json_str.contains("test-task"));
-        assert!(json_str.contains("completed"));
-        assert!(json_str.contains("failed"));
+        assert!(json_str.contains("task1"));
+        assert!(json_str.contains("Test Task 1"));
         assert!(json_str.contains("\"total\":2"));
     }
 }

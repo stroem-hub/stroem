@@ -8,7 +8,7 @@
 		Alert,
 		Tooltip
 	} from '$lib/components';
-	import { TaskHeader, TaskConfiguration, TaskStatistics, Pagination, JobFilters } from '$lib/components';
+	import { TaskHeader, TaskConfiguration, TaskStatistics, Pagination, JobFilters, TaskDurationChart } from '$lib/components';
 	import {
 		CloseCircleIcon,
 		CheckCircleIcon,
@@ -17,7 +17,7 @@
 	} from '$lib/components/icons';
 	import { goto } from '$app/navigation';
 	import type { PageProps } from './$types';
-	import type { EnhancedTask, Job, TaskJobSummary, PaginationInfo, Task, InputField, ApiResponse, PaginatedTaskJobsResponse } from '$lib/types';
+	import type { EnhancedTask, TaskJobSummary, PaginationInfo, Task, InputField, JobExecutionPoint } from '$lib/types';
 	import { callApi } from '$lib/auth';
 
 	let { data }: PageProps = $props();
@@ -48,20 +48,15 @@
 	});
 
 	// Transform current task data to EnhancedTask format
-	// This provides backward compatibility and handles both old and new API formats
-	function transformToEnhancedTask(basicTask: Task, jobsApiResponse?: ApiResponse<PaginatedTaskJobsResponse>): EnhancedTask {
+	// This handles the correct API response format with top-level pagination
+	function transformToEnhancedTask(basicTask: Task, jobsApiResponse?: any): EnhancedTask {
 		let jobs: TaskJobSummary[] = [];
 		let totalJobs = 0;
 
-		// Handle new paginated API response format
-		if (jobsApiResponse?.success && jobsApiResponse?.data?.data) {
-			jobs = jobsApiResponse.data.data;
-			totalJobs = jobsApiResponse.data.pagination?.total || jobs.length;
-		}
-		// Handle legacy API response format (backward compatibility)
-		else if (jobsApiResponse && Array.isArray((jobsApiResponse as any).data)) {
-			jobs = (jobsApiResponse as any).data;
-			totalJobs = jobs.length;
+		// Handle correct API response format: { success: true, data: [...], pagination: {...} }
+		if (jobsApiResponse?.success && Array.isArray(jobsApiResponse?.data)) {
+			jobs = jobsApiResponse.data;
+			totalJobs = jobsApiResponse.pagination?.total || jobs.length;
 		}
 		// Handle direct array format (fallback)
 		else if (Array.isArray(jobsApiResponse)) {
@@ -85,9 +80,12 @@
 				duration: jobs[0].duration
 			} : undefined,
 			average_duration: jobs.length > 0 
-				? jobs.reduce((sum: number, job: TaskJobSummary) => {
-					return sum + (job.duration || 0);
-				}, 0) / jobs.length
+				? (() => {
+					const validJobs = jobs.filter((job: TaskJobSummary) => job.duration != null && job.duration > 0);
+					return validJobs.length > 0 
+						? validJobs.reduce((sum: number, job: TaskJobSummary) => sum + (job.duration || 0), 0) / validJobs.length
+						: undefined;
+				})()
 				: undefined
 		};
 
@@ -111,6 +109,69 @@
 		} catch (error) {
 			// Fallback to basic task data with empty statistics
 			return transformToEnhancedTask(task);
+		}
+	});
+
+	// Transform job data for chart visualization
+	function transformJobsToChartData(jobsApiResponse?: any): JobExecutionPoint[] {
+		let jobs: TaskJobSummary[] = [];
+
+		// Handle the API response format from the page loader
+		if (jobsApiResponse?.success && Array.isArray(jobsApiResponse?.data)) {
+			jobs = jobsApiResponse.data as TaskJobSummary[];
+		}
+		// Handle direct array format (fallback)
+		else if (Array.isArray(jobsApiResponse)) {
+			jobs = jobsApiResponse as any;
+		}
+
+
+
+		const chartPoints = jobs
+			.filter(job => {
+				const hasValidData = job.start_datetime && 
+									 (job.end_datetime || job.success !== null);
+
+				return hasValidData;
+			})
+			.map(job => {
+				// Calculate duration from start and end times
+				let duration = 0;
+				if (job.start_datetime && job.end_datetime) {
+					const startTime = new Date(job.start_datetime).getTime();
+					const endTime = new Date(job.end_datetime).getTime();
+					duration = (endTime - startTime) / 1000; // Convert to seconds
+				} else if (job.start_datetime && job.success === null) {
+					// Job is still running, calculate current duration
+					const startTime = new Date(job.start_datetime).getTime();
+					const currentTime = new Date().getTime();
+					duration = (currentTime - startTime) / 1000;
+				}
+
+				return {
+					timestamp: job.start_datetime,
+					duration: duration,
+					status: job.success === true ? 'success' as const : 
+							job.success === false ? 'failed' as const : 'running' as const,
+					jobId: job.job_id,
+					triggeredBy: job.triggered_by || 'unknown'
+				};
+			})
+			.filter(job => job.duration > 0) // Only include jobs with positive duration
+			.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+		return chartPoints;
+	}
+
+	// Create chart data
+	let chartData = $derived.by(async () => {
+		try {
+			const jobsData = await data.jobs;
+			const transformedData = transformJobsToChartData(jobsData);
+			return transformedData;
+		} catch (error) {
+			console.error('Error transforming chart data:', error);
+			return [];
 		}
 	});
 
@@ -174,7 +235,7 @@
 	let jobsPage = $state(data.jobsParams.page);
 	let jobsLimit = $state(data.jobsParams.limit);
 	let jobsStatus = $state(data.jobsParams.status);
-	let jobsSort = $state(data.jobsParams.sort as 'startDateTime' | 'duration' | 'status');
+	let jobsSort = $state(data.jobsParams.sort as 'start_datetime' | 'end_datetime' | 'duration' | 'status');
 	let jobsOrder = $state(data.jobsParams.order as 'asc' | 'desc');
 	let jobsLoading = $state(false);
 
@@ -221,7 +282,7 @@
 
 	function handleJobsSortChange(newSort: string, newOrder: string) {
 		jobsLoading = true;
-		jobsSort = newSort as 'startDateTime' | 'duration' | 'status';
+		jobsSort = newSort as 'start_datetime' | 'end_datetime' | 'duration' | 'status';
 		jobsOrder = newOrder as 'asc' | 'desc';
 		jobsPage = 1; // Reset to first page when sorting
 		updateJobsUrl();
@@ -230,7 +291,7 @@
 	function handleJobsClearFilters() {
 		jobsLoading = true;
 		jobsStatus = undefined;
-		jobsSort = 'startDateTime';
+		jobsSort = 'start_datetime';
 		jobsOrder = 'desc';
 		jobsPage = 1;
 		updateJobsUrl();
@@ -350,6 +411,26 @@
 
 {#snippet activityTabContent()}
 	<div class="space-y-6">
+		<!-- Duration Chart -->
+		{#await chartData}
+			<TaskDurationChart 
+				jobHistory={[]}
+				loading={true}
+			/>
+		{:then chartDataPoints}
+			<TaskDurationChart 
+				jobHistory={chartDataPoints}
+				height={300}
+				showLegend={true}
+			/>
+		{:catch error}
+			<TaskDurationChart 
+				jobHistory={[]}
+				error={error}
+				onRetry={() => window.location.reload()}
+			/>
+		{/await}
+
 		<!-- Job Filters -->
 		<JobFilters
 			status={jobsStatus}
@@ -381,8 +462,8 @@
 					{/snippet}
 				</Card>
 			{:else if jobsResponse.data}
-				{@const jobs = jobsResponse.data.data as TaskJobSummary[]}
-				{@const pagination = jobsResponse.data.pagination as PaginationInfo}
+				{@const jobs = jobsResponse.data as TaskJobSummary[]}
+				{@const pagination = jobsResponse.pagination as PaginationInfo}
 				
 				{#if jobs && jobs.length > 0}
 					<!-- Jobs Table -->

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { TaskStatistics } from '$lib/types';
-	import { CheckCircleIcon, ExclamationCircleIcon, ClockIcon, TrendingUpIcon, TrendingDownIcon, TasksIcon, UserIcon } from '$lib/components/icons';
+	import { CheckCircleIcon, ExclamationCircleIcon, ClockIcon, TasksIcon, UserIcon } from '$lib/components/icons';
 	import { TaskStatisticsSkeleton, ErrorBoundary, StatisticsFallback } from '$lib/components';
 
 	interface TaskStatisticsProps {
@@ -19,7 +19,7 @@
 
 	// Helper function to format duration
 	function formatDuration(seconds?: number): string {
-		if (!seconds) return 'N/A';
+		if (seconds == null || seconds === undefined) return 'N/A';
 		
 		if (seconds < 60) {
 			return `${Math.round(seconds)}s`;

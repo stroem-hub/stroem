@@ -6,8 +6,8 @@ use sqlx::Row;
 use tracing::{debug, error, info};
 
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use stroem_common::{JobRequest, JobResult};
+use uuid::Uuid;
 
 #[derive(sqlx::FromRow, Debug, Serialize, Deserialize)]
 pub struct JobStep {
@@ -52,8 +52,8 @@ pub struct TaskStatistics {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LastExecution {
     pub timestamp: DateTime<Utc>,
-    pub status: String, // 'success' | 'failed' | 'running' | 'queued'
-    pub triggered_by: String, // source_type:source_id format
+    pub status: String,        // 'success' | 'failed' | 'running' | 'queued'
+    pub triggered_by: String,  // source_type:source_id format
     pub duration: Option<f64>, // in seconds
 }
 
@@ -320,14 +320,21 @@ impl JobRepository {
     }
 
     /// Get task statistics aggregated by task name
-    pub async fn get_task_statistics(&self, task_name: &str) -> Result<Option<TaskStatistics>, Error> {
+    pub async fn get_task_statistics(
+        &self,
+        task_name: &str,
+    ) -> Result<Option<TaskStatistics>, Error> {
         // First, get the basic statistics for the task
         let stats_row = sqlx::query(
             "SELECT 
                 task_name,
                 COUNT(*) as total_executions,
                 COALESCE(AVG(CASE WHEN success = true THEN 1.0 ELSE 0.0 END) * 100, 0)::FLOAT8 as success_rate,
-                AVG(EXTRACT(EPOCH FROM (end_datetime - start_datetime)))::FLOAT8 as average_duration
+                AVG(CASE 
+                    WHEN start_datetime IS NOT NULL AND end_datetime IS NOT NULL 
+                    THEN EXTRACT(EPOCH FROM (end_datetime - start_datetime))
+                    ELSE NULL 
+                END)::FLOAT8 as average_duration
              FROM job 
              WHERE task_name = $1 AND start_datetime IS NOT NULL
              GROUP BY task_name"
@@ -357,7 +364,7 @@ impl JobRepository {
                  FROM job 
                  WHERE task_name = $1 AND start_datetime IS NOT NULL
                  ORDER BY start_datetime DESC 
-                 LIMIT 1"
+                 LIMIT 1",
             )
             .bind(task_name)
             .fetch_optional(&self.pool)
@@ -412,18 +419,17 @@ impl JobRepository {
     /// Get task statistics for multiple tasks
     pub async fn get_all_task_statistics(&self) -> Result<Vec<TaskStatistics>, Error> {
         // Get all unique task names that have been executed
-        let task_names: Vec<String> = sqlx::query_scalar(
-            "SELECT DISTINCT task_name FROM job WHERE task_name IS NOT NULL"
-        )
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|e| {
-            error!("Failed to fetch task names: {}", e);
-            e
-        })?;
+        let task_names: Vec<String> =
+            sqlx::query_scalar("SELECT DISTINCT task_name FROM job WHERE task_name IS NOT NULL")
+                .fetch_all(&self.pool)
+                .await
+                .map_err(|e| {
+                    error!("Failed to fetch task names: {}", e);
+                    e
+                })?;
 
         let mut statistics = Vec::new();
-        
+
         for task_name in task_names {
             if let Some(stats) = self.get_task_statistics(&task_name).await? {
                 statistics.push(stats);
@@ -455,7 +461,9 @@ impl JobRepository {
         let valid_sort_fields = ["start_datetime", "end_datetime", "duration", "status"];
         if let Some(sort) = sort_field {
             if !valid_sort_fields.contains(&sort) {
-                bail!("Invalid sort field. Valid options: start_datetime, end_datetime, duration, status");
+                bail!(
+                    "Invalid sort field. Valid options: start_datetime, end_datetime, duration, status"
+                );
             }
         }
         if sort_order != "asc" && sort_order != "desc" {
@@ -477,19 +485,18 @@ impl JobRepository {
         let order_by = match sort_field {
             Some("start_datetime") => format!("start_datetime {}", sort_order),
             Some("end_datetime") => format!("end_datetime {} NULLS LAST", sort_order),
-            Some("duration") => format!("(EXTRACT(EPOCH FROM (end_datetime - start_datetime))) {} NULLS LAST", sort_order),
+            Some("duration") => format!(
+                "(EXTRACT(EPOCH FROM (end_datetime - start_datetime))) {} NULLS LAST",
+                sort_order
+            ),
             Some("status") => format!("status {}", sort_order),
             _ => format!("start_datetime {}", sort_order), // Default sort
         };
 
         // Get total count for pagination
-        let count_query = format!(
-            "SELECT COUNT(*) FROM job WHERE {}",
-            where_clause
-        );
+        let count_query = format!("SELECT COUNT(*) FROM job WHERE {}", where_clause);
 
-        let mut count_query_builder = sqlx::query_scalar::<_, i64>(&count_query)
-            .bind(task_name);
+        let mut count_query_builder = sqlx::query_scalar::<_, i64>(&count_query).bind(task_name);
 
         if let Some(status) = status_filter {
             count_query_builder = count_query_builder.bind(status);
@@ -521,16 +528,13 @@ impl JobRepository {
             param_count + 2
         );
 
-        let mut jobs_query_builder = sqlx::query_as::<_, Job>(&jobs_query)
-            .bind(task_name);
+        let mut jobs_query_builder = sqlx::query_as::<_, Job>(&jobs_query).bind(task_name);
 
         if let Some(status) = status_filter {
             jobs_query_builder = jobs_query_builder.bind(status);
         }
 
-        jobs_query_builder = jobs_query_builder
-            .bind(limit as i64)
-            .bind(offset as i64);
+        jobs_query_builder = jobs_query_builder.bind(limit as i64).bind(offset as i64);
 
         let jobs = jobs_query_builder
             .fetch_all(&self.pool)
@@ -613,7 +617,7 @@ mod tests {
         // Test that the struct can be serialized to JSON
         let json_result = serde_json::to_string(&stats);
         assert!(json_result.is_ok());
-        
+
         let json_str = json_result.unwrap();
         assert!(json_str.contains("serialize-test"));
         assert!(json_str.contains("100.0"));
@@ -641,22 +645,22 @@ mod tests {
         // 2. Running migrations
         // 3. Inserting test data
         // 4. Testing the actual SQL queries
-        
+
         // Example setup (commented out):
         // let database_url = std::env::var("TEST_DATABASE_URL")
         //     .expect("TEST_DATABASE_URL must be set for integration tests");
         // let pool = PgPool::connect(&database_url).await.unwrap();
         // let repo = JobRepository::new(pool);
-        
+
         // Insert test data and verify statistics calculation
-        
+
         println!("Integration test placeholder - requires test database setup");
     }
 
     #[test]
     fn test_enhanced_task_statistics_serialization() {
         use crate::web::{EnhancedTaskStatistics, LastExecutionInfo};
-        
+
         let enhanced_stats = EnhancedTaskStatistics {
             total_executions: 42,
             success_rate: 85.5,
@@ -672,7 +676,7 @@ mod tests {
         // Test that the enhanced statistics can be serialized to JSON
         let json_result = serde_json::to_string(&enhanced_stats);
         assert!(json_result.is_ok());
-        
+
         let json_str = json_result.unwrap();
         assert!(json_str.contains("42"));
         assert!(json_str.contains("85.5"));
@@ -683,28 +687,28 @@ mod tests {
     #[test]
     fn test_get_task_jobs_parameter_validation() {
         // Test that parameter validation logic would work correctly
-        
+
         // Valid parameters
         let page = 1u32;
         let limit = 20u32;
         let sort_field = Some("start_datetime");
         let sort_order = "desc";
-        
+
         assert!(page > 0);
         assert!(limit > 0 && limit <= 100);
-        
+
         let valid_sort_fields = ["start_datetime", "end_datetime", "duration", "status"];
         if let Some(sort) = sort_field {
             assert!(valid_sort_fields.contains(&sort));
         }
         assert!(sort_order == "asc" || sort_order == "desc");
-        
+
         // Invalid parameters
         let invalid_page = 0u32;
         let invalid_limit = 150u32;
         let invalid_sort = "invalid_field";
         let invalid_order = "invalid_order";
-        
+
         assert_eq!(invalid_page, 0); // Should fail validation
         assert!(invalid_limit > 100); // Should fail validation
         assert!(!valid_sort_fields.contains(&invalid_sort)); // Should fail validation
@@ -714,36 +718,42 @@ mod tests {
     #[test]
     fn test_task_jobs_query_building() {
         // Test the logic for building WHERE clauses and ORDER BY clauses
-        
+
         let _task_name = "test-task";
         let status_filter = Some("completed");
-        
+
         // Test WHERE clause building
         let mut where_conditions = vec!["task_name = $1".to_string()];
         let mut param_count = 1;
-        
+
         if status_filter.is_some() {
             param_count += 1;
             where_conditions.push(format!("status = ${}", param_count));
         }
-        
+
         let where_clause = where_conditions.join(" AND ");
         assert_eq!(where_clause, "task_name = $1 AND status = $2");
         assert_eq!(param_count, 2);
-        
+
         // Test ORDER BY clause building
         let sort_field = Some("duration");
         let sort_order = "desc";
-        
+
         let order_by = match sort_field {
             Some("start_datetime") => format!("start_datetime {}", sort_order),
             Some("end_datetime") => format!("end_datetime {} NULLS LAST", sort_order),
-            Some("duration") => format!("(EXTRACT(EPOCH FROM (end_datetime - start_datetime))) {} NULLS LAST", sort_order),
+            Some("duration") => format!(
+                "(EXTRACT(EPOCH FROM (end_datetime - start_datetime))) {} NULLS LAST",
+                sort_order
+            ),
             Some("status") => format!("status {}", sort_order),
             _ => format!("start_datetime {}", sort_order),
         };
-        
-        assert_eq!(order_by, "(EXTRACT(EPOCH FROM (end_datetime - start_datetime))) desc NULLS LAST");
+
+        assert_eq!(
+            order_by,
+            "(EXTRACT(EPOCH FROM (end_datetime - start_datetime))) desc NULLS LAST"
+        );
     }
 
     #[test]
@@ -752,16 +762,20 @@ mod tests {
         let page = 3u32;
         let limit = 10u32;
         let total_count = 45u32;
-        
+
         let offset = (page - 1) * limit;
-        let total_pages = if total_count == 0 { 1 } else { (total_count + limit - 1) / limit };
-        
+        let total_pages = if total_count == 0 {
+            1
+        } else {
+            (total_count + limit - 1) / limit
+        };
+
         assert_eq!(offset, 20); // Should skip first 20 items
         assert_eq!(total_pages, 5); // 45 items with limit 10 = 5 pages
-        
+
         let has_next = page < total_pages;
         let has_prev = page > 1;
-        
+
         assert!(has_next); // Page 3 of 5 should have next
         assert!(has_prev); // Page 3 should have previous
     }

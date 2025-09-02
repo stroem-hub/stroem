@@ -52,14 +52,15 @@ export const load: PageLoad = async ({ fetch, url }) => {
 			throw new Error(`Failed to fetch tasks: ${response?.status} ${response?.statusText}`);
 		}
 
-		const apiResponse: ApiResponse<PaginatedTasksResponse> = await response.json();
+		const apiResponse = await response.json();
 		
 		// Handle the ApiResponse wrapper structure
 		if (!apiResponse.success || !apiResponse.data) {
 			throw new Error(apiResponse.error?.message || 'API request failed');
 		}
 		
-		const { data: tasks, pagination } = apiResponse.data;
+		const tasks = apiResponse.data;
+		const pagination = apiResponse.pagination;
 		
 		// Validate pagination structure
 		const validatedPagination = {

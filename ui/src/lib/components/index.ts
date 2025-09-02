@@ -30,6 +30,7 @@ export { default as Pagination } from './molecules/Pagination.svelte';
 export { default as TaskStatistics } from './molecules/TaskStatistics.svelte';
 export { default as TaskHeader } from './molecules/TaskHeader.svelte';
 export { default as TaskConfiguration } from './molecules/TaskConfiguration.svelte';
+export { default as TaskDurationChart } from './molecules/TaskDurationChart.svelte';
 export { default as JobFilters } from './molecules/JobFilters.svelte';
 export { default as ErrorBoundary } from './molecules/ErrorBoundary.svelte';
 export { default as StatisticsFallback } from './molecules/StatisticsFallback.svelte';

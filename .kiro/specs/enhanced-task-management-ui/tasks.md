@@ -79,6 +79,16 @@
   - Include proper TypeScript interfaces for task configuration data
   - _Requirements: 2.1, 2.4, 2.5, 5.3_
 
+- [x] 3.4 Create TaskDurationChart component for execution performance visualization
+  - Implement `ui/src/lib/components/molecules/TaskDurationChart.svelte` for job duration visualization
+  - Create scatter plot chart showing execution duration over time
+  - Use green dots for successful executions and red dots for failed executions
+  - Add interactive tooltips displaying job details (duration, status, timestamp, job ID)
+  - Include responsive design with configurable chart dimensions
+  - Add proper TypeScript interfaces for chart data and props
+  - Implement chart library integration (consider Chart.js or D3.js)
+  - _Requirements: 3.6, 3.7, 3.8_
+
 - [x] 4. Enhance task list page with new components
 - [x] 4.1 Update task list page to use enhanced TaskCard components with pagination
   - Modify `ui/src/routes/tasks/+page.svelte` to use new TaskCard and Pagination components
@@ -128,6 +138,15 @@
   - Ensure pagination state is maintained when switching between tabs
   - _Requirements: 2.6, 2.7, 2.8, 4.4, 4.6, 5.2_
 
+- [x] 5.4 Add TaskDurationChart to Activity tab for performance visualization
+  - Integrate TaskDurationChart component into the Activity tab
+  - Fetch job execution data formatted for chart visualization
+  - Position chart above the job history table for optimal user experience
+  - Add chart controls for time range selection and data filtering
+  - Ensure chart data updates when job history pagination changes
+  - Include loading states and error handling for chart data
+  - _Requirements: 3.6, 3.7, 3.8_
+
 - [ ] 6. Add TypeScript interfaces and API integration
 - [x] 6.1 Create TypeScript interfaces for enhanced task data and pagination
   - Define interfaces in `ui/src/lib/types.ts` for EnhancedTask, TaskStatistics, PaginationInfo, and related types
@@ -136,6 +155,13 @@
   - Add proper JSDoc comments for interface documentation
   - Export interfaces for use across components
   - _Requirements: 1.1, 2.1, 3.1, 5.1_
+
+- [x] 6.4 Add TypeScript interfaces for chart data and visualization
+  - Define JobExecutionPoint and ChartDataset interfaces in `ui/src/lib/types.ts`
+  - Add interfaces for chart configuration and interaction events
+  - Include proper type definitions for chart library integration
+  - Ensure type safety for chart data transformation and rendering
+  - _Requirements: 3.6, 3.7, 3.8_
 
 - [x] 6.2 Update API integration for enhanced task endpoints with pagination
   - Modify task data fetching in `ui/src/routes/tasks/+page.ts` to use enhanced paginated API
@@ -154,13 +180,14 @@
   - _Requirements: 5.1, 5.4_
 
 - [ ] 7. Testing and quality assurance
-- [ ] 7.1 Write component tests for new task and pagination components
-  - Create unit tests for TaskCard, TaskHeader, TaskStatistics, TaskConfiguration, and Pagination components
+- [x] 7.1 Write component tests for new task and pagination components
+  - Create unit tests for TaskCard, TaskHeader, TaskStatistics, TaskConfiguration, TaskDurationChart, and Pagination components
   - Test component props, events, and rendering with various data scenarios
   - Test pagination component with different page states and edge cases
+  - Test chart component with different data sets and interaction scenarios
   - Include accessibility testing for keyboard navigation and screen readers
-  - Add visual regression tests for component styling
-  - _Requirements: 5.6, 6.6_
+  - Add visual regression tests for component styling and chart rendering
+  - _Requirements: 3.6, 3.7, 3.8, 5.6, 6.6_
 
 - [ ] 7.2 Write integration tests for enhanced pages with pagination
   - Test enhanced task list page with sorting, searching, pagination, and navigation

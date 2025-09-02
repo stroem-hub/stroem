@@ -192,6 +192,33 @@ interface TaskConfigurationProps {
 - Provide expandable sections for complex configuration
 - Include parameter documentation
 
+#### TaskDurationChart Component
+**Location**: `ui/src/lib/components/molecules/TaskDurationChart.svelte`
+
+**Props Interface**:
+```typescript
+interface TaskDurationChartProps {
+  jobHistory: JobExecutionPoint[];
+  height?: number;
+  showLegend?: boolean;
+}
+
+interface JobExecutionPoint {
+  timestamp: string;
+  duration: number; // in seconds
+  status: 'success' | 'failed' | 'running';
+  jobId: string;
+}
+```
+
+**Features**:
+- Display scatter plot of job execution durations over time
+- Use green dots for successful executions, red dots for failed executions
+- Include interactive tooltips showing job details on hover
+- Support responsive design with configurable chart dimensions
+- Provide zoom and pan functionality for large datasets
+- Include time axis formatting and duration axis with appropriate units
+
 #### Pagination Component
 **Location**: `ui/src/lib/components/molecules/Pagination.svelte`
 
@@ -233,9 +260,10 @@ interface PaginationProps {
 **Enhancements**:
 - Add TaskHeader component with statistics
 - Enhance Overview tab with TaskConfiguration and TaskStatistics
-- Improve Activity tab with better job history display
+- Improve Activity tab with better job history display and TaskDurationChart
 - Maintain existing Run tab functionality
 - Add breadcrumb navigation
+- Include TaskDurationChart component in Activity tab to visualize execution performance over time
 
 ## Data Models
 
@@ -265,6 +293,23 @@ interface TaskJobSummary {
   duration?: number;
   triggeredBy: string;
   success?: boolean;
+}
+```
+
+### Job Execution Point for Duration Chart
+```typescript
+interface JobExecutionPoint {
+  timestamp: string; // ISO 8601 format
+  duration: number; // execution duration in seconds
+  status: 'success' | 'failed' | 'running';
+  jobId: string;
+  triggeredBy?: string;
+}
+
+interface ChartDataset {
+  successful: JobExecutionPoint[];
+  failed: JobExecutionPoint[];
+  running: JobExecutionPoint[];
 }
 ```
 

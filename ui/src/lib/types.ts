@@ -37,6 +37,52 @@ export interface ChartDataPoint {
 	[key: string]: string | number | Date;
 }
 
+/**
+ * Data point for job execution duration chart
+ */
+export interface JobExecutionPoint {
+	/** Timestamp of the job execution (ISO 8601 format) */
+	timestamp: string;
+	/** Execution duration in seconds */
+	duration: number;
+	/** Execution status */
+	status: ExecutionStatus;
+	/** Unique job identifier */
+	jobId: string;
+	/** Who or what triggered the execution */
+	triggeredBy?: string;
+}
+
+/**
+ * Chart dataset organized by execution status
+ */
+export interface ChartDataset {
+	/** Successful job executions */
+	successful: JobExecutionPoint[];
+	/** Failed job executions */
+	failed: JobExecutionPoint[];
+	/** Currently running job executions */
+	running: JobExecutionPoint[];
+}
+
+/**
+ * Props for TaskDurationChart component
+ */
+export interface TaskDurationChartProps {
+	/** Job execution history data for the chart */
+	jobHistory: JobExecutionPoint[];
+	/** Chart height in pixels */
+	height?: number;
+	/** Whether to show the legend */
+	showLegend?: boolean;
+	/** Whether the component is in loading state */
+	loading?: boolean;
+	/** Error state for the component */
+	error?: string | Error | null;
+	/** Retry handler for error recovery */
+	onRetry?: () => void;
+}
+
 // Task Management Types
 
 /**
@@ -263,7 +309,7 @@ export interface JobListQuery {
 	/** Filter by job status */
 	status?: ExecutionStatus;
 	/** Field to sort by */
-	sort?: 'startDateTime' | 'duration' | 'status';
+	sort?: 'start_datetime' | 'end_datetime' | 'duration' | 'status';
 	/** Sort order */
 	order?: 'asc' | 'desc';
 }
@@ -392,6 +438,8 @@ export interface ApiError {
 export interface ApiResponse<T> {
 	/** Response data (present on success) */
 	data?: T;
+	/** Pagination information (present for paginated responses) */
+	pagination?: PaginationInfo;
 	/** Error information (present on failure) */
 	error?: ApiError;
 	/** Whether the request was successful */

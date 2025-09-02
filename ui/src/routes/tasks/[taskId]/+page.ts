@@ -22,8 +22,8 @@ export const load: PageLoad = async ({ fetch, params, url }) => {
 				!value || ['success', 'failed', 'running', 'queued'].includes(value)
 		},
 		sort: {
-			default: 'startDateTime' as const,
-			validate: (value: string) => ['startDateTime', 'duration', 'status'].includes(value)
+			default: 'start_datetime' as const,
+			validate: (value: string) => ['start_datetime', 'end_datetime', 'duration', 'status'].includes(value)
 		},
 		order: {
 			default: 'desc' as const,
@@ -70,7 +70,7 @@ export const load: PageLoad = async ({ fetch, params, url }) => {
 				throw new Error(`Failed to fetch jobs: ${response?.status} ${response?.statusText}`);
 			}
 
-			const jobsApiResponse: ApiResponse<PaginatedTaskJobsResponse> = await response.json();
+			const jobsApiResponse = await response.json();
 			
 			if (!jobsApiResponse.success) {
 				throw new Error(jobsApiResponse.error?.message || 'Failed to load job history');
@@ -85,7 +85,7 @@ export const load: PageLoad = async ({ fetch, params, url }) => {
 				error: {
 					message: error instanceof Error ? error.message : 'Failed to load job history'
 				}
-			} as ApiResponse<PaginatedTaskJobsResponse>;
+			};
 		});
 
 		return {
@@ -111,7 +111,7 @@ export const load: PageLoad = async ({ fetch, params, url }) => {
 				error: {
 					message: 'Task loading failed'
 				}
-			} as ApiResponse<PaginatedTaskJobsResponse>),
+			}),
 			jobsParams,
 			loading: false,
 			error: error instanceof Error ? error.message : 'Failed to load task'

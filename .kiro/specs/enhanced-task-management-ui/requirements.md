@@ -45,6 +45,9 @@ This feature enhances the task list and individual task view pages in the Strøm
 3. WHEN viewing task performance THEN the system SHALL highlight tasks with high failure rates or long execution times
 4. WHEN comparing task performance THEN the system SHALL provide relative performance indicators compared to similar tasks
 5. WHEN viewing execution patterns THEN the system SHALL show peak usage times and frequency distribution
+6. WHEN viewing task execution history THEN the system SHALL display a duration chart showing job execution times over time with success/failure indicators
+7. WHEN viewing the duration chart THEN the system SHALL show green dots for successful executions and red dots for failed executions
+8. WHEN hovering over chart data points THEN the system SHALL display detailed information including execution time, status, and timestamp
 
 ### Requirement 4: Improved Task Navigation and Actions
 
