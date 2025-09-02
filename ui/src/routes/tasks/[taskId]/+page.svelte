@@ -17,12 +17,12 @@
 	} from '$lib/components/icons';
 	import { goto } from '$app/navigation';
 	import type { PageProps } from './$types';
-	import type { EnhancedTask, TaskJobSummary, PaginationInfo, Task, InputField, JobExecutionPoint } from '$lib/types';
+	import type { EnhancedTask, TaskJobSummary, PaginationInfo, InputField, JobExecutionPoint } from '$lib/types';
 	import { callApi } from '$lib/auth';
 
 	let { data }: PageProps = $props();
 
-	let task = data.task.data as Task;
+	let task = data.task.data as EnhancedTask;
 
 	// Handle pagination edge cases
 	function handlePaginationError(error: any): void {
@@ -47,70 +47,8 @@
 		}
 	});
 
-	// Transform current task data to EnhancedTask format
-	// This handles the correct API response format with top-level pagination
-	function transformToEnhancedTask(basicTask: Task, jobsApiResponse?: any): EnhancedTask {
-		let jobs: TaskJobSummary[] = [];
-		let totalJobs = 0;
-
-		// Handle correct API response format: { success: true, data: [...], pagination: {...} }
-		if (jobsApiResponse?.success && Array.isArray(jobsApiResponse?.data)) {
-			jobs = jobsApiResponse.data;
-			totalJobs = jobsApiResponse.pagination?.total || jobs.length;
-		}
-		// Handle direct array format (fallback)
-		else if (Array.isArray(jobsApiResponse)) {
-			jobs = jobsApiResponse as any;
-			totalJobs = jobs.length;
-		}
-		
-		// Calculate statistics from the available job data
-		const mockStatistics = {
-			total_executions: totalJobs,
-			// Note: Success rate is calculated from the current page sample only
-			// In a real implementation, this should come from a dedicated statistics API
-			success_rate: jobs.length > 0 
-				? (jobs.filter((job: TaskJobSummary) => job.success === true).length / jobs.length) * 100 
-				: 0,
-			last_execution: jobs.length > 0 ? {
-				timestamp: jobs[0].start_datetime || '',
-				status: jobs[0].success === true ? 'success' as const : 
-						jobs[0].success === false ? 'failed' as const : 'running' as const,
-				triggered_by: jobs[0].triggered_by || 'unknown',
-				duration: jobs[0].duration
-			} : undefined,
-			average_duration: jobs.length > 0 
-				? (() => {
-					const validJobs = jobs.filter((job: TaskJobSummary) => job.duration != null && job.duration > 0);
-					return validJobs.length > 0 
-						? validJobs.reduce((sum: number, job: TaskJobSummary) => sum + (job.duration || 0), 0) / validJobs.length
-						: undefined;
-				})()
-				: undefined
-		};
-
-		return {
-			id: basicTask.id,
-			name: basicTask.name,
-			description: basicTask.description || undefined,
-			input: basicTask.input,
-			flow: basicTask.flow,
-			statistics: mockStatistics
-		};
-	}
-
-	// Create enhanced task data
-	let enhancedTask = $derived.by(async () => {
-		if (!data.task.success || !data.task.data) return null;
-		
-		try {
-			const jobsData = await data.jobs;
-			return transformToEnhancedTask(task, jobsData);
-		} catch (error) {
-			// Fallback to basic task data with empty statistics
-			return transformToEnhancedTask(task);
-		}
-	});
+	// Since API now returns statistics, we can use the task directly as an EnhancedTask
+	let enhancedTask = $derived(data.task.success && data.task.data ? task : null);
 
 	// Transform job data for chart visualization
 	function transformJobsToChartData(jobsApiResponse?: any): JobExecutionPoint[] {
@@ -344,69 +282,36 @@
 </script>
 
 {#snippet overviewTabContent()}
-	{#await enhancedTask}
-		<!-- Loading state for overview -->
+	{#if enhancedTask}
+		<div class="space-y-6">
+			<!-- Task Statistics Section -->
+			<div>
+				<h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Execution Statistics</h2>
+				<TaskStatistics 
+					statistics={enhancedTask.statistics}
+				/>
+			</div>
+
+			<!-- Task Configuration Section -->
+			<div>
+				<h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Task Configuration</h2>
+				<TaskConfiguration 
+					task={enhancedTask}
+				/>
+			</div>
+		</div>
+	{:else}
+		<!-- Fallback when enhanced data is not available -->
 		<div class="space-y-6">
 			<TaskStatistics 
-				loading={true}
+				error="Statistics unavailable"
+				onRetry={() => window.location.reload()}
 			/>
 			<TaskConfiguration 
 				loading={true}
 			/>
 		</div>
-	{:then enhancedTaskData}
-		{#if enhancedTaskData}
-			<div class="space-y-6">
-				<!-- Task Statistics Section -->
-				<div>
-					<h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Execution Statistics</h2>
-					<TaskStatistics 
-						statistics={enhancedTaskData.statistics}
-					/>
-				</div>
-
-				<!-- Task Configuration Section -->
-				<div>
-					<h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Task Configuration</h2>
-					<TaskConfiguration 
-						task={enhancedTaskData}
-					/>
-				</div>
-			</div>
-		{:else}
-			<!-- Fallback when enhanced data is not available -->
-			<div class="space-y-6">
-				<TaskStatistics 
-					error="Statistics unavailable"
-					onRetry={() => window.location.reload()}
-				/>
-				<TaskConfiguration 
-					task={{
-						...task,
-						description: task.description || undefined
-					}}
-				/>
-			</div>
-		{/if}
-	{:catch error}
-		<!-- Error state for overview -->
-		<div class="space-y-6">
-			<TaskStatistics 
-				error={error}
-				onRetry={() => window.location.reload()}
-			/>
-			
-			<div>
-				<h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Task Configuration</h2>
-				<TaskConfiguration 
-					task={{
-						...task,
-						description: task.description || undefined
-					}}
-				/>
-			</div>
-		</div>
-	{/await}
+	{/if}
 {/snippet}
 
 {#snippet activityTabContent()}
@@ -674,43 +579,29 @@
 		</Card>
 	</div>
 {:else if data.task.data}
-	{#await enhancedTask}
-		<!-- Loading state with TaskHeader skeleton -->
+	{#if enhancedTask}
+		<!-- Enhanced TaskHeader with statistics -->
 		<TaskHeader 
-			loading={true}
-		/>
-	{:then enhancedTaskData}
-		{#if enhancedTaskData}
-			<!-- Enhanced TaskHeader with statistics -->
-			<TaskHeader 
-				task={enhancedTaskData}
-				onRunTask={handleRunTask}
-			/>
-		{:else}
-			<!-- Fallback TaskHeader without statistics -->
-			<TaskHeader 
-				task={{
-					id: task.id,
-					name: task.name,
-					description: task.description || undefined,
-					input: task.input,
-					flow: task.flow,
-					statistics: {
-						total_executions: 0,
-						success_rate: 0
-					}
-				}}
-				onRunTask={handleRunTask}
-			/>
-		{/if}
-	{:catch error}
-		<!-- Error state with TaskHeader -->
-		<TaskHeader 
-			error={error}
-			onRetry={() => window.location.reload()}
+			task={enhancedTask}
 			onRunTask={handleRunTask}
 		/>
-	{/await}
+	{:else}
+		<!-- Fallback TaskHeader without statistics -->
+		<TaskHeader 
+			task={{
+				id: task.id,
+				name: task.name,
+				description: task.description || undefined,
+				input: task.input,
+				flow: task.flow,
+				statistics: {
+					total_executions: 0,
+					success_rate: 0
+				}
+			}}
+			onRunTask={handleRunTask}
+		/>
+	{/if}
 
 	<!-- Tabs content -->
 	<div class="p-6">

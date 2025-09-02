@@ -1,6 +1,6 @@
 import type { PageLoad } from './$types';
 import { callApi } from '$lib/auth';
-import type { ApiResponse, Task, PaginatedTaskJobsResponse, JobListQuery } from '$lib/types';
+import type { ApiResponse, EnhancedTask, PaginatedTaskJobsResponse, JobListQuery } from '$lib/types';
 import { parseUrlParams } from '$lib/utils';
 
 export const load: PageLoad = async ({ fetch, params, url }) => {
@@ -42,7 +42,7 @@ export const load: PageLoad = async ({ fetch, params, url }) => {
 			throw new Error(`Failed to fetch task: ${taskResponse?.status} ${taskResponse?.statusText}`);
 		}
 
-		const taskApiResponse: ApiResponse<Task> = await taskResponse.json();
+		const taskApiResponse: ApiResponse<EnhancedTask> = await taskResponse.json();
 		
 		if (!taskApiResponse.success || !taskApiResponse.data) {
 			throw new Error(taskApiResponse.error?.message || 'Failed to load task');
@@ -105,7 +105,7 @@ export const load: PageLoad = async ({ fetch, params, url }) => {
 				error: {
 					message: error instanceof Error ? error.message : 'Failed to load task'
 				}
-			} as ApiResponse<Task>,
+			} as ApiResponse<EnhancedTask>,
 			jobs: Promise.resolve({
 				success: false,
 				error: {

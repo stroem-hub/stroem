@@ -32,3 +32,11 @@ Object.defineProperty(window, 'matchMedia', {
 		dispatchEvent: vi.fn(),
 	})),
 });
+
+// Mock browser environment for Svelte 5
+if (typeof globalThis !== 'undefined' && typeof window === 'undefined') {
+	Object.defineProperty(globalThis, 'window', {
+		value: {},
+		writable: true
+	});
+}

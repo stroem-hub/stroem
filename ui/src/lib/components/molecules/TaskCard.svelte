@@ -24,7 +24,7 @@
 
 	// Format duration helper
 	function formatDuration(seconds?: number): string {
-		if (!seconds) return 'N/A';
+		if (seconds == null || seconds === undefined) return 'N/A';
 		
 		if (seconds < 60) {
 			return `${Math.round(seconds)}s`;
