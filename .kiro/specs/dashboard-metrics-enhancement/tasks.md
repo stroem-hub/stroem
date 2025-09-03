@@ -23,7 +23,7 @@
   - Add proper error handling and response formatting for all endpoints
   - _Requirements: 1.1, 1.4, 2.1, 2.4, 3.1, 3.3_
 
-- [ ] 4. Build SystemStatusWidget component
+- [x] 4. Build SystemStatusWidget component
   - Create ui/src/lib/components/molecules/SystemStatusWidget.svelte
   - Display active workers count, total jobs today, and system uptime
   - Show system alerts with appropriate severity indicators (info, warning, error)
@@ -31,7 +31,7 @@
   - Add proper accessibility attributes and ARIA labels
   - _Requirements: 1.1, 1.2, 1.3, 1.4_
 
-- [ ] 5. Build JobExecutionMetricsWidget component
+- [x] 5. Build JobExecutionMetricsWidget component
   - Create ui/src/lib/components/molecules/JobExecutionMetricsWidget.svelte
   - Display today's job statistics including total, success rate, and failure rate
   - Show job status distribution with visual indicators for running, completed, failed, queued
@@ -40,7 +40,7 @@
   - Implement loading and error states with retry functionality
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
 
-- [ ] 6. Build RecentActivityWidget component
+- [x] 6. Build RecentActivityWidget component
   - Create ui/src/lib/components/molecules/RecentActivityWidget.svelte
   - Display real-time feed of last 10 job executions with status and duration
   - Show recent failures with error summaries and quick access to detailed logs
@@ -49,7 +49,7 @@
   - Display next 5 upcoming scheduled executions
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [ ] 7. Build JobExecutionTrendsWidget component
+- [x] 7. Build JobExecutionTrendsWidget component
   - Create ui/src/lib/components/molecules/JobExecutionTrendsWidget.svelte
   - Implement time-series chart showing job executions over last 7 days
   - Add interactive hover tooltips with detailed information and clickable drill-down elements

@@ -25,3 +25,4 @@ export { default as ExclamationTriangleIcon } from './ExclamationTriangleIcon.sv
 export { default as ArrowPathIcon } from './ArrowPathIcon.svelte';
 export { default as InformationCircleIcon } from './InformationCircleIcon.svelte';
 export { default as FilterIcon } from './FilterIcon.svelte';
+export { default as ChartBarIcon } from './ChartBarIcon.svelte';

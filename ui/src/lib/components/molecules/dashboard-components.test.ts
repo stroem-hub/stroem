@@ -4,6 +4,7 @@ import { describe, it, expect } from 'vitest';
 import MetricCard from './MetricCard.svelte';
 import LineChart from './LineChart.svelte';
 import ActivityFeed from './ActivityFeed.svelte';
+import SystemStatusWidget from './SystemStatusWidget.svelte';
 
 describe('Dashboard Components', () => {
 	it('should export MetricCard component', () => {
@@ -21,10 +22,16 @@ describe('Dashboard Components', () => {
 		expect(typeof ActivityFeed).toBe('function');
 	});
 
+	it('should export SystemStatusWidget component', () => {
+		expect(SystemStatusWidget).toBeDefined();
+		expect(typeof SystemStatusWidget).toBe('function');
+	});
+
 	it('should have proper component structure', () => {
 		// Verify components have the expected Svelte component structure
 		expect(MetricCard.name).toBe('MetricCard');
 		expect(LineChart.name).toBe('LineChart');
 		expect(ActivityFeed.name).toBe('ActivityFeed');
+		expect(SystemStatusWidget.name).toBe('SystemStatusWidget');
 	});
 });

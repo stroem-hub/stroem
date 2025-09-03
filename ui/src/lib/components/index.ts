@@ -14,6 +14,9 @@ export { default as TaskStatusBadge } from './atoms/TaskStatusBadge.svelte';
 export { default as TaskCardSkeleton } from './atoms/TaskCardSkeleton.svelte';
 export { default as TaskStatisticsSkeleton } from './atoms/TaskStatisticsSkeleton.svelte';
 export { default as TaskConfigurationSkeleton } from './atoms/TaskConfigurationSkeleton.svelte';
+export { default as SystemStatusSkeleton } from './atoms/SystemStatusSkeleton.svelte';
+export { default as JobExecutionMetricsSkeleton } from './atoms/JobExecutionMetricsSkeleton.svelte';
+export { default as RecentActivitySkeleton } from './atoms/RecentActivitySkeleton.svelte';
 export { default as Accordion } from './atoms/Accordion.svelte';
 export { default as Tabs } from './atoms/Tabs.svelte';
 export { default as ThemeToggle } from './atoms/ThemeToggle.svelte';
@@ -34,6 +37,10 @@ export { default as TaskDurationChart } from './molecules/TaskDurationChart.svel
 export { default as JobFilters } from './molecules/JobFilters.svelte';
 export { default as ErrorBoundary } from './molecules/ErrorBoundary.svelte';
 export { default as StatisticsFallback } from './molecules/StatisticsFallback.svelte';
+export { default as SystemStatusWidget } from './molecules/SystemStatusWidget.svelte';
+export { default as JobExecutionMetricsWidget } from './molecules/JobExecutionMetricsWidget.svelte';
+export { default as RecentActivityWidget } from './molecules/RecentActivityWidget.svelte';
+export { default as JobExecutionTrendsWidget } from './molecules/JobExecutionTrendsWidget.svelte';
 
 // Organisms - Complex components
 export { default as Sidebar } from './organisms/Sidebar.svelte';
@@ -50,6 +57,7 @@ export {
   TasksIcon, 
   ActionsIcon, 
   TriggersIcon, 
+  JobsIcon,
   UserIcon, 
   LogoutIcon,
   HomeIcon,
@@ -63,5 +71,6 @@ export {
   ArrowPathIcon,
   InformationCircleIcon,
   FilterIcon,
-  XIcon
+  XIcon,
+  ChartBarIcon
 } from './icons';
