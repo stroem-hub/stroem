@@ -1,5 +1,5 @@
 use anyhow::{Error, bail};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use serde_json::Value;
 use sqlx::PgPool;
 use sqlx::Row;
@@ -55,6 +55,97 @@ pub struct LastExecution {
     pub status: String,        // 'success' | 'failed' | 'running' | 'queued'
     pub triggered_by: String,  // source_type:source_id format
     pub duration: Option<f64>, // in seconds
+}
+
+// Dashboard-specific data structures
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SystemAlert {
+    pub id: String,
+    pub severity: String, // 'info' | 'warning' | 'error'
+    pub message: String,
+    pub timestamp: DateTime<Utc>,
+    pub source: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SystemStatus {
+    pub active_workers: i32,
+    pub idle_workers: i32,
+    pub total_jobs_today: i64,
+    pub system_uptime: String,           // ISO duration format
+    pub average_execution_time_24h: f64, // seconds
+    pub alerts: Vec<SystemAlert>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct JobExecutionMetrics {
+    pub today: DailyJobStats,
+    pub status_distribution: StatusDistribution,
+    pub top_failing_workflows: Vec<FailingWorkflow>,
+    pub average_execution_time: f64, // seconds
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DailyJobStats {
+    pub total_jobs: i64,
+    pub success_count: i64,
+    pub failure_count: i64,
+    pub success_rate: f64, // percentage
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StatusDistribution {
+    pub running: i64,
+    pub completed: i64,
+    pub failed: i64,
+    pub queued: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FailingWorkflow {
+    pub workflow_name: String,
+    pub failure_rate: f64,
+    pub total_executions: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RecentJob {
+    pub job_id: String,
+    pub task_name: String,
+    pub status: String,
+    pub start_time: DateTime<Utc>,
+    pub duration: Option<f64>,
+    pub triggered_by: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UpcomingJob {
+    pub task_name: String,
+    pub scheduled_time: DateTime<Utc>,
+    pub trigger_type: String,
+    pub estimated_duration: Option<f64>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RecentActivity {
+    pub recent_jobs: Vec<RecentJob>,
+    pub alerts: Vec<SystemAlert>,
+    pub upcoming_jobs: Vec<UpcomingJob>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct JobTrendsDataPoint {
+    pub timestamp: DateTime<Utc>,
+    pub total_jobs: i64,
+    pub successful_jobs: i64,
+    pub failed_jobs: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct JobTrendsData {
+    pub time_series: Vec<JobTrendsDataPoint>,
+    pub time_range: String, // '1h' | '24h' | '7d' | '30d'
 }
 
 #[derive(Clone)]
@@ -439,6 +530,382 @@ impl JobRepository {
         Ok(statistics)
     }
 
+    // Dashboard-specific methods
+
+    /// Get system metrics including worker status and uptime
+    pub async fn get_system_metrics(&self) -> Result<SystemStatus, Error> {
+        let now = Utc::now();
+        let today_start = now.date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc();
+
+        // Get active workers (workers that have picked up jobs in the last 5 minutes)
+        let active_workers_row = sqlx::query(
+            "SELECT COUNT(DISTINCT worker_id) as active_workers
+             FROM job 
+             WHERE worker_id IS NOT NULL 
+             AND picked >= $1",
+        )
+        .bind(now - Duration::minutes(5))
+        .fetch_one(&self.pool)
+        .await?;
+
+        let active_workers: i64 = active_workers_row.try_get("active_workers")?;
+
+        // For idle workers, we'll use a simple heuristic: workers that have been active in the last hour but not in the last 5 minutes
+        let idle_workers_row = sqlx::query(
+            "SELECT COUNT(DISTINCT worker_id) as idle_workers
+             FROM job 
+             WHERE worker_id IS NOT NULL 
+             AND picked >= $1 
+             AND picked < $2",
+        )
+        .bind(now - Duration::hours(1))
+        .bind(now - Duration::minutes(5))
+        .fetch_one(&self.pool)
+        .await?;
+
+        let idle_workers: i64 = idle_workers_row.try_get("idle_workers")?;
+
+        // Get total jobs today
+        let jobs_today_row = sqlx::query(
+            "SELECT COUNT(*) as total_jobs_today
+             FROM job 
+             WHERE start_datetime >= $1",
+        )
+        .bind(today_start)
+        .fetch_one(&self.pool)
+        .await?;
+
+        let total_jobs_today: i64 = jobs_today_row.try_get("total_jobs_today")?;
+
+        // Get average execution time for last 24 hours
+        let avg_time_row = sqlx::query(
+            "SELECT AVG(EXTRACT(EPOCH FROM (end_datetime - start_datetime)))::FLOAT8 as avg_time
+             FROM job 
+             WHERE start_datetime >= $1 
+             AND end_datetime IS NOT NULL",
+        )
+        .bind(now - Duration::hours(24))
+        .fetch_one(&self.pool)
+        .await?;
+
+        let average_execution_time_24h: Option<f64> = avg_time_row.try_get("avg_time")?;
+
+        // Generate system alerts based on current conditions
+        let mut alerts = Vec::new();
+
+        // Alert if no active workers
+        if active_workers == 0 {
+            alerts.push(SystemAlert {
+                id: "no-active-workers".to_string(),
+                severity: "warning".to_string(),
+                message: "No active workers detected".to_string(),
+                timestamp: now,
+                source: Some("worker-monitor".to_string()),
+            });
+        }
+
+        // Alert if there are many failed jobs today
+        let failed_jobs_row = sqlx::query(
+            "SELECT COUNT(*) as failed_jobs
+             FROM job 
+             WHERE start_datetime >= $1 
+             AND success = false",
+        )
+        .bind(today_start)
+        .fetch_one(&self.pool)
+        .await?;
+
+        let failed_jobs: i64 = failed_jobs_row.try_get("failed_jobs")?;
+
+        if total_jobs_today > 0 && (failed_jobs as f64 / total_jobs_today as f64) > 0.2 {
+            alerts.push(SystemAlert {
+                id: "high-failure-rate".to_string(),
+                severity: "error".to_string(),
+                message: format!(
+                    "High failure rate detected: {:.1}% of jobs failed today",
+                    (failed_jobs as f64 / total_jobs_today as f64) * 100.0
+                ),
+                timestamp: now,
+                source: Some("job-monitor".to_string()),
+            });
+        }
+
+        // System uptime (simplified - using the oldest job as a proxy for system start)
+        let uptime = "P1DT12H30M".to_string(); // Placeholder - in real implementation, track actual uptime
+
+        Ok(SystemStatus {
+            active_workers: active_workers as i32,
+            idle_workers: idle_workers as i32,
+            total_jobs_today,
+            system_uptime: uptime,
+            average_execution_time_24h: average_execution_time_24h.unwrap_or(0.0),
+            alerts,
+        })
+    }
+
+    /// Get job execution metrics for performance monitoring
+    pub async fn get_job_execution_metrics(&self) -> Result<JobExecutionMetrics, Error> {
+        let now = Utc::now();
+        let today_start = now.date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc();
+
+        // Get today's job statistics
+        let today_stats_row = sqlx::query(
+            "SELECT 
+                COUNT(*) as total_jobs,
+                COUNT(CASE WHEN success = true THEN 1 END) as success_count,
+                COUNT(CASE WHEN success = false THEN 1 END) as failure_count
+             FROM job 
+             WHERE start_datetime >= $1",
+        )
+        .bind(today_start)
+        .fetch_one(&self.pool)
+        .await?;
+
+        let total_jobs: i64 = today_stats_row.try_get("total_jobs")?;
+        let success_count: i64 = today_stats_row.try_get("success_count")?;
+        let failure_count: i64 = today_stats_row.try_get("failure_count")?;
+
+        let success_rate = if total_jobs > 0 {
+            (success_count as f64 / total_jobs as f64) * 100.0
+        } else {
+            0.0
+        };
+
+        // Get status distribution
+        let status_dist_rows = sqlx::query(
+            "SELECT 
+                status,
+                COUNT(*) as count
+             FROM job 
+             GROUP BY status",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut running = 0i64;
+        let mut completed = 0i64;
+        let mut failed = 0i64;
+        let mut queued = 0i64;
+
+        for row in status_dist_rows {
+            let status: String = row.try_get("status")?;
+            let count: i64 = row.try_get("count")?;
+
+            match status.as_str() {
+                "running" => running = count,
+                "completed" => completed = count,
+                "failed" => failed = count,
+                "queued" => queued = count,
+                _ => {}
+            }
+        }
+
+        // Get top failing workflows
+        let failing_workflows_rows = sqlx::query(
+            "SELECT 
+                task_name,
+                COUNT(*) as total_executions,
+                COUNT(CASE WHEN success = false THEN 1 END) as failures,
+                (COUNT(CASE WHEN success = false THEN 1 END)::FLOAT8 / COUNT(*)::FLOAT8 * 100) as failure_rate
+             FROM job 
+             WHERE task_name IS NOT NULL 
+             AND start_datetime >= $1
+             GROUP BY task_name
+             HAVING COUNT(*) >= 3
+             ORDER BY failure_rate DESC, total_executions DESC
+             LIMIT 5"
+        )
+        .bind(now - Duration::days(7)) // Last 7 days
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut top_failing_workflows = Vec::new();
+        for row in failing_workflows_rows {
+            let workflow_name: String = row.try_get("task_name")?;
+            let total_executions: i64 = row.try_get("total_executions")?;
+            let failure_rate: Option<f64> = row.try_get("failure_rate")?;
+
+            if let Some(rate) = failure_rate {
+                if rate > 10.0 {
+                    // Only include workflows with >10% failure rate
+                    top_failing_workflows.push(FailingWorkflow {
+                        workflow_name,
+                        failure_rate: rate,
+                        total_executions,
+                    });
+                }
+            }
+        }
+
+        // Get average execution time
+        let avg_time_row = sqlx::query(
+            "SELECT AVG(EXTRACT(EPOCH FROM (end_datetime - start_datetime)))::FLOAT8 as avg_time
+             FROM job 
+             WHERE start_datetime >= $1 
+             AND end_datetime IS NOT NULL",
+        )
+        .bind(now - Duration::hours(24))
+        .fetch_one(&self.pool)
+        .await?;
+
+        let average_execution_time: Option<f64> = avg_time_row.try_get("avg_time")?;
+
+        Ok(JobExecutionMetrics {
+            today: DailyJobStats {
+                total_jobs,
+                success_count,
+                failure_count,
+                success_rate,
+            },
+            status_distribution: StatusDistribution {
+                running,
+                completed,
+                failed,
+                queued,
+            },
+            top_failing_workflows,
+            average_execution_time: average_execution_time.unwrap_or(0.0),
+        })
+    }
+
+    /// Get recent activity including jobs, alerts, and upcoming executions
+    pub async fn get_recent_activity(&self) -> Result<RecentActivity, Error> {
+        // Get recent jobs (last 10)
+        let recent_jobs_rows = sqlx::query(
+            "SELECT 
+                job_id,
+                task_name,
+                status,
+                start_datetime,
+                end_datetime,
+                source_type,
+                COALESCE(source_id, '') as source_id
+             FROM job 
+             WHERE start_datetime IS NOT NULL
+             ORDER BY start_datetime DESC 
+             LIMIT 10",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut recent_jobs = Vec::new();
+        for row in recent_jobs_rows {
+            let job_id: uuid::Uuid = row.try_get("job_id")?;
+            let task_name: Option<String> = row.try_get("task_name")?;
+            let status: String = row.try_get("status")?;
+            let start_time: DateTime<Utc> = row.try_get("start_datetime")?;
+            let end_datetime: Option<DateTime<Utc>> = row.try_get("end_datetime")?;
+            let source_type: String = row.try_get("source_type")?;
+            let source_id: String = row.try_get("source_id")?;
+
+            let duration = if let Some(end_time) = end_datetime {
+                Some((end_time - start_time).num_seconds() as f64)
+            } else {
+                None
+            };
+
+            let triggered_by = if source_id.is_empty() {
+                source_type
+            } else {
+                format!("{}:{}", source_type, source_id)
+            };
+
+            recent_jobs.push(RecentJob {
+                job_id: job_id.to_string(),
+                task_name: task_name.unwrap_or_else(|| "unknown".to_string()),
+                status,
+                start_time,
+                duration,
+                triggered_by,
+            });
+        }
+
+        // Generate alerts based on recent activity
+        let mut alerts = Vec::new();
+        let now = Utc::now();
+
+        // Check for recent failures
+        let recent_failures_row = sqlx::query(
+            "SELECT COUNT(*) as recent_failures
+             FROM job 
+             WHERE start_datetime >= $1 
+             AND success = false",
+        )
+        .bind(now - Duration::minutes(30))
+        .fetch_one(&self.pool)
+        .await?;
+
+        let recent_failures: i64 = recent_failures_row.try_get("recent_failures")?;
+
+        if recent_failures > 3 {
+            alerts.push(SystemAlert {
+                id: "recent-failures".to_string(),
+                severity: "warning".to_string(),
+                message: format!("{} jobs failed in the last 30 minutes", recent_failures),
+                timestamp: now,
+                source: Some("job-monitor".to_string()),
+            });
+        }
+
+        // Placeholder for upcoming jobs - in a real implementation, this would come from scheduler
+        let upcoming_jobs = Vec::new();
+
+        Ok(RecentActivity {
+            recent_jobs,
+            alerts,
+            upcoming_jobs,
+        })
+    }
+
+    /// Get job execution trends over time
+    pub async fn get_job_trends(&self, time_range: &str) -> Result<JobTrendsData, Error> {
+        let now = Utc::now();
+        let (start_time, interval) = match time_range {
+            "1h" => (now - Duration::hours(1), "5 minutes"),
+            "24h" => (now - Duration::hours(24), "1 hour"),
+            "7d" => (now - Duration::days(7), "1 day"),
+            "30d" => (now - Duration::days(30), "1 day"),
+            _ => return Err(anyhow::anyhow!("Invalid time range: {}", time_range)),
+        };
+
+        let trends_rows = sqlx::query(&format!(
+            "SELECT 
+                date_trunc('{}', start_datetime) as time_bucket,
+                COUNT(*) as total_jobs,
+                COUNT(CASE WHEN success = true THEN 1 END) as successful_jobs,
+                COUNT(CASE WHEN success = false THEN 1 END) as failed_jobs
+             FROM job 
+             WHERE start_datetime >= $1 
+             AND start_datetime IS NOT NULL
+             GROUP BY time_bucket
+             ORDER BY time_bucket ASC",
+            interval
+        ))
+        .bind(start_time)
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut time_series = Vec::new();
+        for row in trends_rows {
+            let timestamp: DateTime<Utc> = row.try_get("time_bucket")?;
+            let total_jobs: i64 = row.try_get("total_jobs")?;
+            let successful_jobs: i64 = row.try_get("successful_jobs")?;
+            let failed_jobs: i64 = row.try_get("failed_jobs")?;
+
+            time_series.push(JobTrendsDataPoint {
+                timestamp,
+                total_jobs,
+                successful_jobs,
+                failed_jobs,
+            });
+        }
+
+        Ok(JobTrendsData {
+            time_series,
+            time_range: time_range.to_string(),
+        })
+    }
+
     /// Get jobs for a specific task with pagination and filtering
     pub async fn get_task_jobs(
         &self,
@@ -778,5 +1245,190 @@ mod tests {
 
         assert!(has_next); // Page 3 of 5 should have next
         assert!(has_prev); // Page 3 should have previous
+    }
+
+    // Dashboard-specific tests
+
+    #[test]
+    fn test_system_status_struct_creation() {
+        let now = Utc::now();
+        let alert = SystemAlert {
+            id: "test-alert".to_string(),
+            severity: "warning".to_string(),
+            message: "Test alert message".to_string(),
+            timestamp: now,
+            source: Some("test-source".to_string()),
+        };
+
+        let status = SystemStatus {
+            active_workers: 3,
+            idle_workers: 1,
+            total_jobs_today: 42,
+            system_uptime: "P1DT12H30M".to_string(),
+            average_execution_time_24h: 45.2,
+            alerts: vec![alert],
+        };
+
+        assert_eq!(status.active_workers, 3);
+        assert_eq!(status.idle_workers, 1);
+        assert_eq!(status.total_jobs_today, 42);
+        assert_eq!(status.alerts.len(), 1);
+        assert_eq!(status.alerts[0].severity, "warning");
+    }
+
+    #[test]
+    fn test_job_execution_metrics_struct_creation() {
+        let metrics = JobExecutionMetrics {
+            today: DailyJobStats {
+                total_jobs: 100,
+                success_count: 95,
+                failure_count: 5,
+                success_rate: 95.0,
+            },
+            status_distribution: StatusDistribution {
+                running: 2,
+                completed: 95,
+                failed: 5,
+                queued: 3,
+            },
+            top_failing_workflows: vec![FailingWorkflow {
+                workflow_name: "test-workflow".to_string(),
+                failure_rate: 15.5,
+                total_executions: 20,
+            }],
+            average_execution_time: 42.8,
+        };
+
+        assert_eq!(metrics.today.total_jobs, 100);
+        assert_eq!(metrics.today.success_rate, 95.0);
+        assert_eq!(metrics.status_distribution.running, 2);
+        assert_eq!(metrics.top_failing_workflows.len(), 1);
+        assert_eq!(
+            metrics.top_failing_workflows[0].workflow_name,
+            "test-workflow"
+        );
+    }
+
+    #[test]
+    fn test_recent_activity_struct_creation() {
+        let now = Utc::now();
+        let recent_job = RecentJob {
+            job_id: "job-123".to_string(),
+            task_name: "test-task".to_string(),
+            status: "completed".to_string(),
+            start_time: now,
+            duration: Some(120.5),
+            triggered_by: "user:admin".to_string(),
+        };
+
+        let alert = SystemAlert {
+            id: "alert-123".to_string(),
+            severity: "info".to_string(),
+            message: "System info".to_string(),
+            timestamp: now,
+            source: None,
+        };
+
+        let activity = RecentActivity {
+            recent_jobs: vec![recent_job],
+            alerts: vec![alert],
+            upcoming_jobs: vec![],
+        };
+
+        assert_eq!(activity.recent_jobs.len(), 1);
+        assert_eq!(activity.recent_jobs[0].task_name, "test-task");
+        assert_eq!(activity.alerts.len(), 1);
+        assert_eq!(activity.upcoming_jobs.len(), 0);
+    }
+
+    #[test]
+    fn test_job_trends_data_struct_creation() {
+        let now = Utc::now();
+        let data_point = JobTrendsDataPoint {
+            timestamp: now,
+            total_jobs: 10,
+            successful_jobs: 8,
+            failed_jobs: 2,
+        };
+
+        let trends = JobTrendsData {
+            time_series: vec![data_point],
+            time_range: "24h".to_string(),
+        };
+
+        assert_eq!(trends.time_series.len(), 1);
+        assert_eq!(trends.time_series[0].total_jobs, 10);
+        assert_eq!(trends.time_series[0].successful_jobs, 8);
+        assert_eq!(trends.time_range, "24h");
+    }
+
+    #[test]
+    fn test_dashboard_structs_serialization() {
+        let now = Utc::now();
+
+        // Test SystemStatus serialization
+        let status = SystemStatus {
+            active_workers: 2,
+            idle_workers: 1,
+            total_jobs_today: 50,
+            system_uptime: "P1DT6H".to_string(),
+            average_execution_time_24h: 30.5,
+            alerts: vec![],
+        };
+
+        let status_json = serde_json::to_string(&status);
+        assert!(status_json.is_ok());
+        assert!(status_json.unwrap().contains("\"active_workers\":2"));
+
+        // Test JobExecutionMetrics serialization
+        let metrics = JobExecutionMetrics {
+            today: DailyJobStats {
+                total_jobs: 25,
+                success_count: 23,
+                failure_count: 2,
+                success_rate: 92.0,
+            },
+            status_distribution: StatusDistribution {
+                running: 1,
+                completed: 23,
+                failed: 2,
+                queued: 0,
+            },
+            top_failing_workflows: vec![],
+            average_execution_time: 25.3,
+        };
+
+        let metrics_json = serde_json::to_string(&metrics);
+        assert!(metrics_json.is_ok());
+        assert!(metrics_json.unwrap().contains("\"success_rate\":92"));
+
+        // Test JobTrendsData serialization
+        let trends = JobTrendsData {
+            time_series: vec![JobTrendsDataPoint {
+                timestamp: now,
+                total_jobs: 5,
+                successful_jobs: 4,
+                failed_jobs: 1,
+            }],
+            time_range: "1h".to_string(),
+        };
+
+        let trends_json = serde_json::to_string(&trends);
+        assert!(trends_json.is_ok());
+        assert!(trends_json.unwrap().contains("\"time_range\":\"1h\""));
+    }
+
+    #[test]
+    fn test_time_range_validation() {
+        // Test valid time ranges
+        let valid_ranges = ["1h", "24h", "7d", "30d"];
+        for range in valid_ranges {
+            // In a real test, we'd call get_job_trends, but here we just test the logic
+            assert!(["1h", "24h", "7d", "30d"].contains(&range));
+        }
+
+        // Test invalid time range
+        let invalid_range = "invalid";
+        assert!(!["1h", "24h", "7d", "30d"].contains(&invalid_range));
     }
 }

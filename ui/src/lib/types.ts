@@ -480,6 +480,209 @@ export interface TaskJobsUrlParams {
 	order?: string;
 }
 
+// Dashboard Types
+
+/**
+ * System alert information for dashboard monitoring
+ */
+export interface SystemAlert {
+	/** Unique identifier for the alert */
+	id: string;
+	/** Alert severity level */
+	severity: 'info' | 'warning' | 'error';
+	/** Alert message text */
+	message: string;
+	/** When the alert was generated (ISO 8601 format) */
+	timestamp: string;
+	/** Source system or component that generated the alert */
+	source?: string;
+}
+
+/**
+ * System status information for dashboard overview
+ */
+export interface SystemStatus {
+	/** Number of currently active workers */
+	active_workers: number;
+	/** Number of idle workers available for tasks */
+	idle_workers: number;
+	/** Total number of jobs executed today */
+	total_jobs_today: number;
+	/** System uptime in ISO 8601 duration format (e.g., "P2DT14H30M") */
+	system_uptime: string;
+	/** Average job execution time over the last 24 hours in seconds */
+	average_execution_time_24h: number;
+	/** Current system alerts and warnings */
+	alerts: SystemAlert[];
+}
+
+/**
+ * Job execution metrics for performance monitoring
+ */
+export interface JobExecutionMetrics {
+	/** Today's job execution statistics */
+	today: {
+		/** Total number of jobs executed today */
+		total_jobs: number;
+		/** Number of successful job executions */
+		success_count: number;
+		/** Number of failed job executions */
+		failure_count: number;
+		/** Success rate as a percentage (0-100) */
+		success_rate: number;
+	};
+	/** Current distribution of jobs by status */
+	status_distribution: {
+		/** Number of currently running jobs */
+		running: number;
+		/** Number of completed jobs */
+		completed: number;
+		/** Number of failed jobs */
+		failed: number;
+		/** Number of queued jobs waiting to execute */
+		queued: number;
+	};
+	/** Workflows with the highest failure rates */
+	top_failing_workflows: Array<{
+		/** Name of the workflow */
+		workflow_name: string;
+		/** Failure rate as a percentage (0-100) */
+		failure_rate: number;
+		/** Total number of executions for this workflow */
+		total_executions: number;
+	}>;
+	/** Average job execution time in seconds */
+	average_execution_time: number;
+}
+
+/**
+ * Recent job execution information for activity monitoring
+ */
+export interface RecentJob {
+	/** Unique identifier for the job */
+	job_id: string;
+	/** Name of the task that was executed */
+	task_name: string;
+	/** Current execution status */
+	status: ExecutionStatus;
+	/** When the job started execution (ISO 8601 format) */
+	start_time: string;
+	/** Job execution duration in seconds (if completed) */
+	duration?: number;
+	/** Who or what triggered the job execution */
+	triggered_by: string;
+}
+
+/**
+ * Upcoming scheduled job information
+ */
+export interface UpcomingJob {
+	/** Name of the task to be executed */
+	task_name: string;
+	/** When the job is scheduled to run (ISO 8601 format) */
+	scheduled_time: string;
+	/** Type of trigger that will execute the job */
+	trigger_type: string;
+	/** Estimated duration based on historical data in seconds */
+	estimated_duration?: number;
+}
+
+/**
+ * Recent activity data combining jobs, alerts, and upcoming executions
+ */
+export interface RecentActivity {
+	/** List of recent job executions */
+	recent_jobs: RecentJob[];
+	/** Current system alerts */
+	alerts: SystemAlert[];
+	/** Upcoming scheduled job executions */
+	upcoming_jobs: UpcomingJob[];
+}
+
+/**
+ * Time-series data point for job execution trends
+ */
+export interface JobTrendsDataPoint {
+	/** Timestamp for this data point (ISO 8601 format) */
+	timestamp: string;
+	/** Total number of jobs executed at this time */
+	total_jobs: number;
+	/** Number of successful job executions */
+	successful_jobs: number;
+	/** Number of failed job executions */
+	failed_jobs: number;
+}
+
+/**
+ * Job execution trends data for dashboard charts
+ */
+export interface JobTrendsData {
+	/** Array of time-series data points */
+	time_series: JobTrendsDataPoint[];
+	/** Time range for the data */
+	time_range: '1h' | '24h' | '7d' | '30d';
+}
+
+// Dashboard Component Props
+
+/**
+ * Props for SystemStatusWidget component
+ */
+export interface SystemStatusWidgetProps {
+	/** System status data to display */
+	systemStatus?: SystemStatus;
+	/** Whether the component is in loading state */
+	loading?: boolean;
+	/** Error state for the component */
+	error?: string | null;
+	/** Retry handler for error recovery */
+	onRetry?: () => void;
+}
+
+/**
+ * Props for JobExecutionMetricsWidget component
+ */
+export interface JobExecutionMetricsWidgetProps {
+	/** Job execution metrics to display */
+	metrics?: JobExecutionMetrics;
+	/** Whether the component is in loading state */
+	loading?: boolean;
+	/** Error state for the component */
+	error?: string | null;
+	/** Retry handler for error recovery */
+	onRetry?: () => void;
+}
+
+/**
+ * Props for RecentActivityWidget component
+ */
+export interface RecentActivityWidgetProps {
+	/** Recent activity data to display */
+	recentActivity?: RecentActivity;
+	/** Whether the component is in loading state */
+	loading?: boolean;
+	/** Error state for the component */
+	error?: string | null;
+	/** Retry handler for error recovery */
+	onRetry?: () => void;
+}
+
+/**
+ * Props for JobExecutionTrendsWidget component
+ */
+export interface JobExecutionTrendsWidgetProps {
+	/** Job trends data to display */
+	trendsData?: JobTrendsData;
+	/** Whether the component is in loading state */
+	loading?: boolean;
+	/** Error state for the component */
+	error?: string | null;
+	/** Retry handler for error recovery */
+	onRetry?: () => void;
+	/** Handler for time range changes */
+	onTimeRangeChange?: (range: '1h' | '24h' | '7d' | '30d') => void;
+}
+
 // Loading and Error State Types
 
 /**
