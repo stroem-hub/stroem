@@ -216,7 +216,7 @@
 				</div>
 				<div class="mt-4">
 					<p class="text-3xl font-bold text-gray-900 dark:text-white">
-						{systemStatus.total_jobs_today.toLocaleString()}
+						{(systemStatus.total_jobs_today || 0).toLocaleString()}
 					</p>
 					<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
 						executed since midnight
@@ -255,7 +255,7 @@
 				<h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
 					System Alerts
 					<span class="ml-2 inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800 dark:bg-red-900/20 dark:text-red-400">
-						{systemStatus.alerts.length}
+						{systemStatus.alerts?.length || 0}
 					</span>
 				</h3>
 				<div class="space-y-3">

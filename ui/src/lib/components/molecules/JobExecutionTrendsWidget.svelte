@@ -240,7 +240,7 @@
 
 	// Calculate summary statistics
 	let summaryStats = $derived(() => {
-		if (!trendsData || trendsData.time_series.length === 0) {
+		if (!trendsData || !trendsData.time_series || trendsData.time_series.length === 0) {
 			return {
 				totalJobs: 0,
 				avgSuccessRate: 0,
@@ -250,10 +250,10 @@
 		}
 
 		const series = trendsData.time_series;
-		const totalJobs = series.reduce((sum, point) => sum + point.total_jobs, 0);
-		const totalSuccessful = series.reduce((sum, point) => sum + point.successful_jobs, 0);
+		const totalJobs = series.reduce((sum, point) => sum + (point.total_jobs || 0), 0);
+		const totalSuccessful = series.reduce((sum, point) => sum + (point.successful_jobs || 0), 0);
 		const avgSuccessRate = totalJobs > 0 ? (totalSuccessful / totalJobs) * 100 : 0;
-		const peakJobs = Math.max(...series.map(point => point.total_jobs));
+		const peakJobs = series.length > 0 ? Math.max(...series.map(point => point.total_jobs || 0)) : 0;
 
 		// Calculate trend (compare first half vs second half)
 		const midPoint = Math.floor(series.length / 2);
@@ -261,10 +261,10 @@
 		const secondHalf = series.slice(midPoint);
 		
 		const firstHalfAvg = firstHalf.length > 0 
-			? firstHalf.reduce((sum, point) => sum + point.total_jobs, 0) / firstHalf.length 
+			? firstHalf.reduce((sum, point) => sum + (point.total_jobs || 0), 0) / firstHalf.length 
 			: 0;
 		const secondHalfAvg = secondHalf.length > 0 
-			? secondHalf.reduce((sum, point) => sum + point.total_jobs, 0) / secondHalf.length 
+			? secondHalf.reduce((sum, point) => sum + (point.total_jobs || 0), 0) / secondHalf.length 
 			: 0;
 
 		let trend: 'up' | 'down' | 'stable' = 'stable';
@@ -322,7 +322,7 @@
 		description="Unable to load job execution trends data at this time."
 		{onRetry}
 	/>
-{:else if !trendsData || trendsData.time_series.length === 0}
+{:else if !trendsData || !trendsData.time_series || trendsData.time_series.length === 0}
 	<div class="rounded-lg border border-gray-200 bg-white p-8 text-center shadow-sm dark:border-gray-700 dark:bg-gray-800">
 		<div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700">
 			<ChartBarIcon class="h-6 w-6 text-gray-600 dark:text-gray-400" />
@@ -391,7 +391,7 @@
 			<!-- Total Jobs -->
 			<div class="text-center">
 				<div class="text-2xl font-bold text-gray-900 dark:text-white">
-					{summaryStats().totalJobs.toLocaleString()}
+					{(summaryStats().totalJobs || 0).toLocaleString()}
 				</div>
 				<div class="text-sm text-gray-600 dark:text-gray-400">Total Jobs</div>
 			</div>
@@ -407,7 +407,7 @@
 			<!-- Peak Jobs -->
 			<div class="text-center">
 				<div class="text-2xl font-bold text-gray-900 dark:text-white">
-					{summaryStats().peakJobs.toLocaleString()}
+					{(summaryStats().peakJobs || 0).toLocaleString()}
 				</div>
 				<div class="text-sm text-gray-600 dark:text-gray-400">Peak Jobs</div>
 			</div>

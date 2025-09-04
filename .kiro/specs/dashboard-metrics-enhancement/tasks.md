@@ -58,7 +58,7 @@
   - Implement chart responsiveness for different screen sizes
   - _Requirements: 2.2, 5.3, 5.4_
 
-- [ ] 8. Implement main dashboard page
+- [x] 8. Implement main dashboard page
   - Update ui/src/routes/+page.svelte to create comprehensive dashboard layout
   - Integrate all four dashboard widgets (SystemStatus, JobExecutionMetrics, RecentActivity, JobExecutionTrends)
   - Implement data fetching logic with 30-second refresh intervals
@@ -66,7 +66,7 @@
   - Ensure responsive design that works on mobile, tablet, and desktop breakpoints
   - _Requirements: 1.1, 2.1, 3.1, 5.5_
 
-- [ ] 9. Add dashboard API client functions
+- [x] 9. Add dashboard API client functions
   - Create dashboard-specific API client functions in ui/src/lib/api/ directory
   - Implement fetchSystemStatus(), fetchJobMetrics(), fetchRecentActivity(), and fetchJobTrends() functions
   - Add proper error handling and TypeScript typing for all API responses

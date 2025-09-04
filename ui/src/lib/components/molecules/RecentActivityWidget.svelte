@@ -234,7 +234,7 @@
 				<h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
 					System Alerts
 					<span class="ml-2 inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800 dark:bg-red-900/20 dark:text-red-400">
-						{recentActivity.alerts.length}
+						{recentActivity.alerts?.length || 0}
 					</span>
 				</h3>
 				<div class="space-y-3 mb-6">
@@ -285,7 +285,7 @@
 				Recent Job Executions
 				{#if recentActivity.recent_jobs && recentActivity.recent_jobs.length > 0}
 					<span class="ml-2 inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/20 dark:text-blue-400">
-						{recentActivity.recent_jobs.length}
+						{recentActivity.recent_jobs?.length || 0}
 					</span>
 				{/if}
 			</h3>
@@ -356,7 +356,7 @@
 				Upcoming Scheduled Jobs
 				{#if recentActivity.upcoming_jobs && recentActivity.upcoming_jobs.length > 0}
 					<span class="ml-2 inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/20 dark:text-green-400">
-						{recentActivity.upcoming_jobs.length}
+						{recentActivity.upcoming_jobs?.length || 0}
 					</span>
 				{/if}
 			</h3>

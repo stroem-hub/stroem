@@ -173,7 +173,7 @@
 				</div>
 				<div class="mt-4">
 					<p class="text-3xl font-bold text-gray-900 dark:text-white">
-						{metrics.today.total_jobs.toLocaleString()}
+						{(metrics.today?.total_jobs || 0).toLocaleString()}
 					</p>
 					<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
 						executed today
@@ -197,10 +197,10 @@
 				</div>
 				<div class="mt-4">
 					<p class="text-3xl font-bold text-gray-900 dark:text-white">
-						{formatPercentage(metrics.today.success_rate)}
+						{formatPercentage(metrics.today?.success_rate || 0)}
 					</p>
 					<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-						{metrics.today.success_count} successful
+						{metrics.today?.success_count || 0} successful
 					</p>
 				</div>
 			</div>
@@ -221,10 +221,10 @@
 				</div>
 				<div class="mt-4">
 					<p class="text-3xl font-bold text-gray-900 dark:text-white">
-						{formatPercentage(100 - metrics.today.success_rate)}
+						{formatPercentage(100 - (metrics.today?.success_rate || 0))}
 					</p>
 					<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-						{metrics.today.failure_count} failed
+						{metrics.today?.failure_count || 0} failed
 					</p>
 				</div>
 			</div>
@@ -264,7 +264,7 @@
 				Job Status Distribution
 			</h3>
 			<div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
-				{#each Object.entries(metrics.status_distribution) as [status, count]}
+				{#each Object.entries(metrics.status_distribution || {}) as [status, count]}
 					{@const colors = getStatusColors(status)}
 					{@const StatusIcon = getStatusIcon(status)}
 					<div class="text-center p-4 rounded-lg border {colors.bg} {colors.border}">
@@ -272,7 +272,7 @@
 							<StatusIcon class="h-6 w-6 {colors.text}" />
 						</div>
 						<p class="text-2xl font-bold text-gray-900 dark:text-white">
-							{count.toLocaleString()}
+							{(count || 0).toLocaleString()}
 						</p>
 						<p class="text-sm font-medium {colors.text} capitalize">
 							{status}
@@ -294,7 +294,7 @@
 						Top Failing Workflows
 					</h3>
 					<Badge variant="error" size="sm">
-						{metrics.top_failing_workflows.length} workflows
+						{metrics.top_failing_workflows?.length || 0} workflows
 					</Badge>
 				</div>
 				<div class="space-y-3">
