@@ -147,8 +147,12 @@ export class AuthService {
    */
   async getCurrentUser(): Promise<User> {
     const response = await apiClient.get<any>('/api/auth/info');
-    // Handle server's wrapped response format: {"success": true, "data": user}
+    // Handle server's wrapped response format: {"success": true, "data": {"user": user}}
     if (response && response.success && response.data) {
+      // Extract user from nested data.user structure
+      if (response.data.user) {
+        return response.data.user;
+      }
       return response.data;
     }
     return response as User;
