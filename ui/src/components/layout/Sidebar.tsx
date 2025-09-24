@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 interface NavigationItem {
@@ -33,9 +35,23 @@ const JobsIcon: React.FC<{ className?: string }> = ({ className }) => (
   </svg>
 );
 
-export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed = false, onToggleCollapse }) => {
   const { user, logout } = useAuth();
   const location = useLocation();
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLLIElement>(null);
+
+  // Close user menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const navigation: NavigationItem[] = [
     { name: 'Dashboard', href: '/dashboard', icon: DashboardIcon },
@@ -45,6 +61,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
   const handleLogout = () => {
     logout();
+    setUserMenuOpen(false);
     onClose();
   };
 
@@ -58,11 +75,26 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   return (
     <>
       {/* Desktop sidebar */}
-      <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-64 lg:flex-col">
+      <div className={`hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:flex-col transition-all duration-300 ${isCollapsed ? 'lg:w-16' : 'lg:w-64'}`}>
         <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-gray-900 px-6 pb-4">
-          {/* Logo */}
-          <div className="flex h-16 shrink-0 items-center">
-            <h1 className="text-white text-xl font-bold">Strøm</h1>
+          {/* Logo and collapse button */}
+          <div className="flex h-16 shrink-0 items-center justify-between">
+            <h1 className={`text-white text-xl font-bold transition-opacity duration-300 ${isCollapsed ? 'opacity-0' : 'opacity-100'}`}>
+              {!isCollapsed && 'Strøm'}
+            </h1>
+            <button
+              onClick={onToggleCollapse}
+              className="text-gray-400 hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 rounded p-1"
+              aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                {isCollapsed ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                )}
+              </svg>
+            </button>
           </div>
 
           {/* Navigation */}
@@ -84,12 +116,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                             }`
                           }
                           aria-current={isActive ? 'page' : undefined}
+                          title={isCollapsed ? item.name : undefined}
                         >
                           <item.icon
                             className="h-6 w-6 shrink-0"
                             aria-hidden="true"
                           />
-                          {item.name}
+                          {!isCollapsed && item.name}
                         </NavLink>
                       </li>
                     );
@@ -98,31 +131,60 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
               </li>
 
               {/* User profile section */}
-              <li className="mt-auto">
-                <div className="flex items-center gap-x-4 px-2 py-3 text-sm font-semibold leading-6 text-white border-t border-gray-700">
-                  <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center">
-                    <span className="text-sm font-medium text-white">
-                      {user?.name ? user.name.charAt(0).toUpperCase() : user?.email.charAt(0).toUpperCase()}
-                    </span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-white truncate">
-                      {user?.name || 'User'}
-                    </div>
-                    <div className="text-xs text-gray-400 truncate">
-                      {user?.email}
-                    </div>
-                  </div>
+              <li className="mt-auto" ref={userMenuRef}>
+                <div className="relative">
                   <button
-                    onClick={handleLogout}
-                    className="text-gray-400 hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 rounded p-1"
-                    aria-label="Sign out"
-                    title="Sign out"
+                    onClick={() => setUserMenuOpen(!userMenuOpen)}
+                    className={`flex items-center gap-x-4 px-2 py-3 text-sm font-semibold leading-6 text-white border-t border-gray-700 hover:bg-gray-800 rounded-md transition-colors w-full ${
+                      isCollapsed ? 'justify-center' : ''
+                    }`}
+                    aria-expanded={userMenuOpen}
+                    aria-haspopup="true"
                   >
-                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" aria-hidden="true">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
-                    </svg>
+                    <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
+                      <span className="text-sm font-medium text-white">
+                        {user?.name ? user.name.charAt(0).toUpperCase() : user?.email.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                    {!isCollapsed && (
+                      <>
+                        <div className="flex-1 min-w-0 text-left">
+                          <div className="text-sm font-medium text-white truncate">
+                            {user?.name || 'User'}
+                          </div>
+                          <div className="text-xs text-gray-400 truncate">
+                            {user?.email}
+                          </div>
+                        </div>
+                        <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" />
+                        </svg>
+                      </>
+                    )}
                   </button>
+
+                  {/* User dropdown menu */}
+                  {userMenuOpen && (
+                    <div
+                      className={`absolute bottom-full mb-2 ${isCollapsed ? 'left-0' : 'right-0'} z-10 w-48 origin-bottom-${isCollapsed ? 'left' : 'right'} rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none`}
+                      role="menu"
+                      aria-orientation="vertical"
+                      aria-labelledby="user-menu-button"
+                    >
+                      <div className="px-4 py-2 text-sm text-gray-700 border-b border-gray-100">
+                        <div className="font-medium">{user?.name || 'User'}</div>
+                        <div className="text-gray-500 text-xs">{user?.email}</div>
+                      </div>
+
+                      <button
+                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 focus:bg-gray-100 focus:outline-none"
+                        role="menuitem"
+                        onClick={handleLogout}
+                      >
+                        Sign out
+                      </button>
+                    </div>
+                  )}
                 </div>
               </li>
             </ul>

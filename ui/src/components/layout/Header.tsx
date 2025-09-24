@@ -1,38 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { useAuth } from '../../hooks/useAuth';
+import React from 'react';
 
 interface HeaderProps {
   onMenuClick: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
-  const { user, logout } = useAuth();
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const userMenuRef = useRef<HTMLDivElement>(null);
-
-  // Close user menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
-        setUserMenuOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  // Handle keyboard navigation for user menu
-  const handleUserMenuKeyDown = (event: React.KeyboardEvent) => {
-    if (event.key === 'Escape') {
-      setUserMenuOpen(false);
-    }
-  };
-
-  const handleLogout = () => {
-    logout();
-    setUserMenuOpen(false);
-  };
 
   return (
     <header className="bg-white shadow-sm border-b border-gray-200">
@@ -70,51 +42,6 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                 Strøm
               </h1>
             </div>
-          </div>
-
-          {/* User menu */}
-          <div className="relative ml-4 flex-shrink-0" ref={userMenuRef}>
-            <button
-              type="button"
-              className="flex rounded-full bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-              onClick={() => setUserMenuOpen(!userMenuOpen)}
-              onKeyDown={handleUserMenuKeyDown}
-              aria-expanded={userMenuOpen}
-              aria-haspopup="true"
-              aria-label="User menu"
-            >
-              <span className="sr-only">Open user menu</span>
-              <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center">
-                <span className="text-sm font-medium text-white">
-                  {user?.name ? user.name.charAt(0).toUpperCase() : user?.email.charAt(0).toUpperCase()}
-                </span>
-              </div>
-            </button>
-
-            {/* User dropdown menu */}
-            {userMenuOpen && (
-              <div
-                className="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
-                role="menu"
-                aria-orientation="vertical"
-                aria-labelledby="user-menu-button"
-                tabIndex={-1}
-              >
-                <div className="px-4 py-2 text-sm text-gray-700 border-b border-gray-100">
-                  <div className="font-medium">{user?.name || 'User'}</div>
-                  <div className="text-gray-500">{user?.email}</div>
-                </div>
-                
-                <button
-                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 focus:bg-gray-100 focus:outline-none"
-                  role="menuitem"
-                  tabIndex={-1}
-                  onClick={handleLogout}
-                >
-                  Sign out
-                </button>
-              </div>
-            )}
           </div>
         </div>
       </div>
