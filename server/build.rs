@@ -24,12 +24,12 @@ fn main() {
 
     // Tell Cargo to rerun this script if the UI source changes
     println!("cargo:rerun-if-changed=../ui/src");
-    println!("cargo:rerun-if-changed=../ui/svelte.config.js");
+    // println!("cargo:rerun-if-changed=../ui/svelte.config.js");
     println!("cargo:rerun-if-changed=../ui/package.json");
 
     // Clean directories for a fresh build
     let static_dir = Path::new("static");
-    let ui_build_dir = Path::new("../ui/build");
+    let ui_build_dir = Path::new("../ui/dist");
 
     // Clean static directory
     if static_dir.exists() {

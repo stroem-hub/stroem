@@ -12,12 +12,12 @@ echo -e "${BLUE}🚀 Starting Strøm Server${NC}"
 
 # clean
 rm -rf ./server/static/*
-rm -rf ./ui/build/*
+rm -rf ./ui/dist/*
 
 # build frontend
-cd ./ui
-pnpm build
-cd ..
-cp -r ./ui/build/ ./server/static/
+# cd ./ui
+# pnpm build
+# cd ..
+# cp -r ./ui/dist/ ./server/static/
 
 cargo run --package stroem-server --bin stroem-server -- -v --config ./files/server-config.dev.yaml

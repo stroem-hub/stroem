@@ -171,7 +171,6 @@ async fn refresh_token(
         .map_err(|e| anyhow!(e.to_string()))?;
 
     Ok(ApiResponse::data(json!({
-        "success": true,
         "access_token": jwt,
         "user": user
     })))
@@ -183,8 +182,7 @@ async fn user_info(
     user: User,
 ) -> Result<ApiResponse, ApiError> {
     Ok(ApiResponse::data(json!({
-        "success": true,
-        "data": user
+        "user": user
     })))
 }
 

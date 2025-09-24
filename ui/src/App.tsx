@@ -1,27 +1,61 @@
-// React import not needed with new JSX transform
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
+import { ProtectedRoute } from './components/auth/ProtectedRoute';
+import { OIDCCallback } from './components/auth/OIDCCallback';
+import { AppLayout } from './components/layout';
+import { LoginPage, DashboardPage, TasksPage, JobsPage } from './pages';
 
 function App() {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8">
-        <div className="card p-8 max-w-2xl mx-auto">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">
-            Strøm Orchestration Platform
-          </h1>
-          <p className="text-gray-600 mb-6">
-            React UI implementation with Vite, TypeScript, and TailwindCSS
-          </p>
-          <div className="flex gap-4">
-            <button className="btn-primary">
-              Primary Button
-            </button>
-            <button className="btn-secondary">
-              Secondary Button
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <AuthProvider>
+      <Router>
+        <Routes>
+          {/* Public routes */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/auth/callback" element={<OIDCCallback />} />
+          
+          {/* Protected routes with layout */}
+          <Route 
+            path="/dashboard" 
+            element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <DashboardPage />
+                </AppLayout>
+              </ProtectedRoute>
+            } 
+          />
+          
+          <Route 
+            path="/tasks" 
+            element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <TasksPage />
+                </AppLayout>
+              </ProtectedRoute>
+            } 
+          />
+          
+          <Route 
+            path="/jobs" 
+            element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <JobsPage />
+                </AppLayout>
+              </ProtectedRoute>
+            } 
+          />
+          
+          {/* Default redirect */}
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          
+          {/* Catch all - redirect to dashboard */}
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+      </Router>
+    </AuthProvider>
   );
 }
 

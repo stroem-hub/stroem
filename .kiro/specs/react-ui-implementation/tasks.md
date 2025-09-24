@@ -8,36 +8,36 @@
   - Set up development scripts and build configuration for static site generation
   - _Requirements: 1.1, 6.1, 6.2_
 
-- [ ] 2. Create core authentication system
-  - [ ] 2.1 Implement authentication context and hooks
+- [x] 2. Create core authentication system
+  - [x] 2.1 Implement authentication context and hooks
     - Create AuthContext with user state and token management
     - Implement useAuth hook for accessing authentication state
     - Create token storage utilities with memory-based JWT storage
     - _Requirements: 1.1, 1.2, 1.3_
 
-  - [ ] 2.2 Build API client with authentication
+  - [x] 2.2 Build API client with authentication
     - Create base API client with fetch wrapper and error handling
     - Implement automatic token refresh logic and retry mechanisms
     - Add request/response interceptors for authentication headers
     - Create typed API response interfaces matching server contracts
     - _Requirements: 1.2, 6.1, 6.2, 6.3_
 
-  - [ ] 2.3 Create login page and authentication flow
+  - [x] 2.3 Create login page and authentication flow
     - Build LoginForm component supporting internal and OIDC providers
     - Implement login submission with proper error handling
     - Create ProtectedRoute component for authenticated pages
     - Add authentication state persistence and restoration
     - _Requirements: 1.1, 1.2, 1.4, 1.5_
 
-- [ ] 3. Build core layout and navigation components
-  - [ ] 3.1 Create application layout structure
+- [x] 3. Build core layout and navigation components
+  - [x] 3.1 Create application layout structure
     - Build AppLayout component with sidebar and main content areas
     - Implement responsive design with mobile-first approach
     - Create Header component with user menu and actions
     - Add proper ARIA labels and keyboard navigation support
     - _Requirements: 5.1, 5.3, 7.1, 7.4_
 
-  - [ ] 3.2 Implement navigation sidebar
+  - [x] 3.2 Implement navigation sidebar
     - Build Sidebar component with collapsible functionality
     - Create navigation menu with active state highlighting
     - Implement user profile section with logout functionality
