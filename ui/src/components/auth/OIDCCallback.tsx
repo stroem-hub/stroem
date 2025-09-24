@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../hooks/useAuth';
+import { authService } from '../../services/authService';
 
 /**
  * Component to handle OIDC callback after successful authentication
@@ -8,22 +8,30 @@ import { useAuth } from '../../hooks/useAuth';
  */
 export const OIDCCallback: React.FC = () => {
   const navigate = useNavigate();
-  const { refreshToken } = useAuth();
 
   useEffect(() => {
     const handleCallback = async () => {
       try {
-        // The server should have set a refresh token cookie during the callback
-        // We need to exchange it for an access token
-        const success = await refreshToken();
-        
-        if (success) {
+        // Exchange the OIDC callback for tokens
+        const authResponse = await authService.exchangeOidcCallback();
+
+        if (authResponse && authResponse.token && authResponse.user) {
+          // Update auth context by dispatching SUCCESS action directly
+          const authEvent = new CustomEvent('auth:success', {
+            detail: { user: authResponse.user, token: authResponse.token }
+          });
+          window.dispatchEvent(authEvent);
+
           // Get the intended destination from session storage or default to dashboard
           const intendedPath = sessionStorage.getItem('auth_redirect') || '/dashboard';
           sessionStorage.removeItem('auth_redirect');
-          navigate(intendedPath, { replace: true });
+
+          // Small delay to ensure auth state is updated
+          setTimeout(() => {
+            navigate(intendedPath, { replace: true });
+          }, 100);
         } else {
-          // If refresh fails, redirect to login with error
+          // If exchange fails, redirect to login with error
           navigate('/login?error=callback_failed', { replace: true });
         }
       } catch (error) {
@@ -33,7 +41,7 @@ export const OIDCCallback: React.FC = () => {
     };
 
     handleCallback();
-  }, [navigate, refreshToken]);
+  }, [navigate]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">

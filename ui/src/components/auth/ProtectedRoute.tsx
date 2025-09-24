@@ -10,9 +10,9 @@ interface ProtectedRouteProps {
 /**
  * ProtectedRoute component that redirects to login if user is not authenticated
  */
-export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
-  children, 
-  fallback 
+export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
+  children,
+  fallback
 }) => {
   const { isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
@@ -34,10 +34,10 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   // Redirect to login if not authenticated
   if (!isAuthenticated) {
     return (
-      <Navigate 
-        to="/login" 
-        state={{ from: location }} 
-        replace 
+      <Navigate
+        to="/login"
+        state={{ from: location }}
+        replace
       />
     );
   }

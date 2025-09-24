@@ -127,10 +127,54 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           // Error parsing token, clear it
           tokenStorage.clearToken();
         }
+      } else {
+        // No token, but we might have a refresh token cookie from OIDC
+        try {
+          const { authService } = await import('../services/authService');
+          dispatch({ type: 'AUTH_START' });
+
+          // Try to exchange refresh token cookie for access token
+          const refreshResponse = await authService.refreshToken();
+
+          if (refreshResponse && refreshResponse.access_token) {
+            // Get user from the new token
+            const user = authService.getCurrentUserFromToken();
+            if (user) {
+              dispatch({ type: 'AUTH_SUCCESS', payload: { user, token: refreshResponse.access_token } });
+            } else {
+              // Fetch user info if not in token
+              const userInfo = await authService.getCurrentUser();
+              dispatch({ type: 'AUTH_SUCCESS', payload: { user: userInfo, token: refreshResponse.access_token } });
+            }
+          } else {
+            dispatch({ type: 'AUTH_FAILURE', payload: '' });
+          }
+        } catch {
+          dispatch({ type: 'AUTH_FAILURE', payload: '' });
+        }
       }
     };
 
     restoreAuth();
+
+    // Listen for auth success events (from OIDC callback)
+    const handleAuthSuccess = (event: Event) => {
+      const customEvent = event as CustomEvent<{ user: User; token: string }>;
+      if (customEvent.detail && customEvent.detail.user && customEvent.detail.token) {
+        dispatch({
+          type: 'AUTH_SUCCESS',
+          payload: {
+            user: customEvent.detail.user,
+            token: customEvent.detail.token
+          }
+        });
+      }
+    };
+
+    window.addEventListener('auth:success', handleAuthSuccess);
+    return () => {
+      window.removeEventListener('auth:success', handleAuthSuccess);
+    };
   }, []);
 
   // Auto-refresh token when it's about to expire

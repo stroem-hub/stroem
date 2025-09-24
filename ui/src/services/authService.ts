@@ -1,12 +1,12 @@
 import { apiClient } from './apiClient';
-import type { 
-  AuthProvidersResponse, 
-  LoginRequest, 
-  RefreshTokenRequest, 
+import type {
+  AuthProvidersResponse,
+  LoginRequest,
   RefreshTokenResponse
 } from './apiTypes';
 import type { User, AuthResponse } from '../types';
 import { tokenStorage } from '../utils/tokenStorage';
+import { buildApiUrl } from '../utils';
 
 /**
  * Authentication service for handling login, logout, and token management
@@ -75,6 +75,11 @@ export class AuthService {
         tokenStorage.setToken(authResponse.token, 3600);
       }
 
+      // Store refresh token if provided
+      if (responseData.refresh_token) {
+        tokenStorage.setRefreshToken(responseData.refresh_token);
+      }
+
       return authResponse;
     }
 
@@ -85,26 +90,31 @@ export class AuthService {
    * Refresh authentication token
    */
   async refreshToken(): Promise<RefreshTokenResponse | null> {
-    const refreshToken = tokenStorage.getRefreshToken();
-    if (!refreshToken) {
-      return null;
-    }
-
     try {
-      const request: RefreshTokenRequest = {
-        refresh_token: refreshToken,
-      };
+      // First try with stored refresh token
+      const refreshToken = tokenStorage.getRefreshToken();
 
-      const response = await apiClient.post<any>(
-        '/api/auth/refresh',
-        request,
-        { requiresAuth: false }
-      );
+      // If no stored refresh token, try with cookies (for OIDC)
+      const response = await fetch(buildApiUrl('/api/auth/refresh'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include', // Include cookies for OIDC
+        body: JSON.stringify(refreshToken ? { refresh_token: refreshToken } : {}),
+      });
+
+      if (!response.ok) {
+        tokenStorage.clearToken();
+        return null;
+      }
+
+      const data = await response.json();
 
       // Handle server's wrapped response format
-      let responseData = response;
-      if (response && response.success && response.data) {
-        responseData = response.data;
+      let responseData = data;
+      if (data && data.success && data.data) {
+        responseData = data.data;
       }
 
       // Update stored token
@@ -117,9 +127,16 @@ export class AuthService {
           // Default to 1 hour if no expiration in token
           tokenStorage.setToken(responseData.access_token, 3600);
         }
+
+        // Store new refresh token if provided
+        if (responseData.refresh_token) {
+          tokenStorage.setRefreshToken(responseData.refresh_token);
+        }
+
+        return responseData;
       }
 
-      return response;
+      return null;
     } catch {
       // Clear tokens if refresh fails
       tokenStorage.clearToken();
@@ -163,6 +180,102 @@ export class AuthService {
    */
   isAuthenticated(): boolean {
     return tokenStorage.hasValidToken();
+  }
+
+  /**
+   * Exchange OIDC callback for tokens using cookies set by server
+   */
+  async exchangeOidcCallback(): Promise<AuthResponse | null> {
+    try {
+      // The server sets HTTP-only cookies during the OIDC callback
+      // Use the refresh endpoint with credentials to get tokens
+      const response = await fetch(buildApiUrl('/api/auth/refresh'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include', // Include cookies
+        body: JSON.stringify({}), // Empty body, cookies contain the refresh token
+      });
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const data = await response.json();
+
+      // Handle server's wrapped response format
+      let responseData = data;
+      if (data && data.success && data.data) {
+        responseData = data.data;
+      }
+
+      if (responseData.access_token) {
+        // Store token first so getCurrentUserFromToken can work
+        const expiration = tokenStorage.getTokenExpiration(responseData.access_token);
+        if (expiration) {
+          const expiresIn = Math.floor((expiration - Date.now()) / 1000);
+          tokenStorage.setToken(responseData.access_token, expiresIn);
+        } else {
+          tokenStorage.setToken(responseData.access_token, 3600);
+        }
+
+        // Get user from the token or make a separate call
+        const user = this.getCurrentUserFromToken() || responseData.user;
+
+        if (!user) {
+          // If we can't get user from token, fetch it
+          const userResponse = await this.getCurrentUser();
+          if (userResponse) {
+            const authResponse: AuthResponse = {
+              token: responseData.access_token,
+              user: userResponse,
+            };
+
+            // Store token with expiration
+            const expiration = tokenStorage.getTokenExpiration(authResponse.token);
+            if (expiration) {
+              const expiresIn = Math.floor((expiration - Date.now()) / 1000);
+              tokenStorage.setToken(authResponse.token, expiresIn);
+            } else {
+              tokenStorage.setToken(authResponse.token, 3600);
+            }
+
+            // Store refresh token if provided
+            if (responseData.refresh_token) {
+              tokenStorage.setRefreshToken(responseData.refresh_token);
+            }
+
+            return authResponse;
+          }
+        } else {
+          const authResponse: AuthResponse = {
+            token: responseData.access_token,
+            user: user,
+          };
+
+          // Store token with expiration
+          const expiration = tokenStorage.getTokenExpiration(authResponse.token);
+          if (expiration) {
+            const expiresIn = Math.floor((expiration - Date.now()) / 1000);
+            tokenStorage.setToken(authResponse.token, expiresIn);
+          } else {
+            tokenStorage.setToken(authResponse.token, 3600);
+          }
+
+          // Store refresh token if provided
+          if (responseData.refresh_token) {
+            tokenStorage.setRefreshToken(responseData.refresh_token);
+          }
+
+          return authResponse;
+        }
+      }
+
+      return null;
+    } catch {
+      return null;
+    }
   }
 
   /**

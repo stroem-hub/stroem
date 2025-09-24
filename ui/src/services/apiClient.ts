@@ -157,6 +157,7 @@ class ApiClient {
         const requestInit: RequestInit = {
           method: config.method,
           headers,
+          credentials: 'include', // Include cookies for authentication
         };
 
         // Add body for non-GET requests
@@ -259,30 +260,48 @@ class ApiClient {
   private async refreshToken(): Promise<boolean> {
     try {
       const refreshToken = tokenStorage.getRefreshToken();
-      if (!refreshToken) {
-        return false;
-      }
 
+      // Try refresh with either stored token or cookies
       const response = await fetch(this.buildUrl('/api/auth/refresh'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ refresh_token: refreshToken }),
+        credentials: 'include', // Include cookies for OIDC
+        body: JSON.stringify(refreshToken ? { refresh_token: refreshToken } : {}),
       });
 
       if (!response.ok) {
+        tokenStorage.clearToken();
         return false;
       }
 
       const data = await response.json();
-      if (data.token) {
-        tokenStorage.setToken(data.token);
+
+      // Handle server's wrapped response format
+      let accessToken = null;
+      if (data.success && data.data) {
+        accessToken = data.data.access_token;
+      } else if (data.access_token) {
+        accessToken = data.access_token;
+      }
+
+      if (accessToken) {
+        // Extract expiration time from token or use default
+        const expiration = tokenStorage.getTokenExpiration(accessToken);
+        if (expiration) {
+          const expiresIn = Math.floor((expiration - Date.now()) / 1000);
+          tokenStorage.setToken(accessToken, expiresIn);
+        } else {
+          // Default to 1 hour if no expiration in token
+          tokenStorage.setToken(accessToken, 3600);
+        }
         return true;
       }
 
       return false;
     } catch {
+      tokenStorage.clearToken();
       return false;
     }
   }
