@@ -1,38 +1,64 @@
-# sv
+# Strøm UI
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+React-based user interface for the Strøm orchestration platform.
 
-## Creating a project
+## Technology Stack
 
-If you're seeing this, you've probably already done this step. Congrats!
+- **React 19.1.1** with TypeScript
+- **Vite** for build tooling
+- **TailwindCSS 4.1.13** for styling
+- **React Router 7.9.1** for navigation
+- **pnpm** for package management
 
-```bash
-# create a new project in the current directory
-npx sv create
-
-# create a new project in my-app
-npx sv create my-app
-```
-
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+## Development
 
 ```bash
-npm run dev
+# Install dependencies
+pnpm install
 
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
+# Start development server
+pnpm dev
+
+# Type checking
+pnpm type-check
+
+# Lint code
+pnpm lint
+
+# Format code
+pnpm format
 ```
 
-## Building
-
-To create a production version of your app:
+## Build
 
 ```bash
-npm run build
+# Build for production
+pnpm build
+
+# Preview production build
+pnpm preview
 ```
 
-You can preview the production build with `npm run preview`.
+## Project Structure
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+```
+src/
+├── components/          # Reusable UI components
+│   ├── ui/             # Basic UI primitives
+│   ├── layout/         # Layout components
+│   └── widgets/        # Dashboard widgets
+├── pages/              # Page components
+├── hooks/              # Custom React hooks
+├── services/           # API service layer
+├── contexts/           # React contexts
+├── types/              # TypeScript definitions
+├── utils/              # Utility functions
+└── styles/             # Global styles
+```
+
+## Environment Variables
+
+Copy `.env.example` to `.env` and configure:
+
+- `VITE_API_BASE_URL` - Backend API URL (default: http://localhost:8080)
+- `VITE_DEV_MODE` - Development mode flag

@@ -24,6 +24,54 @@
 		onRetry
 	}: JobExecutionMetricsWidgetProps = $props();
 
+	// Debug logging for received props
+	$effect(() => {
+		if (typeof window !== 'undefined') {
+			console.log('📊 JobExecutionMetricsWidget: Received props:', {
+				metrics,
+				loading,
+				error,
+				hasOnRetry: !!onRetry
+			});
+			
+			if (metrics) {
+				console.log('📊 JobExecutionMetricsWidget: metrics structure:', {
+					keys: Object.keys(metrics),
+					today: metrics.today,
+					status_distribution: metrics.status_distribution,
+					top_failing_workflows: metrics.top_failing_workflows,
+					average_execution_time: metrics.average_execution_time
+				});
+				
+				if (metrics.today) {
+					console.log('📊 JobExecutionMetricsWidget: today object:', {
+						keys: Object.keys(metrics.today),
+						total_jobs: metrics.today.total_jobs,
+						success_count: metrics.today.success_count,
+						failure_count: metrics.today.failure_count,
+						success_rate: metrics.today.success_rate
+					});
+				} else {
+					console.warn('📊 JobExecutionMetricsWidget: metrics.today is null/undefined');
+				}
+				
+				if (metrics.status_distribution) {
+					console.log('📊 JobExecutionMetricsWidget: status_distribution object:', {
+						keys: Object.keys(metrics.status_distribution),
+						running: metrics.status_distribution.running,
+						completed: metrics.status_distribution.completed,
+						failed: metrics.status_distribution.failed,
+						queued: metrics.status_distribution.queued
+					});
+				} else {
+					console.warn('📊 JobExecutionMetricsWidget: metrics.status_distribution is null/undefined');
+				}
+			} else {
+				console.log('📊 JobExecutionMetricsWidget: metrics is null/undefined');
+			}
+		}
+	});
+
 	// Helper function to format execution time
 	function formatExecutionTime(seconds?: number): string {
 		if (seconds == null || seconds === undefined) return 'N/A';

@@ -20,6 +20,37 @@
 		onTimeRangeChange
 	}: JobExecutionTrendsWidgetProps = $props();
 
+	// Debug logging for received props
+	$effect(() => {
+		if (typeof window !== 'undefined') {
+			console.log('📈 JobExecutionTrendsWidget: Received props:', {
+				trendsData,
+				loading,
+				error,
+				hasOnRetry: !!onRetry,
+				hasOnTimeRangeChange: !!onTimeRangeChange
+			});
+			
+			if (trendsData) {
+				console.log('📈 JobExecutionTrendsWidget: trendsData structure:', {
+					keys: Object.keys(trendsData),
+					time_series: trendsData.time_series,
+					time_range: trendsData.time_range
+				});
+				
+				if (trendsData.time_series) {
+					console.log('📈 JobExecutionTrendsWidget: time_series array:', {
+						isArray: Array.isArray(trendsData.time_series),
+						length: trendsData.time_series.length,
+						firstItem: trendsData.time_series[0]
+					});
+				}
+			} else {
+				console.log('📈 JobExecutionTrendsWidget: trendsData is null/undefined');
+			}
+		}
+	});
+
 	// Chart.js setup
 	Chart.register(...registerables);
 

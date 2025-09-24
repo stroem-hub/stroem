@@ -23,6 +23,53 @@
 		onRetry
 	}: RecentActivityWidgetProps = $props();
 
+	// Debug logging for received props
+	$effect(() => {
+		if (typeof window !== 'undefined') {
+			console.log('🔄 RecentActivityWidget: Received props:', {
+				recentActivity,
+				loading,
+				error,
+				hasOnRetry: !!onRetry
+			});
+			
+			if (recentActivity) {
+				console.log('🔄 RecentActivityWidget: recentActivity structure:', {
+					keys: Object.keys(recentActivity),
+					recent_jobs: recentActivity.recent_jobs,
+					alerts: recentActivity.alerts,
+					upcoming_jobs: recentActivity.upcoming_jobs
+				});
+				
+				if (recentActivity.recent_jobs) {
+					console.log('🔄 RecentActivityWidget: recent_jobs array:', {
+						isArray: Array.isArray(recentActivity.recent_jobs),
+						length: recentActivity.recent_jobs.length,
+						firstItem: recentActivity.recent_jobs[0]
+					});
+				}
+				
+				if (recentActivity.alerts) {
+					console.log('🔄 RecentActivityWidget: alerts array:', {
+						isArray: Array.isArray(recentActivity.alerts),
+						length: recentActivity.alerts.length,
+						firstItem: recentActivity.alerts[0]
+					});
+				}
+				
+				if (recentActivity.upcoming_jobs) {
+					console.log('🔄 RecentActivityWidget: upcoming_jobs array:', {
+						isArray: Array.isArray(recentActivity.upcoming_jobs),
+						length: recentActivity.upcoming_jobs.length,
+						firstItem: recentActivity.upcoming_jobs[0]
+					});
+				}
+			} else {
+				console.log('🔄 RecentActivityWidget: recentActivity is null/undefined');
+			}
+		}
+	});
+
 	// Helper function to get status display properties
 	function getStatusDisplay(status: ExecutionStatus) {
 		switch (status) {

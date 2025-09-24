@@ -50,16 +50,22 @@
 		systemStatusError = null;
 
 		try {
+			console.log('🏥 Dashboard: Loading system status...');
 			const response = await fetchSystemStatus();
 			if (response.success && response.data) {
 				systemStatus = response.data;
+				console.log('🏥 Dashboard: System status loaded successfully');
+				console.log('🏥 Dashboard: systemStatus variable set to:', systemStatus);
 			} else {
 				systemStatusError = response.error?.message || 'Failed to load system status';
+				console.error('🏥 Dashboard: System status load failed:', systemStatusError);
 			}
 		} catch (error) {
 			systemStatusError = error instanceof Error ? error.message : 'Unknown error occurred';
+			console.error('🏥 Dashboard: System status load exception:', error);
 		} finally {
 			systemStatusLoading = false;
+			console.log('🏥 Dashboard: System status loading complete. Loading:', systemStatusLoading, 'Error:', systemStatusError);
 		}
 	}
 
@@ -71,16 +77,22 @@
 		jobMetricsError = null;
 
 		try {
+			console.log('📊 Dashboard: Loading job metrics...');
 			const response = await fetchJobMetrics();
 			if (response.success && response.data) {
 				jobMetrics = response.data;
+				console.log('📊 Dashboard: Job metrics loaded successfully');
+				console.log('📊 Dashboard: jobMetrics variable set to:', jobMetrics);
 			} else {
 				jobMetricsError = response.error?.message || 'Failed to load job metrics';
+				console.error('📊 Dashboard: Job metrics load failed:', jobMetricsError);
 			}
 		} catch (error) {
 			jobMetricsError = error instanceof Error ? error.message : 'Unknown error occurred';
+			console.error('📊 Dashboard: Job metrics load exception:', error);
 		} finally {
 			jobMetricsLoading = false;
+			console.log('📊 Dashboard: Job metrics loading complete. Loading:', jobMetricsLoading, 'Error:', jobMetricsError);
 		}
 	}
 
@@ -92,16 +104,22 @@
 		recentActivityError = null;
 
 		try {
+			console.log('🔄 Dashboard: Loading recent activity...');
 			const response = await fetchRecentActivity();
 			if (response.success && response.data) {
 				recentActivity = response.data;
+				console.log('🔄 Dashboard: Recent activity loaded successfully');
+				console.log('🔄 Dashboard: recentActivity variable set to:', recentActivity);
 			} else {
 				recentActivityError = response.error?.message || 'Failed to load recent activity';
+				console.error('🔄 Dashboard: Recent activity load failed:', recentActivityError);
 			}
 		} catch (error) {
 			recentActivityError = error instanceof Error ? error.message : 'Unknown error occurred';
+			console.error('🔄 Dashboard: Recent activity load exception:', error);
 		} finally {
 			recentActivityLoading = false;
+			console.log('🔄 Dashboard: Recent activity loading complete. Loading:', recentActivityLoading, 'Error:', recentActivityError);
 		}
 	}
 
@@ -113,17 +131,23 @@
 		trendsError = null;
 
 		try {
+			console.log(`📈 Dashboard: Loading trends data for range: ${range}...`);
 			const response = await fetchJobTrends(range);
 			if (response.success && response.data) {
 				trendsData = response.data;
 				currentTrendsRange = range;
+				console.log('📈 Dashboard: Trends data loaded successfully');
+				console.log('📈 Dashboard: trendsData variable set to:', trendsData);
 			} else {
 				trendsError = response.error?.message || 'Failed to load trends data';
+				console.error('📈 Dashboard: Trends data load failed:', trendsError);
 			}
 		} catch (error) {
 			trendsError = error instanceof Error ? error.message : 'Unknown error occurred';
+			console.error('📈 Dashboard: Trends data load exception:', error);
 		} finally {
 			trendsLoading = false;
+			console.log('📈 Dashboard: Trends data loading complete. Loading:', trendsLoading, 'Error:', trendsError);
 		}
 	}
 
@@ -218,6 +242,9 @@
 		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
 			<!-- System Status Widget -->
 			<div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+				{#if typeof window !== 'undefined'}
+					{console.log('🏥 Dashboard: Passing to SystemStatusWidget:', { systemStatus, loading: systemStatusLoading, error: systemStatusError })}
+				{/if}
 				<SystemStatusWidget
 					{systemStatus}
 					loading={systemStatusLoading}
@@ -228,6 +255,9 @@
 
 			<!-- Job Execution Metrics Widget -->
 			<div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+				{#if typeof window !== 'undefined'}
+					{console.log('📊 Dashboard: Passing to JobExecutionMetricsWidget:', { metrics: jobMetrics, loading: jobMetricsLoading, error: jobMetricsError })}
+				{/if}
 				<JobExecutionMetricsWidget
 					metrics={jobMetrics}
 					loading={jobMetricsLoading}
@@ -242,6 +272,9 @@
 			<!-- Recent Activity Widget (takes 1 column) -->
 			<div class="xl:col-span-1">
 				<div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 h-full">
+					{#if typeof window !== 'undefined'}
+						{console.log('🔄 Dashboard: Passing to RecentActivityWidget:', { recentActivity, loading: recentActivityLoading, error: recentActivityError })}
+					{/if}
 					<RecentActivityWidget
 						{recentActivity}
 						loading={recentActivityLoading}
@@ -254,6 +287,9 @@
 			<!-- Job Execution Trends Widget (takes 2 columns) -->
 			<div class="xl:col-span-2">
 				<div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 h-full">
+					{#if typeof window !== 'undefined'}
+						{console.log('📈 Dashboard: Passing to JobExecutionTrendsWidget:', { trendsData, loading: trendsLoading, error: trendsError })}
+					{/if}
 					<JobExecutionTrendsWidget
 						{trendsData}
 						loading={trendsLoading}

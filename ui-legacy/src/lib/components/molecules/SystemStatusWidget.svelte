@@ -24,6 +24,32 @@
 		onRetry
 	}: SystemStatusWidgetProps = $props();
 
+	// Debug logging for received props
+	$effect(() => {
+		if (typeof window !== 'undefined') {
+			console.log('🏥 SystemStatusWidget: Received props:', {
+				systemStatus,
+				loading,
+				error,
+				hasOnRetry: !!onRetry
+			});
+			
+			if (systemStatus) {
+				console.log('🏥 SystemStatusWidget: systemStatus structure:', {
+					keys: Object.keys(systemStatus),
+					active_workers: systemStatus.active_workers,
+					idle_workers: systemStatus.idle_workers,
+					total_jobs_today: systemStatus.total_jobs_today,
+					system_uptime: systemStatus.system_uptime,
+					average_execution_time_24h: systemStatus.average_execution_time_24h,
+					alerts: systemStatus.alerts
+				});
+			} else {
+				console.log('🏥 SystemStatusWidget: systemStatus is null/undefined');
+			}
+		}
+	});
+
 	// Helper function to format uptime from ISO 8601 duration
 	function formatUptime(uptimeDuration?: string): string {
 		if (!uptimeDuration) return 'Unknown';
