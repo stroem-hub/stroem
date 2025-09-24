@@ -1,7 +1,7 @@
 // Export all services
 export { apiClient, ApiClient } from './apiClient';
 export { authService, AuthService } from './authService';
-export { dashboardService, DashboardService } from './dashboardService';
+export { dashboardService, DashboardService, type DashboardServiceConfig } from './dashboardService';
 export { taskService, TaskService } from './taskService';
 export { jobService, JobService } from './jobService';
 
