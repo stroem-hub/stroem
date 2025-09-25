@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { DashboardService } from '../dashboardService';
 import { apiClient } from '../apiClient';
-import type { SystemStatus, JobExecutionMetrics, RecentActivity, JobTrendsData } from '../../types';
+import type { SystemStatus } from '../../types';
 
 // Mock the API client
 vi.mock('../apiClient', () => ({
@@ -174,7 +174,7 @@ describe('DashboardService', () => {
       expect(result.jobMetrics).toBeNull();
       expect(result.recentActivity).toEqual(mockData.recentActivity);
       expect(result.jobTrends).toEqual(mockData.jobTrends);
-      expect(result.errors.jobMetrics).toEqual(error);
+      expect(result.errors['jobMetrics']).toEqual(error);
     });
   });
 

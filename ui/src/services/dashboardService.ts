@@ -92,12 +92,7 @@ export class DashboardService {
     });
   }
 
-  /**
-   * Clear cache entry
-   */
-  private clearCache(key: string): void {
-    this.cache.delete(key);
-  }
+
 
   /**
    * Clear all cache entries
@@ -234,7 +229,7 @@ export class DashboardService {
     params: JobTrendsParams = {},
     options: { skipCache?: boolean } = {}
   ): Promise<JobTrendsData> {
-    const cacheKey = this.getCacheKey('/api/dashboard/job-trends', params);
+    const cacheKey = this.getCacheKey('/api/dashboard/job-trends', params as Record<string, unknown>);
     
     return this.executeWithRetryAndCache(
       cacheKey,

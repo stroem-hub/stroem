@@ -24,8 +24,8 @@ export async function basicDashboardUsage() {
       console.log('System Status loaded successfully');
     }
     
-    if (allData.errors.systemStatus) {
-      console.error('Failed to load system status:', allData.errors.systemStatus);
+    if (allData.errors['systemStatus']) {
+      console.error('Failed to load system status:', allData.errors['systemStatus']);
     }
 
   } catch (error) {
@@ -105,12 +105,12 @@ export async function handleDashboardErrors() {
     }
     
     // Handle specific errors
-    if (dataGraceful.errors.systemStatus) {
+    if (dataGraceful.errors['systemStatus']) {
       console.warn('System status failed, using fallback');
       // Implement fallback logic
     }
     
-    if (dataGraceful.errors.jobMetrics) {
+    if (dataGraceful.errors['jobMetrics']) {
       console.warn('Job metrics failed, showing cached data');
       // Show cached or default data
     }

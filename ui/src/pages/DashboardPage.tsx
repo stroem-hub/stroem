@@ -1,5 +1,7 @@
 import React from 'react';
 import { useAuth } from '../hooks/useAuth';
+import { SystemStatusWidget, JobMetricsWidget, RecentActivityWidget, JobTrendsWidget } from '../components/widgets';
+import type { AppError } from '../types';
 
 export const DashboardPage: React.FC = () => {
   const { user, logout } = useAuth();
@@ -10,6 +12,16 @@ export const DashboardPage: React.FC = () => {
     } catch (error) {
       console.error('Logout error:', error);
     }
+  };
+
+  const handleWidgetError = (error: AppError) => {
+    console.error('Widget error:', error);
+    // In a real app, you might show a toast notification
+  };
+
+  const handleWorkflowClick = (workflowName: string) => {
+    console.log('Navigate to workflow:', workflowName);
+    // In a real app, you would navigate to the workflow details page
   };
 
   return (
@@ -37,14 +49,46 @@ export const DashboardPage: React.FC = () => {
 
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
+          {/* Dashboard Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
+            {/* System Status Widget */}
+            <div className="lg:col-span-1">
+              <SystemStatusWidget onError={handleWidgetError} />
+            </div>
+            
+            {/* Job Metrics Widget */}
+            <div className="lg:col-span-1">
+              <JobMetricsWidget 
+                onError={handleWidgetError}
+                onWorkflowClick={handleWorkflowClick}
+                refreshInterval={60000} // Refresh every minute
+              />
+            </div>
+            
+            {/* Recent Activity Widget */}
+            <div className="lg:col-span-1 xl:col-span-1">
+              <RecentActivityWidget 
+                refreshInterval={30000} // Refresh every 30 seconds
+                maxItems={8}
+              />
+            </div>
+          </div>
+
+          {/* Job Trends Widget - Full Width */}
+          <div className="mb-8">
+            <JobTrendsWidget 
+              refreshInterval={60000} // Refresh every minute
+              defaultRange="24h"
+              showSuccessFailure={true}
+            />
+          </div>
+
+          {/* Authentication Status */}
           <div className="border-4 border-dashed border-gray-200 rounded-lg p-8">
             <div className="text-center">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                Dashboard Content
+                Authentication Status
               </h2>
-              <p className="text-gray-600 mb-6">
-                This is a placeholder for the dashboard content. The authentication system is working!
-              </p>
               
               <div className="bg-green-50 border border-green-200 rounded-md p-4 max-w-md mx-auto">
                 <div className="flex">

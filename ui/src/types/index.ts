@@ -119,6 +119,19 @@ export interface JobTrendsData {
 
 export type TimeRange = '1h' | '6h' | '24h' | '7d' | '30d';
 
+// Chart types
+export interface ChartDataPoint {
+  label: string;
+  value: number;
+  color?: string;
+}
+
+export interface TimeSeriesDataPoint {
+  timestamp: string;
+  value: number;
+  label?: string;
+}
+
 // API Error types
 export interface ApiError {
   message: string;

@@ -69,21 +69,21 @@
     - Implement data caching with appropriate TTL values
     - _Requirements: 2.1, 2.2, 2.5, 6.1, 6.2_
 
-  - [ ] 5.2 Build system status widget
+  - [x] 5.2 Build system status widget
     - Create SystemStatusWidget component displaying worker counts and uptime
     - Implement real-time data updates with automatic refresh
     - Add error states and retry functionality
     - Include alert display for system notifications
     - _Requirements: 2.1, 2.2, 2.5_
 
-  - [ ] 5.3 Create job metrics widget
+  - [x] 5.3 Create job metrics widget
     - Build JobMetricsWidget showing execution statistics and success rates
     - Implement status distribution visualization with charts
     - Add today's metrics display with proper formatting
     - Include top failing workflows list with navigation links
     - _Requirements: 2.1, 2.2, 2.5_
 
-  - [ ] 5.4 Build recent activity and trends widgets
+  - [x] 5.4 Build recent activity and trends widgets
     - Create RecentActivityWidget displaying recent jobs and alerts
     - Implement JobTrendsWidget with interactive time range selection
     - Add chart visualization for job execution trends over time
