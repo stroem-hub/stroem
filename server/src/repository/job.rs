@@ -44,7 +44,8 @@ pub struct Job {
 pub struct TaskStatistics {
     pub task_name: String,
     pub total_executions: i64,
-    pub success_rate: f64, // 0-100
+    pub success_count: i64,
+    pub failure_count: i64,
     pub last_execution: Option<LastExecution>,
     pub average_duration: Option<f64>, // in seconds
 }
@@ -420,7 +421,8 @@ impl JobRepository {
             "SELECT 
                 task_name,
                 COUNT(*) as total_executions,
-                COALESCE(AVG(CASE WHEN success = true THEN 1.0 ELSE 0.0 END) * 100, 0)::FLOAT8 as success_rate,
+                COUNT(CASE WHEN success = true THEN 1 END) as success_count,
+                COUNT(CASE WHEN success = false THEN 1 END) as failure_count,
                 AVG(CASE 
                     WHEN start_datetime IS NOT NULL AND end_datetime IS NOT NULL 
                     THEN EXTRACT(EPOCH FROM (end_datetime - start_datetime))
@@ -440,7 +442,8 @@ impl JobRepository {
 
         if let Some(row) = stats_row {
             let total_executions: i64 = row.try_get("total_executions")?;
-            let success_rate: f64 = row.try_get("success_rate")?;
+            let success_count: i64 = row.try_get("success_count")?;
+            let failure_count: i64 = row.try_get("failure_count")?;
             let average_duration: Option<f64> = row.try_get("average_duration")?;
 
             // Get the last execution details
@@ -491,7 +494,8 @@ impl JobRepository {
             Ok(Some(TaskStatistics {
                 task_name: task_name.to_string(),
                 total_executions,
-                success_rate,
+                success_count,
+                failure_count,
                 last_execution,
                 average_duration,
             }))
@@ -500,7 +504,8 @@ impl JobRepository {
             Ok(Some(TaskStatistics {
                 task_name: task_name.to_string(),
                 total_executions: 0,
-                success_rate: 0.0,
+                success_count: 0,
+                failure_count: 0,
                 last_execution: None,
                 average_duration: None,
             }))
@@ -1044,14 +1049,16 @@ mod tests {
         let stats = TaskStatistics {
             task_name: "test-task".to_string(),
             total_executions: 10,
-            success_rate: 85.0,
+            success_count: 8,
+            failure_count: 2,
             last_execution: Some(last_execution),
             average_duration: Some(95.2),
         };
 
         assert_eq!(stats.task_name, "test-task");
         assert_eq!(stats.total_executions, 10);
-        assert_eq!(stats.success_rate, 85.0);
+        assert_eq!(stats.success_count, 8);
+        assert_eq!(stats.failure_count, 2);
         assert!(stats.last_execution.is_some());
         assert_eq!(stats.average_duration, Some(95.2));
     }
@@ -1076,7 +1083,8 @@ mod tests {
         let stats = TaskStatistics {
             task_name: "serialize-test".to_string(),
             total_executions: 5,
-            success_rate: 100.0,
+            success_count: 5,
+            failure_count: 0,
             last_execution: None,
             average_duration: Some(45.0),
         };

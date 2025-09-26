@@ -11,8 +11,7 @@ import type {
   SystemStatus, 
   JobExecutionMetrics, 
   RecentActivity, 
-  JobTrendsData,
-  PaginatedResponse 
+  JobTrendsData
 } from '../types';
 
 // Authentication API responses
@@ -50,13 +49,35 @@ export interface UserInfoResponse {
 }
 
 // Task API responses
-export interface TasksResponse extends PaginatedResponse<Task> {}
+export interface TasksResponse {
+  success: boolean;
+  data: Task[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    total_pages: number;
+    has_next: boolean;
+    has_prev: boolean;
+  };
+}
 
 export interface TaskResponse {
   task: Task;
 }
 
-export interface TaskJobsResponse extends PaginatedResponse<Job> {}
+export interface TaskJobsResponse {
+  success: boolean;
+  data: Job[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    total_pages: number;
+    has_next: boolean;
+    has_prev: boolean;
+  };
+}
 
 export interface TaskExecutionRequest {
   task_id: string;
@@ -114,7 +135,7 @@ export interface TaskListParams {
   page?: number;
   limit?: number;
   search?: string;
-  sort_by?: 'name' | 'created_at' | 'last_execution';
+  sort_by?: 'name' | 'total_executions' | 'success_rate' | 'average_duration' | 'created_at' | 'last_execution';
   sort_order?: 'asc' | 'desc';
 }
 

@@ -91,21 +91,21 @@
     - _Requirements: 2.1, 2.2, 2.5_
 
 - [ ] 6. Create tasks management interface
-  - [ ] 6.1 Implement tasks service layer
+  - [x] 6.1 Implement tasks service layer
     - Create tasks API service with pagination and filtering support
     - Implement task execution service for manual job triggering
     - Add TypeScript interfaces for task data structures
     - Include error handling for task operations
     - _Requirements: 3.1, 3.2, 3.4, 6.1, 6.2_
 
-  - [ ] 6.2 Build tasks listing page
+  - [x] 6.2 Build tasks listing page
     - Create TasksPage component with search and filtering capabilities
     - Implement pagination controls with proper navigation
     - Build TaskCard component displaying task information and statistics
     - Add sorting functionality for task list
     - _Requirements: 3.1, 3.2, 5.1, 5.2_
 
-  - [ ] 6.3 Create task detail view
+  - [x] 6.3 Create task detail view
     - Build TaskDetail component showing comprehensive task information
     - Implement task execution button with confirmation dialog
     - Add task statistics display with execution history

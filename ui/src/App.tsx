@@ -3,7 +3,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { OIDCCallback } from './components/auth/OIDCCallback';
 import { AppLayout } from './components/layout';
-import { LoginPage, DashboardPage, TasksPage, JobsPage } from './pages';
+import { LoginPage, DashboardPage, TasksPage, TaskDetailPage, JobsPage } from './pages';
 
 function App() {
   return (
@@ -32,6 +32,17 @@ function App() {
               <ProtectedRoute>
                 <AppLayout>
                   <TasksPage />
+                </AppLayout>
+              </ProtectedRoute>
+            } 
+          />
+          
+          <Route 
+            path="/tasks/:taskId" 
+            element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <TaskDetailPage />
                 </AppLayout>
               </ProtectedRoute>
             } 

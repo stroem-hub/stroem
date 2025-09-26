@@ -11,3 +11,4 @@ export { Badge, StatusBadge, PriorityBadge, type BadgeProps, type BadgeVariant, 
 export { Modal, ConfirmModal, type ModalProps, type ConfirmModalProps } from './Modal';
 export { Tooltip, SimpleTooltip, RichTooltip, type TooltipProps, type SimpleTooltipProps, type RichTooltipProps, type TooltipPlacement } from './Tooltip';
 export { LineChart, BarChart, DonutChart, AreaChart, type LineChartProps, type BarChartProps, type DonutChartProps, type AreaChartProps, type ChartDataPoint, type TimeSeriesDataPoint } from './Chart';
+export { Pagination, type PaginationProps } from './Pagination';

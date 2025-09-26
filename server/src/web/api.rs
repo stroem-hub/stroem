@@ -92,7 +92,8 @@ pub struct PaginatedTasksResponse {
 #[derive(Debug, Serialize)]
 pub struct EnhancedTaskStatistics {
     pub total_executions: i64,
-    pub success_rate: f64,
+    pub success_count: i64,
+    pub failure_count: i64,
     pub last_execution: Option<LastExecutionInfo>,
     pub average_duration: Option<f64>,
 }
@@ -234,7 +235,8 @@ async fn get_tasks(
                 if let Some(stats) = stats_map.get(task_name) {
                     let enhanced_stats = EnhancedTaskStatistics {
                         total_executions: stats.total_executions,
-                        success_rate: stats.success_rate,
+                        success_count: stats.success_count,
+                        failure_count: stats.failure_count,
                         last_execution: stats.last_execution.as_ref().map(|le| {
                             // Map API status values to frontend expected values
                             let frontend_status = match le.status.as_str() {
@@ -259,7 +261,8 @@ async fn get_tasks(
                     // Task has no execution history
                     let empty_stats = EnhancedTaskStatistics {
                         total_executions: 0,
-                        success_rate: 0.0,
+                        success_count: 0,
+                        failure_count: 0,
                         last_execution: None,
                         average_duration: None,
                     };
@@ -316,16 +319,17 @@ async fn get_tasks(
                     a_timestamp.cmp(b_timestamp)
                 }
                 "successRate" => {
-                    let a_rate = a
-                        .get("statistics")
-                        .and_then(|s| s.get("success_rate"))
-                        .and_then(|r| r.as_f64())
-                        .unwrap_or(0.0);
-                    let b_rate = b
-                        .get("statistics")
-                        .and_then(|s| s.get("success_rate"))
-                        .and_then(|r| r.as_f64())
-                        .unwrap_or(0.0);
+                    // Calculate success rate from counts
+                    let a_stats = a.get("statistics");
+                    let a_total = a_stats.and_then(|s| s.get("total_executions")).and_then(|t| t.as_i64()).unwrap_or(0);
+                    let a_success = a_stats.and_then(|s| s.get("success_count")).and_then(|c| c.as_i64()).unwrap_or(0);
+                    let a_rate = if a_total > 0 { (a_success as f64 / a_total as f64) * 100.0 } else { 0.0 };
+                    
+                    let b_stats = b.get("statistics");
+                    let b_total = b_stats.and_then(|s| s.get("total_executions")).and_then(|t| t.as_i64()).unwrap_or(0);
+                    let b_success = b_stats.and_then(|s| s.get("success_count")).and_then(|c| c.as_i64()).unwrap_or(0);
+                    let b_rate = if b_total > 0 { (b_success as f64 / b_total as f64) * 100.0 } else { 0.0 };
+                    
                     a_rate
                         .partial_cmp(&b_rate)
                         .unwrap_or(std::cmp::Ordering::Equal)
@@ -410,7 +414,8 @@ async fn get_task(
         Ok(Some(stats)) => {
             let enhanced_stats = EnhancedTaskStatistics {
                 total_executions: stats.total_executions,
-                success_rate: stats.success_rate,
+                success_count: stats.success_count,
+                failure_count: stats.failure_count,
                 last_execution: stats.last_execution.as_ref().map(|le| {
                     // Map API status values to frontend expected values
                     let frontend_status = match le.status.as_str() {
@@ -436,7 +441,8 @@ async fn get_task(
             // Task has no execution history
             let empty_stats = EnhancedTaskStatistics {
                 total_executions: 0,
-                success_rate: 0.0,
+                success_count: 0,
+                failure_count: 0,
                 last_execution: None,
                 average_duration: None,
             };
@@ -447,7 +453,8 @@ async fn get_task(
             warn!("Failed to get statistics for task {}: {}", task_id, e);
             let empty_stats = EnhancedTaskStatistics {
                 total_executions: 0,
-                success_rate: 0.0,
+                success_count: 0,
+                failure_count: 0,
                 last_execution: None,
                 average_duration: None,
             };
@@ -841,7 +848,8 @@ mod tests {
     fn test_enhanced_task_statistics_serialization() {
         let stats = EnhancedTaskStatistics {
             total_executions: 100,
-            success_rate: 95.5,
+            success_count: 95,
+            failure_count: 5,
             last_execution: Some(LastExecutionInfo {
                 timestamp: "2024-01-15T10:30:00Z".to_string(),
                 status: "completed".to_string(),
@@ -856,7 +864,7 @@ mod tests {
 
         let json_str = json_result.unwrap();
         assert!(json_str.contains("100"));
-        assert!(json_str.contains("95.5"));
+        assert!(json_str.contains("95"));
         assert!(json_str.contains("scheduler:daily"));
     }
 

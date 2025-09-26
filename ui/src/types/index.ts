@@ -12,6 +12,20 @@ export interface PaginatedResponse<T> {
   limit: number;
 }
 
+// Actual API response structure from the server
+export interface ApiPaginatedResponse<T> {
+  success: boolean;
+  data: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    total_pages: number;
+    has_next: boolean;
+    has_prev: boolean;
+  };
+}
+
 // User and Authentication types
 export interface User {
   user_id: string;
@@ -33,9 +47,30 @@ export interface LoginCredentials {
 // Task types
 export interface Task {
   id: string;
-  name: string;
-  description?: string;
+  name: string | null;
+  description?: string | null;
+  input?: Record<string, TaskInputField>;
+  flow?: Record<string, TaskStep>;
   statistics: TaskStatistics;
+}
+
+export interface TaskInputField {
+  id: string;
+  required: boolean;
+  description: string;
+  order: number | null;
+  type: string;
+  default: string | null;
+}
+
+export interface TaskStep {
+  id: string;
+  name: string | null;
+  action: string;
+  input: Record<string, any>;
+  depends_on: string[] | null;
+  continue_on_fail: boolean | null;
+  on_error: string | null;
 }
 
 export interface TaskStatistics {
@@ -43,6 +78,12 @@ export interface TaskStatistics {
   success_count: number;
   failure_count: number;
   average_duration: number;
+  last_execution?: {
+    timestamp: string;
+    status: string;
+    triggered_by: string;
+    duration: number;
+  };
 }
 
 // Job types
